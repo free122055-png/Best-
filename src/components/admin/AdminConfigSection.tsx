@@ -331,6 +331,9 @@ export function AdminConfigSection(props: any) {
     setCfgUpdateTitle,
     cfgUpdateDescription,
     setCfgUpdateDescription,
+    cfgEmailMigrationPopupEnabled,
+    setCfgEmailMigrationPopupEnabled,
+    handleToggleEmailMigrationPopup,
     cfgServiceStatus,
     setCfgServiceStatus,
     cfgBannerHeightType,
@@ -1308,6 +1311,53 @@ export function AdminConfigSection(props: any) {
                           </div>
                         </div>
                       )}
+                    </div>
+
+                    {/* 3. Old Account Email Migration & Recovery Popup Switch */}
+                    <div className="space-y-4 md:col-span-2 pt-4 border-t border-slate-800/80">
+                      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-4 bg-gradient-to-r from-cyan-950/80 via-slate-900 to-cyan-950/80 border border-cyan-600/60 rounded-2xl shadow-sm text-left">
+                        <div className="flex items-start gap-3">
+                          <div className="w-10 h-10 rounded-xl bg-cyan-500/20 text-cyan-300 flex items-center justify-center shrink-0 border border-cyan-500/40 text-lg">
+                            🔄
+                          </div>
+                          <div className="space-y-1">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="text-xs sm:text-sm font-bold text-white">পুরানো একাউন্ট ইমেইল লিঙ্ক পপ-আপ (Legacy Account Email Link Popup)</span>
+                              <span className={`text-[9.5px] font-black px-2 py-0.5 rounded-full border ${
+                                cfgEmailMigrationPopupEnabled 
+                                  ? 'bg-cyan-500/25 text-cyan-300 border-cyan-400' 
+                                  : 'bg-slate-800 text-slate-400 border-slate-700'
+                              }`}>
+                                {cfgEmailMigrationPopupEnabled ? '🟢 চালু (ACTIVE)' : '⚪ বন্ধ (OFF)'}
+                              </span>
+                            </div>
+                            <p className="text-[11px] text-slate-300 leading-relaxed max-w-2xl">
+                              এই সুইচটি <b>চালু (ON)</b> রাখলে সাধারণ ইউজার অ্যাপে প্রবেশের সাথে সাথে একটি পপ-আপ আসবে যেখানে পূর্বে ফোন নম্বর দিয়ে খোলা একাউন্টে নতুন ইমেইল লিঙ্ক করা যাবে। ইমেইল লিঙ্ক হওয়ার পর তারা সরাসরি ঐ নতুন ইমেইল দিয়ে সমস্ত পুরানো ডাটাবেজ সহ লগইন করতে পারবে। সমস্ত ইউজারদের ইমেইল সেট সম্পন্ন হলে এটি <b>বন্ধ (OFF)</b> করে দিতে পারবেন।
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-3 shrink-0 self-end sm:self-center">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (typeof handleToggleEmailMigrationPopup === 'function') {
+                                handleToggleEmailMigrationPopup();
+                              } else {
+                                setCfgEmailMigrationPopupEnabled(!cfgEmailMigrationPopupEnabled);
+                              }
+                            }}
+                            className={`w-12 h-6.5 flex items-center rounded-full p-0.5 transition-colors duration-200 cursor-pointer select-none shrink-0 ${
+                              cfgEmailMigrationPopupEnabled ? 'bg-cyan-500' : 'bg-slate-700'
+                            }`}
+                            title="ক্লিক করে চালু বা বন্ধ করুন"
+                          >
+                            <div className={`bg-white w-5.5 h-5.5 rounded-full shadow-md transform transition-transform duration-200 ${
+                              cfgEmailMigrationPopupEnabled ? 'translate-x-5.5' : 'translate-x-0'
+                            }`} />
+                          </button>
+                        </div>
+                      </div>
                     </div>
 
                   </div>

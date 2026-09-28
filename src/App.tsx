@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { ensureAuth, db, handleFirestoreError, OperationType, auth } from './lib/firebase';
 import { signOut } from 'firebase/auth';
 import { doc, getDoc, collection, query, where, getDocs, updateDoc, setDoc, limit, onSnapshot, increment, serverTimestamp, writeBatch, runTransaction } from 'firebase/firestore';
@@ -6,7 +6,7 @@ import { User, AppConfig, getEffectiveBalance } from './types';
 import { processUserSamitySavingsAutoDeduction, getUnpaidSamityMonths } from './lib/samitySavingsEngine';
 import { loadAppConfig, DEFAULT_CONFIG } from './lib/config';
 import { executeHistoryRetentionCleanup } from './lib/retentionCleanup';
-import { normalizeMemberId, findUserInFirestoreByPhone, convertBengaliToEnglishDigits, getClientDeviceId, getDeviceFingerprint, isSameDevice, getNextSequentialMemberId, getDeviceBoundUser } from './lib/memberUtils';
+import { normalizeMemberId, findUserInFirestoreByPhone, convertBengaliToEnglishDigits, getClientDeviceId, getDeviceFingerprint, isSameDevice, getNextSequentialMemberId, getDeviceBoundUser, saveUserToLocalBackup } from './lib/memberUtils';
 import { restoreAndSeedDatabase } from './lib/databaseSeeder';
 import LoginScreen from './components/LoginScreen';
 import LockScreen from './components/LockScreen';
@@ -51,8 +51,17 @@ if (typeof window !== 'undefined') {
 
 export default function App() {
   const [currentUser, setCurrentUser] = useState<User | null>(() => {
-    const rememberedPhone = localStorage.getItem('amb_user_phone');
     const rememberedUid = localStorage.getItem('amb_user_uid');
+    const lastUserRaw = localStorage.getItem('amb_last_user');
+    if (rememberedUid && lastUserRaw) {
+      try {
+        const parsed = JSON.parse(lastUserRaw);
+        if (parsed && (parsed.uid === rememberedUid || !parsed.uid)) {
+          return { ...parsed, uid: rememberedUid };
+        }
+      } catch (e) {}
+    }
+    const rememberedPhone = localStorage.getItem('amb_user_phone');
     if (rememberedPhone && rememberedUid) {
       return {
         uid: rememberedUid,
@@ -84,7 +93,26 @@ export default function App() {
   const [showSetLockModal, setShowSetLockModal] = useState(false);
   const [authUid, setAuthUid] = useState<string>('');
   const [loading, setLoading] = useState(false);
-  const [showSplash, setShowSplash] = useState(true);
+  const [showSplash, setShowSplash] = useState(() => {
+    try {
+      if (typeof window !== 'undefined') {
+        const alreadyShown = sessionStorage.getItem('amb_splash_shown');
+        if (alreadyShown === 'true') {
+          return false;
+        }
+      }
+    } catch (e) {}
+    return true;
+  });
+
+  const handleSplashFinish = useCallback(() => {
+    setShowSplash(false);
+    try {
+      if (typeof window !== 'undefined') {
+        sessionStorage.setItem('amb_splash_shown', 'true');
+      }
+    } catch (e) {}
+  }, []);
   const [appConfig, setAppConfig] = useState<AppConfig>(() => {
     try {
       const cached = localStorage.getItem('amb_app_config');
@@ -390,8 +418,9 @@ export default function App() {
     localStorage.setItem('amb_dark_mode', String(nextVal));
   };
 
-  // Layout states
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const handleOpenDrawer = useCallback(() => setDrawerOpen(true), []);
+  const handleCloseDrawer = useCallback(() => setDrawerOpen(false), []);
   const [adminOpen, setAdminOpen] = useState(false);
   const [showAdminPinModal, setShowAdminPinModal] = useState(false);
   const [adminPinInput, setAdminPinInput] = useState('');
@@ -1084,28 +1113,28 @@ export default function App() {
     }
   }, [currentUser]);
 
-  const handleLoginSuccess = async (userData: User) => {
-    const finalUserData = await autoPromoteAndReturnUser(userData);
-    setCurrentUser(finalUserData);
+  const handleLoginSuccess = (userData: User) => {
+    // 1. Immediately switch screen in 0ms
+    setCurrentUser(userData);
     setPreferRegister(false);
-    localStorage.setItem('amb_user_phone', finalUserData.phone);
-    localStorage.setItem('amb_user_uid', finalUserData.uid);
-    if (finalUserData.pin) {
-      localStorage.setItem('amb_user_pin', String(finalUserData.pin));
+    localStorage.setItem('amb_user_phone', userData.phone || '');
+    localStorage.setItem('amb_user_uid', userData.uid);
+    if (userData.pin) {
+      localStorage.setItem('amb_user_pin', String(userData.pin));
     }
+    saveUserToLocalBackup(userData);
 
-    const isAuthorized = isSameDevice(finalUserData.currentDeviceId, finalUserData.deviceFingerprint, deviceId, deviceFingerprint, finalUserData.activeDeviceTokens);
     const isLockedToOther = false;
 
     if (!isLockedToOther) {
-      if (finalUserData.isAppLocked) {
+      if (userData.isAppLocked) {
         setIsLocked(true);
       } else {
         setIsLocked(false);
       }
-      const cleanPhone = finalUserData.phone?.replace(/\D/g, '') || '';
-      const isAdminAccount = (finalUserData.role === 'admin' || finalUserData.uid === 'admin_master') && 
-                             (cleanPhone.endsWith('00011112222') || cleanPhone.endsWith('11112222') || finalUserData.uid === 'admin_master');
+      const cleanPhone = userData.phone?.replace(/\D/g, '') || '';
+      const isAdminAccount = (userData.role === 'admin' || userData.uid === 'admin_master') && 
+                             (cleanPhone.endsWith('00011112222') || cleanPhone.endsWith('11112222') || userData.uid === 'admin_master');
       if (isAdminAccount) {
         localStorage.setItem('amb_admin_mode', 'true');
         setAdminOpen(true);
@@ -1117,6 +1146,12 @@ export default function App() {
       setIsLocked(false);
       setShowLocationModal(false);
     }
+
+    // 2. Run autoPromote in the background asynchronously without blocking UI render
+    autoPromoteAndReturnUser(userData).then(finalUserData => {
+      setCurrentUser(finalUserData);
+      saveUserToLocalBackup(finalUserData);
+    }).catch(err => console.warn('Background autoPromote error:', err));
   };
 
   const [isMandatoryLockOnLogout, setIsMandatoryLockOnLogout] = useState(false);
@@ -1273,7 +1308,7 @@ export default function App() {
   );
 
   if (showSplash) {
-    return <CleanSplash onFinish={() => setShowSplash(false)} />;
+    return <CleanSplash onFinish={handleSplashFinish} />;
   }
 
   return (
@@ -1355,7 +1390,7 @@ export default function App() {
               <Dashboard 
                 user={currentUser} 
                 onLogout={handleLogout} 
-                onOpenDrawer={() => setDrawerOpen(true)}
+                onOpenDrawer={handleOpenDrawer}
                 onTriggerAdmin={handleOpenAdmin}
                 onTriggerBap={() => {}}
                 activeTab={activeTab}
@@ -1373,7 +1408,7 @@ export default function App() {
               {/* Slide drawer menu overlay */}
               <DrawerMenu 
                 isOpen={drawerOpen}
-                onClose={() => setDrawerOpen(false)}
+                onClose={handleCloseDrawer}
                 user={currentUser}
                 onLogout={handleLogout}
                 onOpenAdmin={() => { setDrawerOpen(false); setTimeout(handleOpenAdmin, 150); }}

@@ -135,7 +135,9 @@ export interface DashboardSubViewsProps {
   [key: string]: any;
 }
 
-export function DashboardSubViews(props: DashboardSubViewsProps) {
+export const DashboardSubViews = React.memo(function DashboardSubViews(props: DashboardSubViewsProps) {
+  if (!props.modalType) return null;
+
   
   
   const resendSamitySuccess = props.resendSamitySuccess || false;
@@ -285,14 +287,9 @@ const {
 
   return (
     <>
-              <AnimatePresence>
+              
                 {modalType === 'samity' && (
-                  <motion.div 
-                    initial={{ opacity: 0, y: 30 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: 30 }}
-                    className="fixed inset-0 z-50 overflow-y-auto bg-slate-50 w-full h-full min-h-screen font-sans"
-                  >
+                  <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-50 w-full h-full min-h-screen font-sans">
                     {(
                       (liveUser.role === 'admin' || liveUser.role === 'sub_admin') ||
                       liveUser.samityStatus === 'approved' ||
@@ -508,15 +505,10 @@ const {
                         />
                       </div>
                     )}
-                  </motion.div>
+                  </div>
                 )}
                 {modalType === 'telecom' && (
-                  <motion.div 
-                    initial={{ opacity: 0, y: 30 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: 30 }}
-                    className="fixed inset-0 z-50 overflow-y-auto bg-slate-50 w-full h-full min-h-screen font-sans"
-                  >
+                  <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-50 w-full h-full min-h-screen font-sans">
                     <AMBTelecomScreen
                       user={liveUser}
                       allOffers={allOffers}
@@ -528,15 +520,10 @@ const {
                       appConfig={appConfig}
                       allNotices={allNotices}
                     />
-                  </motion.div>
+                  </div>
                 )}
                 {modalType === 'qard' && (
-                  <motion.div 
-                    initial={{ opacity: 0, y: 30 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: 30 }}
-                    className="fixed inset-0 z-50 overflow-y-auto bg-slate-50 w-full h-full min-h-screen font-sans"
-                  >
+                  <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-50 w-full h-full min-h-screen font-sans">
                     <QardScreen
                       user={liveUser}
                       onBack={() => setModalType(null)}
@@ -545,15 +532,10 @@ const {
                       }}
                       appConfig={appConfig}
                     />
-                  </motion.div>
+                  </div>
                 )}
                 {modalType === 'safedeals' && (
-                  <motion.div 
-                    initial={{ opacity: 0, y: 30 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: 30 }}
-                    className="fixed inset-0 z-50 overflow-y-auto bg-slate-50 w-full h-full min-h-screen font-sans"
-                  >
+                  <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-50 w-full h-full min-h-screen font-sans">
                     <SafeDealsEscrowView 
                       liveUser={liveUser} 
                       syncLiveProfile={syncLiveProfile} 
@@ -561,29 +543,19 @@ const {
                       onBack={() => setModalType(null)}
                       allNotices={allNotices}
                     />
-                  </motion.div>
+                  </div>
                 )}
                 {modalType === 'agent' && (
-                  <motion.div 
-                    initial={{ opacity: 0, y: 30 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: 30 }}
-                    className="fixed inset-0 z-50 overflow-y-auto bg-[#FAFDFB] w-full h-full min-h-screen font-sans"
-                  >
+                  <div className="fixed inset-0 z-50 overflow-y-auto bg-[#FAFDFB] w-full h-full min-h-screen font-sans">
                     <AgentScreen
                       user={liveUser}
                       onBack={() => setModalType(null)}
                       appConfig={appConfig}
                     />
-                  </motion.div>
+                  </div>
                 )}
                 {modalType === 'bank' && (
-                  <motion.div 
-                    initial={{ opacity: 0, y: 30 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: 30 }}
-                    className="fixed inset-0 z-50 overflow-y-auto bg-slate-50 w-full h-full min-h-screen font-sans"
-                  >
+                  <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-50 w-full h-full min-h-screen font-sans">
                     <div className="bg-slate-50 min-h-screen flex flex-col relative text-slate-800">
                       <header className="bg-white border-b border-slate-200 px-4 py-3.5 flex items-center justify-between sticky top-0 z-40 backdrop-blur-md shadow-xs w-full">
                         <div className="flex items-center gap-3">
@@ -621,15 +593,10 @@ const {
                         />
                       </div>
                     </div>
-                  </motion.div>
+                  </div>
                 )}
                 {modalType === 'shop' && (
-                  <motion.div 
-                    initial={{ opacity: 0, y: 30 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: 30 }}
-                    className="fixed inset-0 z-50 overflow-y-auto bg-slate-50 w-full h-full min-h-screen font-sans"
-                  >
+                  <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-50 w-full h-full min-h-screen font-sans">
                     <div className="bg-slate-50 min-h-screen flex flex-col relative text-slate-800">
                       <header className="bg-white border-b border-slate-200 px-4 py-3.5 flex items-center justify-between sticky top-0 z-40 backdrop-blur-md shadow-xs w-full">
                         <div className="flex items-center gap-3">
@@ -1337,95 +1304,65 @@ const {
                         )}
                       </div>
                     </div>
-                  </motion.div>
+                  </div>
                 )}
 
                 {modalType === 'ration' && (
-                  <motion.div 
-                    initial={{ opacity: 0, y: 30 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: 30 }}
-                    className="fixed inset-0 z-50 overflow-y-auto bg-slate-50 w-full h-full min-h-screen font-sans"
-                  >
+                  <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-50 w-full h-full min-h-screen font-sans">
                     <RationCardView
                       liveUser={liveUser}
                       syncLiveProfile={syncLiveProfile}
                       appConfig={appConfig}
                       onClose={() => setModalType(null)}
                     />
-                  </motion.div>
+                  </div>
                 )}
 
                 {modalType === 'bill_pay' && (
-                  <motion.div 
-                    initial={{ opacity: 0, y: 30 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: 30 }}
-                    className="fixed inset-0 z-50 overflow-y-auto bg-slate-50 w-full h-full min-h-screen font-sans"
-                  >
+                  <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-50 w-full h-full min-h-screen font-sans">
                     <AmbBillPayScreen
                       user={liveUser}
                       onBack={() => setModalType(null)}
                       syncLiveProfile={syncLiveProfile}
                       appConfig={appConfig}
                     />
-                  </motion.div>
+                  </div>
                 )}
 
                 {modalType === 'salary' && (
-                  <motion.div 
-                    initial={{ opacity: 0, y: 30 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: 30 }}
-                    className="fixed inset-0 z-50 overflow-y-auto bg-slate-50 w-full h-full min-h-screen font-sans"
-                  >
+                  <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-50 w-full h-full min-h-screen font-sans">
                     <AmbAutoSalaryPay
                       user={liveUser}
                       onBack={() => setModalType(null)}
                       syncLiveProfile={syncLiveProfile}
                       appConfig={appConfig}
                     />
-                  </motion.div>
+                  </div>
                 )}
 
                 {modalType === 'auto_recharge' && (
-                  <motion.div 
-                    initial={{ opacity: 0, y: 30 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: 30 }}
-                    className="fixed inset-0 z-50 overflow-y-auto bg-slate-50 w-full h-full min-h-screen font-sans"
-                  >
+                  <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-50 w-full h-full min-h-screen font-sans">
                     <AmbAutoRechargeScreen
                       user={liveUser}
                       onBack={() => setModalType(null)}
                       syncLiveProfile={syncLiveProfile}
                       appConfig={appConfig}
                     />
-                  </motion.div>
+                  </div>
                 )}
 
                 {modalType === 'edu' && (
-                  <motion.div 
-                    initial={{ opacity: 0, y: 30 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: 30 }}
-                    className="fixed inset-0 z-50 overflow-y-auto bg-slate-50 w-full h-full min-h-screen font-sans"
-                  >
+                  <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-50 w-full h-full min-h-screen font-sans">
                     <AmbEducationCenter
                       user={liveUser}
                       onBack={() => setModalType(null)}
                       appConfig={appConfig}
                     />
-                  </motion.div>
+                  </div>
                 )}
 
                 {modalType === 'safi' && (
-                  <motion.div 
-                    initial={{ opacity: 0, y: 30 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: 30 }}
-                    className="fixed inset-0 z-50 overflow-y-auto bg-slate-50 w-full h-full min-h-screen font-sans"
-                  >
+                  <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-50 w-full h-full min-h-screen font-sans">
                     <SafiPremiumShop
                       user={liveUser}
                       onClose={() => setModalType(null)}
@@ -1433,25 +1370,20 @@ const {
                       handleBuyPremiumSafi={handleBuyPremiumSafi}
                       syncLiveProfile={syncLiveProfile}
                     />
-                  </motion.div>
+                  </div>
                 )}
 
                 {modalType === 'about' && (
-                  <motion.div 
-                    initial={{ opacity: 0, y: 30 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: 30 }}
-                    className="fixed inset-0 z-50 overflow-y-auto bg-slate-50 w-full h-full min-h-screen font-sans"
-                  >
+                  <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-50 w-full h-full min-h-screen font-sans">
                     <AmbCorporateGuide
                       user={liveUser}
                       onBack={() => setModalType(null)}
                       appConfig={appConfig}
                       onUpdateConfig={() => {}}
                     />
-                  </motion.div>
+                  </div>
                 )}
-              </AnimatePresence>
+              
     </>
   );
-}
+});

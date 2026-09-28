@@ -360,6 +360,7 @@ export const DEFAULT_CONFIG: AppConfig = {
   maintenanceLogoUrl: "",
   maintenanceBgUrl: "",
   forceUpdateActive: false,
+  emailMigrationPopupEnabled: true,
   minAppVersion: "2.0",
   latestAppVersion: "2.0",
   downloadLink: "https://play.google.com/store/apps/details?id=com.amb.business",

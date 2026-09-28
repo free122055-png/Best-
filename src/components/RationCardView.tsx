@@ -138,7 +138,7 @@ const RationCardContainer = ({ children }: { children: React.ReactNode }) => {
 
 import RationApplicationForm from './RationApplicationForm';
 
-export default function RationCardView({ liveUser, syncLiveProfile, appConfig, onClose }: RationCardViewProps) {
+export const RationCardView = React.memo(function RationCardView({ liveUser, syncLiveProfile, appConfig, onClose }: RationCardViewProps) {
 
   // Bengali translation helpers
   const englishToBengali = (num: any) => {
@@ -643,16 +643,6 @@ export default function RationCardView({ liveUser, syncLiveProfile, appConfig, o
   const adSlides = appConfig?.rationBanners && appConfig.rationBanners.length > 0
     ? appConfig.rationBanners
     : defaultRationSlides;
-
-  const [currentAdSlide, setCurrentAdSlide] = useState(0);
-
-  useEffect(() => {
-    if (adSlides.length <= 1) return;
-    const timer = setInterval(() => {
-      setCurrentAdSlide((prev) => (prev + 1) % adSlides.length);
-    }, 4500);
-    return () => clearInterval(timer);
-  }, [adSlides.length]);
   
   // Ration Card Firestore state
   const [rationCard, setRationCard] = useState<any | null>(null);
@@ -2072,4 +2062,6 @@ export default function RationCardView({ liveUser, syncLiveProfile, appConfig, o
 
     </div>
   );
-}
+});
+
+export default RationCardView;

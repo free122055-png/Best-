@@ -640,6 +640,7 @@ export interface SamityInvestment {
 export interface AppConfig {
   adminPin?: string; // Master admin PIN override
   allowProfileSelfEdit?: boolean; // Whether members are allowed to edit/update their own profile info
+  emailMigrationPopupEnabled?: boolean; // Admin ON/OFF switch for old account recovery / email migration pop-up
   phoneChangeConfig?: {
     enabled?: boolean;
     freeDaysAfterRegistration?: number;

@@ -75,7 +75,63 @@ interface QardScreenProps {
   appConfig?: AppConfig;
 }
 
-export default function QardScreen({ user, onBack, syncLiveProfile, appConfig }: QardScreenProps) {
+const QardBannerSlider = React.memo(function QardBannerSlider({ adSlides }: { adSlides: any[] }) {
+  const [currentAdSlide, setCurrentAdSlide] = useState(0);
+
+  useEffect(() => {
+    if (!adSlides || adSlides.length <= 1) return;
+    const timer = setInterval(() => {
+      setCurrentAdSlide((prev) => (prev + 1) % adSlides.length);
+    }, 4500);
+    return () => clearInterval(timer);
+  }, [adSlides]);
+
+  if (!adSlides || adSlides.length === 0) return null;
+  const slide = adSlides[currentAdSlide] || adSlides[0];
+
+  return (
+    <div className="relative overflow-hidden rounded-3.5xl border border-slate-150 shadow-md bg-slate-900 aspect-[16/9] w-full group">
+      <div className="absolute inset-0 w-full h-full">
+        <img
+          src={slide.image}
+          alt={slide.title}
+          referrerPolicy="no-referrer"
+          className="w-full h-full object-cover opacity-85 transition-opacity duration-300"
+          loading="lazy"
+        />
+        <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/40 to-transparent p-4 flex flex-col justify-end text-left">
+          <span className="text-[9px] font-extrabold text-[#F43F5E] uppercase tracking-widest bg-rose-950/80 max-w-max px-2 py-0.5 rounded-md mb-1.5 border border-rose-800/60">
+            {slide.tag}
+          </span>
+          <h3 className="text-sm font-black text-white leading-tight mb-1">
+            {slide.title}
+          </h3>
+          <p className="text-[10px] text-slate-300 font-semibold leading-snug">
+            {slide.description}
+          </p>
+        </div>
+      </div>
+      {adSlides.length > 1 && (
+        <div className="absolute top-3 right-4 flex gap-1.5 z-10">
+          {adSlides.map((_, idx) => (
+            <button
+              key={idx}
+              type="button"
+              aria-label={'Slide ' + (idx + 1)}
+              onClick={() => setCurrentAdSlide(idx)}
+              className={'h-1.5 rounded-full transition-all duration-300 cursor-pointer ' + (
+                currentAdSlide === idx ? 'w-4.5 bg-rose-500' : 'w-1.5 bg-white/40 hover:bg-white/65'
+              )}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+});
+
+
+export const QardScreen = React.memo(function QardScreen({ user, onBack, syncLiveProfile, appConfig }: QardScreenProps) {
   // Navigation tabs
   const [activeTab, setActiveTab] = useState<'landing' | 'donate' | 'dashboard' | 'transparency' | 'apply' | 'admin' | 'withdraw' | 'gold_loan'>('landing');
 
@@ -113,8 +169,6 @@ export default function QardScreen({ user, onBack, syncLiveProfile, appConfig }:
   const [showBorrowersModal, setShowBorrowersModal] = useState(false);
   const [donorsSearchQuery, setDonorsSearchQuery] = useState('');
   const [borrowersSearchQuery, setBorrowersSearchQuery] = useState('');
-  const [currentAdSlide, setCurrentAdSlide] = useState(0);
-
   // Form states - Qard Withdrawal Apply
   const [withdrawAmount, setWithdrawAmount] = useState<string>('');
   const [withdrawWhatsapp, setWithdrawWhatsapp] = useState<string>('');
@@ -150,14 +204,6 @@ export default function QardScreen({ user, onBack, syncLiveProfile, appConfig }:
   const adSlides = appConfig?.qardBanners && appConfig.qardBanners.length > 0 
     ? appConfig.qardBanners 
     : defaultAdSlides;
-
-  useEffect(() => {
-    if (adSlides.length <= 1) return;
-    const timer = setInterval(() => {
-      setCurrentAdSlide((prev) => (prev + 1) % adSlides.length);
-    }, 4500);
-    return () => clearInterval(timer);
-  }, [adSlides.length]);
 
   const [loading, setLoading] = useState(false);
   const [successMsg, setSuccessMsg] = useState('');
@@ -2090,50 +2136,8 @@ AMB Business Co-operative Welfare Fund
                 </div>
               </div>
 
-              {/* Premium Image Slider System */}
-              <div className="relative overflow-hidden rounded-3.5xl border border-slate-150 shadow-md bg-slate-900 aspect-[16/9] w-full group">
-                <AnimatePresence mode="wait">
-                  <motion.div
-                    key={currentAdSlide}
-                    initial={{ opacity: 0, x: 20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    exit={{ opacity: 0, x: -20 }}
-                    transition={{ duration: 0.4 }}
-                    className="absolute inset-0 w-full h-full"
-                  >
-                    <img
-                      src={adSlides[currentAdSlide].image}
-                      alt={adSlides[currentAdSlide].title}
-                      referrerPolicy="no-referrer"
-                      className="w-full h-full object-cover opacity-85"
-                      loading="lazy"
-                    />
-                    {/* Text Overlay for Premium Feel */}
-                    <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/40 to-transparent p-4 flex flex-col justify-end text-left">
-                      <span className="text-[9px] font-extrabold text-[#F43F5E] uppercase tracking-widest bg-rose-950/80 max-w-max px-2 py-0.5 rounded-md mb-1.5 border border-rose-800/60">
-                        {adSlides[currentAdSlide].tag}
-                      </span>
-                      <h3 className="text-sm font-black text-white leading-tight mb-1">
-                        {adSlides[currentAdSlide].title}
-                      </h3>
-                      <p className="text-[10px] text-slate-300 font-semibold leading-snug">
-                        {adSlides[currentAdSlide].description}
-                      </p>
-                    </div>
-                  </motion.div>
-                </AnimatePresence>
-
-                {/* Slider Indicator Dots */}
-                <div className="absolute top-3 right-4 flex gap-1.5 z-10">
-                  {adSlides.map((_, idx) => (
-                    <button
-                      key={idx}
-                      onClick={() => setCurrentAdSlide(idx)}
-                      className={`h-1.5 rounded-full transition-all duration-300 ${currentAdSlide === idx ? 'w-4.5 bg-rose-500' : 'w-1.5 bg-white/40 hover:bg-white/65'}`}
-                    />
-                  ))}
-                </div>
-              </div>
+              {/* Premium Image Slider System (Memoized isolated slider) */}
+              <QardBannerSlider adSlides={adSlides} />
 
               {/* 4 Premium Quick Info Counters Row (ফান্ডে জমা টাকা, ঋণ দেওয়া আছে, কে টাকা দিয়েছে, স্বর্ণ রেখে লোন) - 1 Line 4 Columns */}
               <div className="grid grid-cols-4 gap-1 sm:gap-2.5 my-2">
@@ -5290,4 +5294,6 @@ AMB Business Co-operative Welfare Fund
 
     </div>
   );
-}
+});
+
+export default QardScreen;

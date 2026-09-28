@@ -757,6 +757,7 @@ export default function AdminPanel(props: AdminPanelProps) {
   const [cfgDownloadLink, setCfgDownloadLink] = useState(appConfig.downloadLink || "https://play.google.com/store/apps/details?id=com.amb.business");
   const [cfgUpdateTitle, setCfgUpdateTitle] = useState(appConfig.updateTitle || "নতুন সংস্করণ উপলব্ধ!");
   const [cfgUpdateDescription, setCfgUpdateDescription] = useState(appConfig.updateDescription || "AMB BUSINESS Network Bangladesh-এর নতুন আপডেট প্রকাশিত হয়েছে। অ্যাপ ব্যবহার চালিয়ে যেতে হলে নতুন ভার্সন ইনস্টল করা বাধ্যতামূলক।");
+  const [cfgEmailMigrationPopupEnabled, setCfgEmailMigrationPopupEnabled] = useState(appConfig.emailMigrationPopupEnabled || false);
 
   const [cfgSuccess, setCfgSuccess] = useState(false);
   const [cfgError, setCfgError] = useState('');
@@ -1468,6 +1469,7 @@ export default function AdminPanel(props: AdminPanelProps) {
         maintenanceLogoUrl: cfgMaintenanceLogoUrl,
         maintenanceBgUrl: cfgMaintenanceBgUrl,
         forceUpdateActive: !!cfgForceUpdateActive,
+        emailMigrationPopupEnabled: !!cfgEmailMigrationPopupEnabled,
         minAppVersion: cfgMinAppVersion,
         latestAppVersion: cfgLatestAppVersion,
         downloadLink: cfgDownloadLink,
@@ -2028,6 +2030,21 @@ export default function AdminPanel(props: AdminPanelProps) {
     } catch (err: any) {
       console.error('Error toggling integration active status:', err);
       alert('অবস্থা পরিবর্তন করতে সমস্যা হয়েছে: ' + err.message);
+    }
+  };
+
+  const handleToggleEmailMigrationPopup = async () => {
+    try {
+      const newVal = !cfgEmailMigrationPopupEnabled;
+      setCfgEmailMigrationPopupEnabled(newVal);
+      const configRef = doc(db, 'system_settings', 'app_config');
+      await setDoc(configRef, { emailMigrationPopupEnabled: newVal }, { merge: true });
+      const updated = { ...appConfig, emailMigrationPopupEnabled: newVal };
+      onChangeConfig(updated);
+      alert(`পুরানো একাউন্ট ইমেইল লিঙ্ক পপ-আপ সফলভাবে ${newVal ? 'চালু (ON)' : 'বন্ধ (OFF)'} করা হয়েছে!`);
+    } catch (err: any) {
+      console.error('Error toggling email migration popup:', err);
+      alert('পপ-আপ অবস্থা পরিবর্তন করতে সমস্যা হয়েছে: ' + (err?.message || err));
     }
   };
 
@@ -2795,6 +2812,7 @@ export default function AdminPanel(props: AdminPanelProps) {
   const [editUserName, setEditUserName] = useState('');
   const [editUserMemberId, setEditUserMemberId] = useState('');
   const [editUserPhone, setEditUserPhone] = useState('');
+  const [editEmail, setEditEmail] = useState('');
   const [editBalance, setEditBalance] = useState<string | number>(0);
   const [adminConfirmPin, setAdminConfirmPin] = useState('');
   const [adminPinError, setAdminPinError] = useState('');
@@ -2868,6 +2886,7 @@ export default function AdminPanel(props: AdminPanelProps) {
     setEditUserName(u.name || '');
     setEditUserMemberId(u.memberId || '');
     setEditUserPhone(u.phone || '');
+    setEditEmail(u.email || '');
     setEditBalance(Number(u.balance !== undefined ? u.balance : (u as any).mainBalance) || 0);
     setEditTelecomBalance(u.telecomBalance || 0);
     setEditSuperShopBalance(u.superShopBalance || 0);
@@ -8960,6 +8979,7 @@ export default function AdminPanel(props: AdminPanelProps) {
         name: safeTrim(editUserName) || editingUser.name || 'সদস্য',
         memberId: safeTrim(editUserMemberId) || editingUser.memberId || '',
         phone: safeTrim(editUserPhone) || editingUser.phone || '',
+        email: safeTrim(editEmail).toLowerCase(),
         balance: currentMainBalance,
         mainBalance: currentMainBalance,
         telecomBalance: parseBal(editTelecomBalance),
@@ -10442,6 +10462,9 @@ export default function AdminPanel(props: AdminPanelProps) {
     setCfgUpdateTitle,
     cfgUpdateDescription,
     setCfgUpdateDescription,
+    cfgEmailMigrationPopupEnabled,
+    setCfgEmailMigrationPopupEnabled,
+    handleToggleEmailMigrationPopup,
     cfgServiceStatus,
     setCfgServiceStatus,
     cfgBannerHeightType,
@@ -11051,6 +11074,8 @@ export default function AdminPanel(props: AdminPanelProps) {
     setEditUserMemberId,
     editUserPhone,
     setEditUserPhone,
+    editEmail,
+    setEditEmail,
     setEditBalance,
     setEditTelecomBalance,
     setEditSuperShopBalance,

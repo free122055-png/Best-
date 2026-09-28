@@ -92,7 +92,7 @@ interface SamityScreenProps {
   transactions?: Transaction[];
 }
 
-export default function SamityScreen({ 
+export const SamityScreen = React.memo(function SamityScreen({ 
   user, 
   allUsers, 
   onBack, 
@@ -1870,14 +1870,6 @@ export default function SamityScreen({
   const samitySlides = appConfig?.samityBanners && appConfig.samityBanners.length > 0
     ? appConfig.samityBanners
     : defaultSamitySlides;
-
-  useEffect(() => {
-    if (samitySlides.length <= 1) return;
-    const timer = setInterval(() => {
-      setCurrentSlide((prev) => (prev + 1) % samitySlides.length);
-    }, 4500);
-    return () => clearInterval(timer);
-  }, [samitySlides.length]);
 
   // Form states - New Deposit
   const [depositPurpose, setDepositPurpose] = useState<'savings' | 'loan' | 'fees'>('savings');
@@ -6992,4 +6984,6 @@ export default function SamityScreen({
 
     </div>
   );
-}
+});
+
+export default SamityScreen;

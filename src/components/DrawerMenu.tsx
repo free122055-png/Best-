@@ -55,7 +55,99 @@ interface DrawerMenuProps {
   appConfig?: AppConfig;
 }
 
-export default function DrawerMenu({ 
+  // Menu Category Items Data structure matching exactly with user query
+  const menuCategories = [
+    {
+      id: 'security',
+      label: '🔒 SECURITY (নিরাপত্তা)',
+      icon: Lock,
+      color: 'text-amber-600',
+      bgColor: 'bg-amber-50',
+      subItems: [
+        { id: 'change_password', label: 'পাসওয়ার্ড পরিবর্তন', desc: 'অ্যাকাউন্টের মূল পাসওয়ার্ড পরিবর্তন' },
+        { id: 'change_pin', label: 'পিন পরিবর্তন', desc: '4 ডিজিটের সিকিউরিটি ট্রানজেকশন পিন বদল' },
+        { id: 'biometric', label: 'ফিঙ্গারপ্রিন্ট/ফেস আইডি', desc: 'বায়োমেট্রিক সহজ লগইন সেটিংস' },
+        { id: 'logout_all', label: 'সকল ডিভাইস থেকে লগআউট', desc: 'অন্যান্য সব সেশন এক ক্লিকে বাতিল' },
+        { id: 'delete_account', label: 'আজীবন স্থায়ী অ্যাকাউন্ট', desc: 'অ্যাকাউন্ট চিরস্থায়ী সুরক্ষা ও স্থায়িত্ব সনদ' },
+      ]
+    },
+    {
+      id: 'settings',
+      label: '⚙️ SETTINGS (সেটিংস)',
+      icon: SettingsIcon,
+      color: 'text-blue-600',
+      bgColor: 'bg-blue-50',
+      subItems: [
+        { id: 'lang_setting', label: 'ভাষা (বাংলা/ইংরেজি)', desc: 'অ্যাপের ডিফল্ট ভাষা পরিবর্তন' },
+        { id: 'notify_setting', label: 'নোটিফিকেশন চালু/বন্ধ', desc: 'জরুরি এলার্ট ও মেসেজ সেটিংস' },
+        { id: 'theme_setting', label: 'ডার্ক/লাইট মোড', desc: 'চোখের আরামের জন্য ডিসপ্লে থিম' },
+      ]
+    },
+    {
+      id: 'support',
+      label: '🛠 SUPPORT (সহায়তা)',
+      icon: HelpCircle,
+      color: 'text-rose-600',
+      bgColor: 'bg-rose-50',
+      subItems: [
+        { id: 'report_issue', label: 'সমস্যা রিপোর্ট করুন', desc: 'যেকোনো অমিল বা ত্রুটি নিয়ে কমপ্লেইন' },
+        { id: 'live_chat', label: 'আমাদের সাথে যোগাযোগ করুন লাইভ চ্যাট', desc: 'গ্রাহক সেবা এজেন্টের সাথে সরাসরি চ্যাট' },
+        { id: 'faq', label: 'FAQ (সাধারণ প্রশ্ন)', desc: 'সমবায় নিয়ে আপনার মনে জাগা প্রশ্ন' },
+      ]
+    },
+    {
+      id: 'info',
+      label: 'ℹ️ INFORMATION (তথ্য)',
+      icon: Info,
+      color: 'text-teal-600',
+      bgColor: 'bg-teal-50',
+      subItems: [
+        { id: 'terms', label: 'শর্তাবলী (Terms & Conditions)', desc: 'AMB কো-অপারেটিভ এর আইনি শর্তাবলী' },
+        { id: 'privacy', label: 'গোপনীয়তা নীতি (Privacy Policy)', desc: 'আপনার ব্যক্তিগত ও লেনদেন তথ্যের সুরক্ষা' },
+        { id: 'permissions_info', label: 'অ্যাপ পারমিশন ও ডেটা সেফটি', desc: 'কোন পারমিশন কেন ব্যবহার করা হয়' },
+      ]
+    },
+    {
+      id: 'about',
+      label: '👨💼 ABOUT (আমাদের সম্পর্কে)',
+      icon: BookOpen,
+      color: 'text-indigo-600',
+      bgColor: 'bg-indigo-50',
+      subItems: [
+        { id: 'about_us', label: 'আমাদের সম্পর্কে', desc: 'BNB সমবায় উদ্যোগের মূল লক্ষ্য ও টিম' },
+        { id: 'app_version', label: 'অ্যাপের ভার্সন', desc: 'রিলিজ ও কারিগরি সংস্করণ বিস্তারিত' },
+        { id: 'contact_info', label: 'যোগাযোগের তথ্য', desc: 'আমাদের অফিস ঠিকানা ও কন্টাক্ট ইনফো' },
+      ]
+    }
+  ];
+
+  // FAQ Database
+  const faqData = [
+    {
+      q: 'Al Mayadin Bazar (AMB) সমবায় সমিতি কী?',
+      a: 'AMB হচ্ছে গণপ্রজাতন্ত্রী বাংলাদেশ সরকারের বিধিমালা মেনে পরিচালিত একটি প্রগতিশীল অনলাইন ও অফলাইন ভিত্তিক সমবায় সঞ্চয় ও ঋণদান প্ল্যাটফর্ম। এর মূল উদ্দেশ্য সদস্যদের মাঝে অর্থনৈতিক বন্ধন সুদৃঢ় করা এবং গ্রামীণ ও ক্ষুদ্র ব্যবসায়ীদের সহজ শর্তে পুঁজির ব্যবস্থা করা।'
+    },
+    {
+      q: 'আমানত ও দৈনিক সঞ্চয় জমার নিয়মাবলি কী?',
+      a: 'AMB মেম্বারগণ দৈনিক, সাপ্তাহিক বা মাসিক ভিত্তিতে সঞ্চয় জমা করতে পারেন। বিকাশ, নগদ, রকেট মোবাইল ব্যাংকিং অথবা সরাসরি এজেন্টের মাধ্যমে সঞ্চয় গ্রহণ করা হয়। জমাকৃত সঞ্চয় প্রতি মাসের শেষে সুদমুক্ত লভ্যাংশ বা ক্যাশব্যাক অর্জনে ভূমিকা রাখে।'
+    },
+    {
+      q: 'আমি কীভাবে লোন বা করজে হাসানা গ্রহণ করতে পারি?',
+      a: 'কোনো প্রকার সুদ ছাড়াই জরুরি সাহায্য হিসেবে সদস্যদের "করজে হাসানা" ঋণ দেওয়া হয়। সদস্যদের আবেদনের 24 ঘণ্টার মধ্যে সর্বোচ্চ 5,000 টাকা পর্যন্ত ঋণ দ্রুত অনুমোদন করা হয়। তবে এর জন্য সদস্যের ক্যাটাগরি ও নিয়মিত সঞ্চয়ের ইতিহাস বিবেচনা করা হয়।'
+    },
+    {
+      q: 'টেলিকম ও ই-মার্কেট রিচার্জ কমিশন কী?',
+      a: 'BNB টেলিকম প্যানেলে রয়েছে লাভজনক রিচার্জ কমিশন। যেকোনো রিচার্জে সদস্যরা তাৎক্ষণিক 2% থেকে 5% পর্যন্ত ক্যাশব্যাক ও ড্রাইভিং অফার কমিশন পান। এই কমিশন সরাসরি আপনার মূল ব্যালেন্সে যুক্ত হয়।'
+    },
+    {
+      q: 'আমার পিন বা পাসওয়ার্ড ভুলে গেলে করণীয় কী?',
+      a: 'নিরাপত্তা পিন বা পাসওয়ার্ড পরিবর্তন বা রিসেট করতে আমাদের হোয়াটসঅ্যাপ হেল্পলাইনে মেসেজ দিন (01865911728)। শুধুমাত্র এডমিন প্যানেল থেকে এডমিন যাচাই করে আপনার পিন পরিবর্তন করে দিবেন।'
+    }
+  ];
+
+
+
+export const DrawerMenu = React.memo(function DrawerMenu({ 
   isOpen, 
   onClose, 
   user, 
@@ -77,6 +169,9 @@ export default function DrawerMenu({
 
   // Active sub-item modal
   const [activeSubModal, setActiveSubModal] = useState<string | null>(null);
+
+  if (!isOpen && !activeSubModal) return null;
+
 
   // Success/Error feedback alerts
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
@@ -438,96 +533,6 @@ export default function DrawerMenu({
     }, 1500);
   };
 
-  // Menu Category Items Data structure matching exactly with user query
-  const menuCategories = [
-    {
-      id: 'security',
-      label: '🔒 SECURITY (নিরাপত্তা)',
-      icon: Lock,
-      color: 'text-amber-600',
-      bgColor: 'bg-amber-50',
-      subItems: [
-        { id: 'change_password', label: 'পাসওয়ার্ড পরিবর্তন', desc: 'অ্যাকাউন্টের মূল পাসওয়ার্ড পরিবর্তন' },
-        { id: 'change_pin', label: 'পিন পরিবর্তন', desc: '4 ডিজিটের সিকিউরিটি ট্রানজেকশন পিন বদল' },
-        { id: 'biometric', label: 'ফিঙ্গারপ্রিন্ট/ফেস আইডি', desc: 'বায়োমেট্রিক সহজ লগইন সেটিংস' },
-        { id: 'logout_all', label: 'সকল ডিভাইস থেকে লগআউট', desc: 'অন্যান্য সব সেশন এক ক্লিকে বাতিল' },
-        { id: 'delete_account', label: 'আজীবন স্থায়ী অ্যাকাউন্ট', desc: 'অ্যাকাউন্ট চিরস্থায়ী সুরক্ষা ও স্থায়িত্ব সনদ' },
-      ]
-    },
-    {
-      id: 'settings',
-      label: '⚙️ SETTINGS (সেটিংস)',
-      icon: SettingsIcon,
-      color: 'text-blue-600',
-      bgColor: 'bg-blue-50',
-      subItems: [
-        { id: 'lang_setting', label: 'ভাষা (বাংলা/ইংরেজি)', desc: 'অ্যাপের ডিফল্ট ভাষা পরিবর্তন' },
-        { id: 'notify_setting', label: 'নোটিফিকেশন চালু/বন্ধ', desc: 'জরুরি এলার্ট ও মেসেজ সেটিংস' },
-        { id: 'theme_setting', label: 'ডার্ক/লাইট মোড', desc: 'চোখের আরামের জন্য ডিসপ্লে থিম' },
-      ]
-    },
-    {
-      id: 'support',
-      label: '🛠 SUPPORT (সহায়তা)',
-      icon: HelpCircle,
-      color: 'text-rose-600',
-      bgColor: 'bg-rose-50',
-      subItems: [
-        { id: 'report_issue', label: 'সমস্যা রিপোর্ট করুন', desc: 'যেকোনো অমিল বা ত্রুটি নিয়ে কমপ্লেইন' },
-        { id: 'live_chat', label: 'আমাদের সাথে যোগাযোগ করুন লাইভ চ্যাট', desc: 'গ্রাহক সেবা এজেন্টের সাথে সরাসরি চ্যাট' },
-        { id: 'faq', label: 'FAQ (সাধারণ প্রশ্ন)', desc: 'সমবায় নিয়ে আপনার মনে জাগা প্রশ্ন' },
-      ]
-    },
-    {
-      id: 'info',
-      label: 'ℹ️ INFORMATION (তথ্য)',
-      icon: Info,
-      color: 'text-teal-600',
-      bgColor: 'bg-teal-50',
-      subItems: [
-        { id: 'terms', label: 'শর্তাবলী (Terms & Conditions)', desc: 'AMB কো-অপারেটিভ এর আইনি শর্তাবলী' },
-        { id: 'privacy', label: 'গোপনীয়তা নীতি (Privacy Policy)', desc: 'আপনার ব্যক্তিগত ও লেনদেন তথ্যের সুরক্ষা' },
-        { id: 'permissions_info', label: 'অ্যাপ পারমিশন ও ডেটা সেফটি', desc: 'কোন পারমিশন কেন ব্যবহার করা হয়' },
-      ]
-    },
-    {
-      id: 'about',
-      label: '👨💼 ABOUT (আমাদের সম্পর্কে)',
-      icon: BookOpen,
-      color: 'text-indigo-600',
-      bgColor: 'bg-indigo-50',
-      subItems: [
-        { id: 'about_us', label: 'আমাদের সম্পর্কে', desc: 'BNB সমবায় উদ্যোগের মূল লক্ষ্য ও টিম' },
-        { id: 'app_version', label: 'অ্যাপের ভার্সন', desc: 'রিলিজ ও কারিগরি সংস্করণ বিস্তারিত' },
-        { id: 'contact_info', label: 'যোগাযোগের তথ্য', desc: 'আমাদের অফিস ঠিকানা ও কন্টাক্ট ইনফো' },
-      ]
-    }
-  ];
-
-  // FAQ Database
-  const faqData = [
-    {
-      q: 'Al Mayadin Bazar (AMB) সমবায় সমিতি কী?',
-      a: 'AMB হচ্ছে গণপ্রজাতন্ত্রী বাংলাদেশ সরকারের বিধিমালা মেনে পরিচালিত একটি প্রগতিশীল অনলাইন ও অফলাইন ভিত্তিক সমবায় সঞ্চয় ও ঋণদান প্ল্যাটফর্ম। এর মূল উদ্দেশ্য সদস্যদের মাঝে অর্থনৈতিক বন্ধন সুদৃঢ় করা এবং গ্রামীণ ও ক্ষুদ্র ব্যবসায়ীদের সহজ শর্তে পুঁজির ব্যবস্থা করা।'
-    },
-    {
-      q: 'আমানত ও দৈনিক সঞ্চয় জমার নিয়মাবলি কী?',
-      a: 'AMB মেম্বারগণ দৈনিক, সাপ্তাহিক বা মাসিক ভিত্তিতে সঞ্চয় জমা করতে পারেন। বিকাশ, নগদ, রকেট মোবাইল ব্যাংকিং অথবা সরাসরি এজেন্টের মাধ্যমে সঞ্চয় গ্রহণ করা হয়। জমাকৃত সঞ্চয় প্রতি মাসের শেষে সুদমুক্ত লভ্যাংশ বা ক্যাশব্যাক অর্জনে ভূমিকা রাখে।'
-    },
-    {
-      q: 'আমি কীভাবে লোন বা করজে হাসানা গ্রহণ করতে পারি?',
-      a: 'কোনো প্রকার সুদ ছাড়াই জরুরি সাহায্য হিসেবে সদস্যদের "করজে হাসানা" ঋণ দেওয়া হয়। সদস্যদের আবেদনের 24 ঘণ্টার মধ্যে সর্বোচ্চ 5,000 টাকা পর্যন্ত ঋণ দ্রুত অনুমোদন করা হয়। তবে এর জন্য সদস্যের ক্যাটাগরি ও নিয়মিত সঞ্চয়ের ইতিহাস বিবেচনা করা হয়।'
-    },
-    {
-      q: 'টেলিকম ও ই-মার্কেট রিচার্জ কমিশন কী?',
-      a: 'BNB টেলিকম প্যানেলে রয়েছে লাভজনক রিচার্জ কমিশন। যেকোনো রিচার্জে সদস্যরা তাৎক্ষণিক 2% থেকে 5% পর্যন্ত ক্যাশব্যাক ও ড্রাইভিং অফার কমিশন পান। এই কমিশন সরাসরি আপনার মূল ব্যালেন্সে যুক্ত হয়।'
-    },
-    {
-      q: 'আমার পিন বা পাসওয়ার্ড ভুলে গেলে করণীয় কী?',
-      a: 'নিরাপত্তা পিন বা পাসওয়ার্ড পরিবর্তন বা রিসেট করতে আমাদের হোয়াটসঅ্যাপ হেল্পলাইনে মেসেজ দিন (01865911728)। শুধুমাত্র এডমিন প্যানেল থেকে এডমিন যাচাই করে আপনার পিন পরিবর্তন করে দিবেন।'
-    }
-  ];
-
   return (
     <>
       <AnimatePresence>
@@ -547,8 +552,8 @@ export default function DrawerMenu({
               initial={{ x: '-100%' }}
               animate={{ x: 0 }}
               exit={{ x: '-100%' }}
-              transition={{ type: 'spring', damping: 25, stiffness: 220 }}
-              className="fixed inset-y-0 left-0 w-full max-w-sm bg-white z-55 shadow-2xl flex flex-col h-full overflow-hidden text-slate-800 font-sans"
+              transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
+              className="fixed inset-y-0 left-0 w-full max-w-sm bg-white z-55 shadow-2xl flex flex-col h-full overflow-hidden text-slate-800 font-sans transform-gpu will-change-transform"
             >
               {/* Drawer Header Box */}
               <div className="bg-gradient-to-br from-emerald-800 to-emerald-950 text-white p-5 pt-7 relative shrink-0">
@@ -1471,4 +1476,6 @@ export default function DrawerMenu({
       </AnimatePresence>
     </>
   );
-}
+});
+
+export default DrawerMenu;

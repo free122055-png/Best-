@@ -53,7 +53,52 @@ interface SafeDealsEscrowViewProps {
   allNotices?: any[];
 }
 
-export default function SafeDealsEscrowView({ 
+const SafeDealsBannerSlider = React.memo(function SafeDealsBannerSlider({ adSlides }: { adSlides: any[] }) {
+  const [currentAdSlide, setCurrentAdSlide] = useState(0);
+
+  useEffect(() => {
+    if (!adSlides || adSlides.length <= 1) return;
+    const interval = setInterval(() => {
+      setCurrentAdSlide((prev) => (prev + 1) % adSlides.length);
+    }, 4000);
+    return () => clearInterval(interval);
+  }, [adSlides]);
+
+  if (!adSlides || adSlides.length === 0) return null;
+
+  return (
+    <div className="relative rounded-none overflow-hidden aspect-video shadow-sm border border-slate-200/80 bg-slate-900 group w-full">
+      <div className="absolute inset-0 w-full h-full">
+        <img 
+          src={adSlides[currentAdSlide]?.image} 
+          alt="নিরাপদ লেনদেন ব্যানার"
+          referrerPolicy="no-referrer"
+          className="absolute inset-0 w-full h-full object-cover transition-opacity duration-300"
+          loading="lazy"
+        />
+        <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent pointer-events-none" />
+      </div>
+      {adSlides.length > 1 && (
+        <div className="absolute bottom-3 left-1/2 transform -translate-x-1/2 flex items-center gap-1.5 z-20">
+          {adSlides.map((_, idx) => (
+            <button
+              key={idx}
+              type="button"
+              aria-label={'Slide ' + (idx + 1)}
+              onClick={() => setCurrentAdSlide(idx)}
+              className={'h-1.5 rounded-full transition-all duration-300 cursor-pointer ' + (
+                currentAdSlide === idx ? 'w-4 bg-[#1A56DB]' : 'w-1.5 bg-white/60'
+              )}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+});
+
+
+export const SafeDealsEscrowView = React.memo(function SafeDealsEscrowView({ 
   liveUser, 
   syncLiveProfile, 
   appConfig, 
@@ -120,15 +165,7 @@ export default function SafeDealsEscrowView({
     ? appConfig.safeDealsBanners 
     : defaultDealsSlides;
 
-  const [currentAdSlide, setCurrentAdSlide] = useState(0);
 
-  useEffect(() => {
-    if (adSlides.length <= 1) return;
-    const interval = setInterval(() => {
-      setCurrentAdSlide((prev) => (prev + 1) % adSlides.length);
-    }, 4000);
-    return () => clearInterval(interval);
-  }, [adSlides.length]);
 
   // Trigger real-time sync with safe_deal_orders
   useEffect(() => {
@@ -937,42 +974,8 @@ export default function SafeDealsEscrowView({
           <span>অভিযোগ ট্র্যাকিং ও কাস্টমার কেয়ার (Support Desk)</span>
         </button>
         
-        {/* 2. YOUTUBE SIZE BANNER */}
-        <div className="relative rounded-none overflow-hidden aspect-video shadow-sm border border-slate-200/80 bg-slate-900 group w-full">
-          <AnimatePresence mode="wait">
-            <motion.div
-              key={currentAdSlide}
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.4 }}
-              className="absolute inset-0 w-full h-full"
-            >
-              <img 
-                src={adSlides[currentAdSlide].image} 
-                alt="নিরাপদ লেনদেন ব্যানার"
-                referrerPolicy="no-referrer"
-                className="absolute inset-0 w-full h-full object-cover"
-              />
-              <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent pointer-events-none" />
-            </motion.div>
-          </AnimatePresence>
-          
-          {/* Indicator Dots */}
-          {adSlides.length > 1 && (
-            <div className="absolute bottom-3 left-1/2 transform -translate-x-1/2 flex items-center gap-1.5 z-20">
-              {adSlides.map((_, idx) => (
-                <button
-                  key={idx}
-                  onClick={() => setCurrentAdSlide(idx)}
-                  className={`h-1.5 rounded-full transition-all duration-300 ${
-                    currentAdSlide === idx ? 'w-4 bg-[#1A56DB]' : 'w-1.5 bg-white/60'
-                  }`}
-                />
-              ))}
-            </div>
-          )}
-        </div>
+        {/* 2. YOUTUBE SIZE BANNER (Memoized isolated slider) */}
+        <SafeDealsBannerSlider adSlides={adSlides} />
 
         {/* 3. TWO ACTION CARDS - MATCHING IMAGE */}
         <div className="grid grid-cols-2 bg-white rounded-[32px] overflow-hidden border border-[#E2E8F0] shadow-sm divide-x divide-[#E2E8F0]">
@@ -2704,4 +2707,6 @@ export default function SafeDealsEscrowView({
 
     </div>
   );
-}
+});
+
+export default SafeDealsEscrowView;

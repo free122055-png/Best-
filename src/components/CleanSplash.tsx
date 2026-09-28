@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 
 interface CleanSplashProps {
   onFinish: () => void;
@@ -6,24 +6,28 @@ interface CleanSplashProps {
 
 export default function CleanSplash({ onFinish }: CleanSplashProps) {
   const [fading, setFading] = useState(false);
+  const onFinishRef = useRef(onFinish);
+  onFinishRef.current = onFinish;
 
   useEffect(() => {
-    // 1. Remove initial static index.html splash marker if present
-    const initMarker = document.getElementById('app-initial-splash');
-    if (initMarker) {
-      initMarker.remove();
-    }
+    // Prevent double invocation
+    let isMounted = true;
 
-    // 2. Display official clean splash for 1.2s, then smooth transition to login/main
+    // Display official clean splash with exact logo, then smooth transition
     const timer = setTimeout(() => {
+      if (!isMounted) return;
       setFading(true);
       setTimeout(() => {
-        onFinish();
-      }, 150);
-    }, 1200);
+        if (!isMounted) return;
+        onFinishRef.current();
+      }, 180);
+    }, 1100);
 
-    return () => clearTimeout(timer);
-  }, [onFinish]);
+    return () => {
+      isMounted = false;
+      clearTimeout(timer);
+    };
+  }, []);
 
   return (
     <div
@@ -35,17 +39,18 @@ export default function CleanSplash({ onFinish }: CleanSplashProps) {
         alignItems: 'center',
         justifyContent: 'center',
         zIndex: 999999,
-        transition: 'opacity 0.15s ease-out',
+        transition: 'opacity 0.18s ease-out',
         opacity: fading ? 0 : 1,
         pointerEvents: fading ? 'none' : 'auto',
       }}
     >
       <img
-        src="/samity_logo.svg"
+        src="/app_icon.png"
         alt="BNB Official Logo"
+        referrerPolicy="no-referrer"
         style={{
-          width: '160px',
-          height: '160px',
+          width: '180px',
+          height: '180px',
           objectFit: 'contain',
           userSelect: 'none',
         }}

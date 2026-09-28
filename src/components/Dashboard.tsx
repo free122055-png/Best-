@@ -233,7 +233,85 @@ interface DashboardProps {
   onThemeToggle?: () => void;
 }
 
-export default function Dashboard({ 
+const DashboardBannerSlider = React.memo(function DashboardBannerSlider({
+  activeSliders,
+  bannerType,
+  bannerVal
+}: {
+  activeSliders: string[];
+  bannerType: string;
+  bannerVal?: number;
+}) {
+  const [currentAdSlide, setCurrentAdSlide] = useState(0);
+
+  useEffect(() => {
+    if (!activeSliders || activeSliders.length <= 1) return;
+    const timer = setInterval(() => {
+      setCurrentAdSlide((prev) => (prev + 1) % activeSliders.length);
+    }, 4500);
+    return () => clearInterval(timer);
+  }, [activeSliders]);
+
+  if (!activeSliders || activeSliders.length === 0) return null;
+
+  let className = "relative w-full bg-slate-100 overflow-hidden border-t border-b border-slate-200/50 shadow-3xs";
+  let style: React.CSSProperties = {};
+
+  if (bannerType === 'custom' && bannerVal) {
+    style = { height: `${bannerVal}px` };
+  } else {
+    switch (bannerType) {
+      case 'thin':
+        className += ' aspect-[16/5]';
+        break;
+      case 'medium':
+        className += ' aspect-[16/7.5]';
+        break;
+      case 'thick':
+        className += ' aspect-[16/10]';
+        break;
+      case '16:9':
+        className += ' aspect-[16/9]';
+        break;
+      case 'square':
+        className += ' aspect-square';
+        break;
+      default:
+        className += ' aspect-[16/7.5]';
+        break;
+    }
+  }
+
+  return (
+    <div className="w-full">
+      <div className={className} style={style}>
+        <img 
+          src={activeSliders[currentAdSlide]} 
+          alt="Advertisement Banner" 
+          className="w-full h-full object-cover select-none transition-opacity duration-300"
+          loading="lazy"
+        />
+        {activeSliders.length > 1 && (
+          <div className="absolute bottom-3 right-4 flex items-center gap-1 bg-black/25 px-2.5 py-1.5 rounded-full backdrop-blur-xs">
+            {activeSliders.map((_, index) => (
+              <button
+                key={index}
+                type="button"
+                aria-label={'Slide ' + (index + 1)}
+                onClick={() => setCurrentAdSlide(index)}
+                className={'h-1.5 rounded-full transition-all duration-300 cursor-pointer ' + (
+                  currentAdSlide === index ? 'w-4.5 bg-[#00a884]' : 'w-1.5 bg-white/60 hover:bg-white'
+                )}
+              />
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+});
+
+export const Dashboard = React.memo(function Dashboard({ 
   user, 
   onLogout, 
   onOpenDrawer, 
@@ -465,7 +543,6 @@ export default function Dashboard({
   const [isRevealed, setIsRevealed] = useState(false);
 
   // Advertisement slider states
-  const [currentAdSlide, setCurrentAdSlide] = useState(0);
   const defaultAdSlides = [
     {
       id: 1,
@@ -501,13 +578,7 @@ export default function Dashboard({
     ? appConfig.sliders
     : adSlides.map(slide => slide.image);
 
-  useEffect(() => {
-    if (activeSliders.length <= 1) return;
-    const timer = setInterval(() => {
-      setCurrentAdSlide((prev) => (prev + 1) % activeSliders.length);
-    }, 4500);
-    return () => clearInterval(timer);
-  }, [activeSliders.length]);
+
 
   // Core Account details loaded live in real-time
   const [liveUser, setLiveUser] = useState<User>(user);
@@ -1316,22 +1387,7 @@ export default function Dashboard({
 
   // ON-DEMAND / CONDITIONAL REAL-TIME LISTENERS TO RADICALLY REDUCE FIRESTORE READ UNITS
 
-  // A. Members Directory Listener (Only active when Samity Screen or Transfer screen is opened)
-  useEffect(() => {
-    if (!user?.uid || !['samity', 'deposit', 'members'].includes(modalType)) {
-      return;
-    }
-    const unsubUsers = onSnapshot(query(collection(db, 'users'), limit(150)), (snap) => {
-      const listMems: User[] = [];
-      snap.forEach((d) => {
-        listMems.push({ uid: d.id, ...d.data() } as User);
-      });
-      setAllUsers(listMems);
-    }, (err) => {
-      console.error("Dashboard Users subscription error:", err);
-    });
-    return () => unsubUsers();
-  }, [modalType, user?.uid]);
+  // A. Members Directory (Handled centrally by global users listener)
 
   // B. Live Qard Hasana global real-time listener (Only active when Qard Screen is open)
   useEffect(() => {
@@ -3619,37 +3675,12 @@ export default function Dashboard({
               </div>
             </div>
 
-            {/* 2. Banner Slider (Full-width edge-to-edge layout as requested) */}
-            {activeSliders && activeSliders.length > 0 && (() => {
-              const { className: bannerClass, style: bannerStyle } = getBannerStyleAndClass();
-              return (
-                <div className="w-full">
-                  <div className={bannerClass} style={bannerStyle}>
-                    <img 
-                      src={activeSliders[currentAdSlide]} 
-                      alt="Advertisement Banner" 
-                      className="w-full h-full object-cover select-none"
-                    />
-                    
-                    {/* Dots indicator - Aligned bottom-right to match screenshot exactly */}
-                    {activeSliders.length > 1 && (
-                      <div className="absolute bottom-3 right-4 flex items-center gap-1 bg-black/25 px-2.5 py-1.5 rounded-full backdrop-blur-xs">
-                        {activeSliders.map((_, index) => (
-                          <button
-                            key={index}
-                            type="button"
-                            onClick={() => setCurrentAdSlide(index)}
-                            className={`h-1.5 rounded-full transition-all duration-300 ${
-                              currentAdSlide === index ? 'w-4.5 bg-[#00a884]' : 'w-1.5 bg-white/60 hover:bg-white'
-                            }`}
-                          />
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                </div>
-              );
-            })()}
+            {/* 2. Banner Slider (Isolated memoized component to prevent full Dashboard re-render) */}
+            <DashboardBannerSlider 
+              activeSliders={activeSliders} 
+              bannerType={bannerType} 
+              bannerVal={bannerVal} 
+            />
 
             {/* Main Content Area with padding px-4 */}
             <div className="px-4 space-y-4">
@@ -5231,4 +5262,6 @@ export default function Dashboard({
       </nav>
     </div>
   );
-}
+});
+
+export default Dashboard;

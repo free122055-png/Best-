@@ -63,7 +63,7 @@ interface CartItem {
   brand: string;
 }
 
-export default function SafiPremiumShop({ 
+export const SafiPremiumShop = React.memo(function SafiPremiumShop({ 
   user, 
   onClose, 
   appConfig, 
@@ -822,27 +822,26 @@ export default function SafiPremiumShop({
     }
   };
 
-  // Product Filter Logic
-  const filteredProducts = safiProducts.filter(product => {
-    if (activeTab === 'favorites') {
-      return favorites.includes(product.id);
-    }
-    const matchesSearch = product.name.toLowerCase().includes(safiSearchQuery.toLowerCase()) || 
-                          product.desc.toLowerCase().includes(safiSearchQuery.toLowerCase()) ||
-                          product.brand.toLowerCase().includes(safiSearchQuery.toLowerCase());
-    const matchesCategory = !safiSelectedCategory || product.category === safiSelectedCategory;
-    return matchesSearch && matchesCategory;
-  });
+  // Product Filter Logic (Memoized for zero lag on category click)
+  const filteredProducts = React.useMemo(() => {
+    const q = (safiSearchQuery || '').toLowerCase().trim();
+    return safiProducts.filter(product => {
+      if (activeTab === 'favorites') {
+        return favorites.includes(product.id);
+      }
+      const matchesCategory = !safiSelectedCategory || product.category === safiSelectedCategory;
+      if (!matchesCategory) return false;
+      if (!q) return true;
+      return (product.name && product.name.toLowerCase().includes(q)) || 
+             (product.desc && product.desc.toLowerCase().includes(q)) ||
+             (product.brand && product.brand.toLowerCase().includes(q));
+    });
+  }, [safiProducts, activeTab, favorites, safiSelectedCategory, safiSearchQuery]);
 
   const isEffectiveAdmin = isAdmin && !adminPreviewAsUser;
 
   return (
-    <motion.div 
-      initial={{ opacity: 0, scale: 0.98 }}
-      animate={{ opacity: 1, scale: 1 }}
-      exit={{ opacity: 0, scale: 0.98 }}
-      className="fixed inset-0 z-50 bg-[#f8fafc] w-full h-full min-h-screen font-sans flex flex-col text-slate-800"
-    >
+    <div className="fixed inset-0 z-50 bg-[#f8fafc] w-full h-full min-h-screen font-sans flex flex-col text-slate-800">
       {/* 1. Header Area */}
       <div className="bg-[#1e1e2d] text-white px-4 py-3 flex items-center justify-between shadow-md shrink-0 border-b border-white/10">
         <div className="flex items-center gap-2">
@@ -2040,6 +2039,8 @@ export default function SafiPremiumShop({
           <span className="text-[9px]">অ্যাকাউন্ট</span>
         </button>
       </div>
-    </motion.div>
+    </div>
   );
-}
+});
+
+export default SafiPremiumShop;

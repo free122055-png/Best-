@@ -222,6 +222,8 @@ function AdminUserEditModalContent(props: any) {
     setEditUserMemberId,
     editUserPhone,
     setEditUserPhone,
+    editEmail,
+    setEditEmail,
     handleReleaseAccountDeviceAndLogout,
     setEditBalance,
     setEditTelecomBalance,
@@ -409,6 +411,13 @@ function AdminUserEditModalContent(props: any) {
               </span>
               <span className="text-[10px] font-mono text-amber-300 bg-amber-950/60 border border-amber-800 px-1.5 py-0.2 rounded">
                 মেইন: ৳{safePrimitiveNumber(editBalance, 0).toLocaleString()}
+              </span>
+              <span className={`text-[10px] font-mono px-1.5 py-0.2 rounded border ${
+                editEmail 
+                  ? 'bg-cyan-950 text-cyan-300 border-cyan-700' 
+                  : 'bg-rose-950/80 text-rose-300 border-rose-800'
+              }`}>
+                {editEmail ? `✉️ ${editEmail}` : '⚠️ ইমেইল নেই (ফোন একাউন্ট)'}
               </span>
             </div>
           </div>
@@ -1034,7 +1043,7 @@ function AdminUserEditModalContent(props: any) {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-2">
             <div>
               <label className="block text-[10px] font-bold text-slate-600 mb-0.5">
                 সদস্যের পূর্ণ নাম <span className="text-rose-500">*</span>
@@ -1075,6 +1084,27 @@ function AdminUserEditModalContent(props: any) {
                 placeholder="01700000000"
                 className="block w-full px-2 py-1 bg-white border border-slate-300 rounded-lg text-xs font-mono font-bold text-slate-900 focus:outline-none focus:ring-1 focus:ring-emerald-500"
               />
+            </div>
+
+            <div>
+              <label className="block text-[10px] font-bold text-slate-600 mb-0.5 flex items-center justify-between">
+                <span>📧 লগইন ইমেইল (Login Email)</span>
+                {!editEmail && (
+                  <span className="text-[8.5px] text-amber-700 bg-amber-100 font-bold px-1 rounded">
+                    ইমেইল নেই (ফোন একাউন্ট)
+                  </span>
+                )}
+              </label>
+              <input
+                type="email"
+                value={editEmail || ''}
+                onChange={(e) => setEditEmail(e.target.value.trim().toLowerCase())}
+                placeholder="member@gmail.com"
+                className="block w-full px-2 py-1 bg-white border border-slate-300 rounded-lg text-xs font-mono font-bold text-slate-900 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+              />
+              <p className="text-[8.5px] text-slate-500 mt-0.5">
+                এখানে ইমেইল সেভ করলে ইউজার এই ইমেইল দিয়ে পুরানো একাউন্টে সরাসরি লগইন করতে পারবে।
+              </p>
             </div>
           </div>
         </div>

@@ -110,7 +110,7 @@ interface AMBTelecomScreenProps {
   allNotices?: any[];
 }
 
-export default function AMBTelecomScreen({ 
+export const AMBTelecomScreen = React.memo(function AMBTelecomScreen({ 
   user, 
   allOffers, 
   onBack, 
@@ -134,47 +134,6 @@ export default function AMBTelecomScreen({
       onBack();
     }
   };
-
-  // Premium Ad Slider and Notice variables
-  const [currentAdSlide, setCurrentAdSlide] = useState(0);
-  const defaultAdSlides = [
-    {
-      id: 1,
-      tag: "টেলিকম অফার",
-      title: "AMB টেলিকম রিচার্জ",
-      description: "সব অপারেটরে আকর্ষণীয় ক্যাশব্যাক ও সুপার ফাস্ট ফ্লেক্সিলোড ড্রাইভে অফার!",
-      bgGradient: "from-slate-950 via-cyan-950 to-emerald-950",
-      image: "https://images.unsplash.com/photo-1511707171634-5f897ff02aa9?auto=format&fit=crop&q=80&w=650"
-    },
-    {
-      id: 2,
-      tag: "সঞ্চয় ও বিনিয়োগ",
-      title: "Al Mayadin Bazar",
-      description: "নিরাপদে আপনার আমানত সঞ্চয় করুন ও সহজ ঋণের সুবিধা গ্রহণ করুন।",
-      bgGradient: "from-emerald-950 via-emerald-900 to-teal-950",
-      image: "https://images.unsplash.com/photo-1579621970563-ebec7560ff3e?auto=format&fit=crop&q=80&w=650"
-    },
-    {
-      id: 3,
-      tag: "সুদমুক্ত ঋণ",
-      title: "করযে হাসানা কল্যাণ তহবিল",
-      description: "সব মেম্বারদের জন্য বিপদের সময়ে স্বস্তি ও সুদমুক্ত করযে হাসানা ঋণ সমাধান!",
-      bgGradient: "from-stone-950 via-rose-950 to-indigo-950",
-      image: "https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?auto=format&fit=crop&q=80&w=650"
-    }
-  ];
-
-  const adSlides = appConfig?.telecomBanners && appConfig.telecomBanners.length > 0
-    ? appConfig.telecomBanners
-    : defaultAdSlides;
-
-  useEffect(() => {
-    if (adSlides.length <= 1) return;
-    const timer = setInterval(() => {
-      setCurrentAdSlide((prev) => (prev + 1) % adSlides.length);
-    }, 4500);
-    return () => clearInterval(timer);
-  }, [adSlides.length]);
 
   // Filtering states
   const [selectedOperator, setSelectedOperator] = useState<string>('all');
@@ -326,13 +285,17 @@ export default function AMBTelecomScreen({
     finalOffersList.push(...fallbackPresets);
   }
 
-  // Filter list by selected operator and category
-  const filteredOffers = finalOffersList.filter((off) => {
-    const matchesOp = selectedOperator === 'all' || off.operator.toLowerCase() === selectedOperator.toLowerCase();
-    const matchesCat = selectedCategory === 'all' || off.category === selectedCategory;
-    const matchesSearch = off.title.toLowerCase().includes(searchQuery.toLowerCase()) || off.operator.toLowerCase().includes(searchQuery.toLowerCase());
-    return matchesOp && matchesCat && matchesSearch;
-  });
+  // Filter list by selected operator and category (Memoized for zero lag on category and operator click)
+  const filteredOffers = React.useMemo(() => {
+    const q = searchQuery.toLowerCase().trim();
+    return finalOffersList.filter((off) => {
+      const matchesOp = selectedOperator === 'all' || off.operator.toLowerCase() === selectedOperator.toLowerCase();
+      const matchesCat = selectedCategory === 'all' || off.category === selectedCategory;
+      if (!matchesOp || !matchesCat) return false;
+      if (!q) return true;
+      return (off.title && off.title.toLowerCase().includes(q)) || (off.operator && off.operator.toLowerCase().includes(q));
+    });
+  }, [finalOffersList, selectedOperator, selectedCategory, searchQuery]);
 
   const handleClaimDailyBonus = async () => {
     if (dailyBonusClaimed) {
@@ -1877,4 +1840,6 @@ export default function AMBTelecomScreen({
 
     </div>
   );
-}
+});
+
+export default AMBTelecomScreen;
