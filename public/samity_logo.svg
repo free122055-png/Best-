@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 800" width="800" height="800">
+  <rect width="800" height="800" fill="#000000"/>
+  <rect x="0" y="0" width="800" height="14" fill="#064e3b"/>
+  <rect x="0" y="786" width="800" height="14" fill="#064e3b"/>
+
+  <path d="M 230 85 L 675 85 C 700 85 715 100 715 125 L 715 675 C 715 700 700 715 675 715 L 85 715 L 85 230 C 85 150 150 85 230 85 Z" 
+        fill="none" stroke="#FFFFFF" stroke-width="8" stroke-linejoin="round" stroke-linecap="round"/>
+
+  <g transform="translate(400, 430)">
+    <path d="M 0 -270 C -50 -195 -50 -90 0 0 C 50 -90 50 -195 0 -270 Z" fill="#FFFFFF"/>
+    <path d="M 0 -210 L 0 -15" stroke="#000000" stroke-width="6" stroke-linecap="round"/>
+
+    <path d="M -15 -85 C -125 -190 -220 -155 -190 -55 C -140 45 -40 10 -15 -85 Z" fill="#FFFFFF"/>
+    <path d="M -140 -70 C -100 -50 -60 -40 -20 -60" stroke="#000000" stroke-width="5" stroke-linecap="round" fill="none"/>
+
+    <path d="M 15 -85 C 125 -190 220 -155 190 -55 C 140 45 40 10 15 -85 Z" fill="#FFFFFF"/>
+    <path d="M 140 -70 C 100 -50 60 -40 20 -60" stroke="#000000" stroke-width="5" stroke-linecap="round" fill="none"/>
+
+    <path d="M -130 250 C -165 200 -215 125 -250 40 C -260 15 -235 -15 -215 5 C -185 35 -165 70 -140 115 C -120 150 -100 180 -90 250 Z" fill="#FFFFFF"/>
+    <path d="M -215 5 C -170 55 -135 110 -65 165 C -45 185 -25 225 -45 250 L -125 250 C -155 190 -185 130 -225 70 C -235 55 -230 25 -215 5 Z" fill="#FFFFFF"/>
+    <path d="M -185 70 C -155 115 -115 160 -50 200 L -45 250 L -75 250 C -90 215 -125 175 -160 135 Z" fill="#FFFFFF"/>
+
+    <path d="M 130 250 C 165 200 215 125 250 40 C 260 15 235 -15 215 5 C 185 35 165 70 140 115 C 120 150 100 180 90 250 Z" fill="#FFFFFF"/>
+    <path d="M 215 5 C 170 55 135 110 65 165 C 45 185 25 225 45 250 L 125 250 C 155 190 185 130 225 70 C 235 55 230 25 215 5 Z" fill="#FFFFFF"/>
+    <path d="M 185 70 C 155 115 115 160 50 200 L 45 250 L 75 250 C 90 215 125 175 160 135 Z" fill="#FFFFFF"/>
+
+    <path d="M -50 250 L -40 145 C -25 115 0 95 0 65 C 0 95 25 115 40 145 L 50 250 Z" fill="#000000"/>
+
+    <g transform="translate(0, 85)">
+      <text x="0" y="0" text-anchor="middle" dominant-baseline="central"
+            font-family="'Arial Black', 'Impact', sans-serif" font-weight="900" font-style="italic" font-size="94"
+            fill="#000000" stroke="#000000" stroke-width="20" stroke-linejoin="round" letter-spacing="3">BNB</text>
+      <text x="0" y="0" text-anchor="middle" dominant-baseline="central"
+            font-family="'Arial Black', 'Impact', sans-serif" font-weight="900" font-style="italic" font-size="94"
+            fill="#FFFFFF" letter-spacing="3">BNB</text>
+    </g>
+  </g>
+</svg>

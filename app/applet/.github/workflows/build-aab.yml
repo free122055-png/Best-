@@ -1,0 +1,61 @@
+name: Build Signed Android AAB (Google Play Store)
+
+on:
+  push:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+jobs:
+  build-aab:
+    name: Build Signed Android App Bundle (AAB)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Setup Java JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+
+      - name: Install Node Dependencies
+        run: npm install --legacy-peer-deps
+
+      - name: Build Web Production Bundle
+        run: npm run build
+
+      - name: Sync Capacitor Android
+        run: npx cap sync android
+
+      - name: Verify Authentic Release Keystore
+        run: |
+          echo "=== Verifying Authentic Release Keystore Fingerprint ==="
+          keytool -list -v -keystore android/app/release.keystore -storepass almayadin123
+
+      - name: Grant Execute Permission to Gradle Wrapper
+        run: chmod +x android/gradlew
+
+      - name: Build Signed AAB (Bundle Release)
+        run: |
+          cd android
+          echo "=== Building Signed Android App Bundle (.aab) ==="
+          ./gradlew clean bundleRelease --no-daemon -Pandroid.suppressUnsupportedCompileSdk=36
+
+      - name: Prepare AAB Artifact
+        run: |
+          mkdir -p final-artifacts
+          cp android/app/build/outputs/bundle/release/*.aab final-artifacts/BNB-BUSINESS-Network-Bangladesh-release.aab || cp android/app/build/outputs/bundle/release/*.aab final-artifacts/app-release.aab
+
+      - name: Upload AAB Artifact for Play Console
+        uses: actions/upload-artifact@v4
+        with:
+          name: Google-Play-Release-AAB
+          path: final-artifacts/*.aab
+          retention-days: 30

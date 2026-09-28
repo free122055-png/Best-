@@ -1,0 +1,26 @@
+workflows:
+  android-workflow:
+    name: Android Build (AAB & APK)
+    max_build_duration: 60
+    instance_type: mac_mini_m1
+    environment:
+      node: 20.x
+      java: 17
+    scripts:
+      - name: Install Node Dependencies
+        script: |
+          npm install
+      - name: Build Web Assets (Vite)
+        script: |
+          npm run build
+      - name: Sync Capacitor Android Project
+        script: |
+          npx cap sync android
+      - name: Build Android App Bundle (.aab) and APK (.apk)
+        script: |
+          cd android
+          chmod +x gradlew
+          ./gradlew bundleRelease assembleRelease
+    artifacts:
+      - android/app/build/outputs/bundle/release/*.aab
+      - android/app/build/outputs/apk/release/*.apk

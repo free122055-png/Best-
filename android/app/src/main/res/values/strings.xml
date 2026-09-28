@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">BNB BUSINESS Network Bangladesh</string>
+    <string name="title_activity_main">BNB BUSINESS Network Bangladesh</string>
+    <string name="package_name">com.bnb.business.network</string>
+    <string name="custom_url_scheme">com.bnb.business.network</string>
+</resources>

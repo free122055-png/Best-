@@ -1,0 +1,972 @@
+showHeaderPendingModal && (
+        <div className="fixed inset-0 z-[100000] bg-slate-900/70 backdrop-blur-xs flex flex-col w-screen h-screen min-h-screen text-left overflow-hidden animate-fade-in font-sans p-0 m-0 text-slate-800">
+          <div className="bg-[#f8fafc] w-full h-full flex flex-col overflow-hidden font-sans">
+            
+            {/* TOAST COPIED NOTICE */}
+            {copiedNotice && (
+              <div className="fixed top-3 left-1/2 -translate-x-1/2 z-[100002] bg-slate-900 text-amber-300 border border-amber-400/50 shadow-2xl px-4 py-1.5 rounded-xl font-bold text-xs flex items-center gap-1.5 animate-bounce">
+                <span>{copiedNotice}</span>
+              </div>
+            )}
+
+            {/* 1. TOP HEADER BAR - PROFESSIONAL DARK SLATE BAR */}
+            <div className="px-2.5 sm:px-3 py-1.5 bg-[#0f172a] text-white flex items-center justify-between shrink-0 border-b border-slate-800 shadow-xs">
+              <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap overflow-hidden">
+                <div className="w-5 h-5 rounded-md bg-emerald-500/20 border border-emerald-500/40 text-emerald-400 flex items-center justify-center font-bold text-[11px] shrink-0">
+                  🕒
+                </div>
+                <h3 className="text-xs sm:text-sm font-black text-white tracking-tight shrink-0 mr-1">
+                  প্রসেসিং সেন্টার
+                </h3>
+
+                {/* Status Badges */}
+                <div className="flex items-center gap-1 text-[10px] flex-wrap">
+                  <span className="bg-amber-950/80 border border-amber-500/40 text-amber-300 px-1.5 py-0.2 rounded font-bold">
+                    ⏳ পেন্ডিং: {transactions.filter(t => t.status === "pending").length}
+                  </span>
+                  <span className="bg-emerald-950/80 border border-emerald-500/40 text-emerald-300 px-1.5 py-0.2 rounded font-bold">
+                    ✅ সফল: {transactions.filter(t => t.status === "success").length}
+                  </span>
+                  <span className="bg-rose-950/80 border border-rose-500/40 text-rose-300 px-1.5 py-0.2 rounded font-bold">
+                    ❌ বাতিল: {transactions.filter(t => (t.status as any) === "rejected" || (t.status as any) === "failed" || (t.status as any) === "canceled").length}
+                  </span>
+                </div>
+              </div>
+
+              {/* Right Close Button */}
+              <button
+                type="button"
+                onClick={() => setShowHeaderPendingModal(false)}
+                className="w-6 h-6 rounded-md bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white flex items-center justify-center transition cursor-pointer shrink-0 text-xs font-bold border border-slate-700"
+                title="বন্ধ করুন"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* 2. FILTER BARS & SEARCH INPUT (CLEAN WHITE THEME) */}
+            <div className="bg-white border-b border-slate-200 px-2.5 py-1.5 space-y-1.5 shrink-0 shadow-2xs">
+              
+              {/* LINE 1: STATUS & SERVICE CATEGORIES */}
+              <div className="flex items-center gap-1 overflow-x-auto pb-0.5 scrollbar-none text-[11px]">
+                <span className="font-black text-slate-700 shrink-0 text-[10px] flex items-center gap-0.5">
+                  <span>🎯</span>
+                  <span className="hidden sm:inline">স্ট্যাটাস:</span>
+                </span>
+
+                {/* Status Group */}
+                {[
+                  { id: "pending", label: "⏳ পেন্ডিং", count: transactions.filter(t => t.status === "pending").length },
+                  { id: "success", label: "✅ সফল", count: transactions.filter(t => t.status === "success").length },
+                  { id: "rejected", label: "❌ বাতিল", count: transactions.filter(t => (t.status as any) === "rejected" || (t.status as any) === "failed" || (t.status as any) === "canceled").length },
+                  { id: "all", label: "🌐 সব", count: transactions.length }
+                ].map((st) => {
+                  const isActive = headerPendingStatusFilter === st.id;
+                  return (
+                    <button
+                      key={st.id}
+                      type="button"
+                      onClick={() => setHeaderPendingStatusFilter(st.id as any)}
+                      className={`px-2 py-0.5 rounded-md font-bold transition cursor-pointer whitespace-nowrap text-[10px] flex items-center gap-1 ${
+                        isActive
+                          ? st.id === "pending"
+                            ? "bg-amber-500 text-white shadow-xs font-black ring-1 ring-amber-400"
+                            : st.id === "success"
+                            ? "bg-emerald-600 text-white shadow-xs font-black ring-1 ring-emerald-400"
+                            : st.id === "rejected"
+                            ? "bg-rose-600 text-white shadow-xs font-black ring-1 ring-rose-400"
+                            : "bg-slate-900 text-white shadow-xs font-black ring-1 ring-slate-700"
+                          : "bg-slate-100 text-slate-700 hover:bg-slate-200 border border-slate-200"
+                      }`}
+                    >
+                      <span>{st.label}</span>
+                      <span className={`px-1 rounded text-[9px] font-bold ${
+                        isActive ? "bg-black/25 text-white" : "bg-slate-200 text-slate-800"
+                      }`}>
+                        {st.count}
+                      </span>
+                    </button>
+                  );
+                })}
+
+                <div className="h-3 w-[1px] bg-slate-300 mx-0.5 shrink-0" />
+
+                {/* Service Category Group */}
+                {[
+                  { id: "all", label: "📂 সব সার্ভিস" },
+                  { id: "add_money", label: "💰 অ্যাড মানি" },
+                  { id: "withdraw", label: "💳 উইথড্র" },
+                  { id: "telecom", label: "📱 টেলিকম রিচার্জ" },
+                  { id: "loan", label: "⚖️ লোন / ঋণ" },
+                  { id: "other", label: "📜 অন্যান্য" }
+                ].map((tab) => {
+                  const isActive = headerPendingTab === tab.id;
+                  return (
+                    <button
+                      key={tab.id}
+                      type="button"
+                      onClick={() => setHeaderPendingTab(tab.id as any)}
+                      className={`px-1.5 py-0.5 rounded-md font-bold transition cursor-pointer whitespace-nowrap text-[10px] ${
+                        isActive
+                          ? "bg-slate-800 text-white shadow-xs font-black ring-1 ring-slate-600"
+                          : "bg-slate-100 text-slate-700 hover:bg-slate-200 border border-slate-200"
+                      }`}
+                    >
+                      {tab.label}
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* LINE 2: ALL PAYMENT GATEWAYS (CLICKABLE WITH AUTO-EXPAND) */}
+              {(() => {
+                const getTxMethodKey = (t: any): string => {
+                  const raw = (
+                    (t.paymentMethod || "") + " " +
+                    (t.method || "") + " " +
+                    (t.gateway || "") + " " +
+                    (t.bankName || "") + " " +
+                    (t.senderMethod || "") + " " +
+                    (t.operator || "") + " " +
+                    (t.provider || "") + " " +
+                    (t.description || "") + " " +
+                    (t.typeLabel || "") + " " +
+                    (t.title || "") + " " +
+                    (t.note || "")
+                  ).toLowerCase();
+
+                  if (raw.includes("nagad") || raw.includes("নগদ")) return "nagad";
+                  if (raw.includes("rocket") || raw.includes("রকেট") || raw.includes("dbbl rocket")) return "rocket";
+                  if (raw.includes("upay") || raw.includes("উপায়") || raw.includes("উপায়")) return "upay";
+                  if (raw.includes("cellfin") || raw.includes("সেলফিন") || raw.includes("ibbl cellfin")) return "cellfin";
+                  if (raw.includes("foreign") || raw.includes("abroad") || raw.includes("প্রবাসী") || raw.includes("রেমিট্যান্স") || raw.includes("remittance") || raw.includes("বিদেশি")) return "foreign_bank";
+                  if (raw.includes("bank") || raw.includes("bbc") || raw.includes("ব্যাংক") || raw.includes("islamic") || raw.includes("ইসলামী") || raw.includes("brac") || raw.includes("ব্র্যাক") || raw.includes("dutch") || raw.includes("city bank") || raw.includes("sonali")) return "bank";
+                  if (raw.includes("bkash") || raw.includes("বিকাশ") || raw.includes("b-kash")) return "bkash";
+                  return "bkash";
+                };
+
+                const calcMethodStats = (methodKey: string) => {
+                  const filtered = transactions.filter(t => methodKey === "all" ? true : getTxMethodKey(t) === methodKey);
+                  const count = filtered.length;
+                  const total = filtered.reduce((sum, t) => sum + (Number(t.amount) || 0), 0);
+                  return { count, total };
+                };
+
+                const methods = [
+                  { id: "all", label: "সকল মাধ্যম", icon: "🌐" },
+                  { id: "bkash", label: "বিকাশ", icon: "💖" },
+                  { id: "nagad", label: "নগদ", icon: "🧡" },
+                  { id: "rocket", label: "রকেট", icon: "🚀" },
+                  { id: "upay", label: "উপায়", icon: "💛" },
+                  { id: "cellfin", label: "সেলফিন", icon: "🔵" },
+                  { id: "bank", label: "ব্যাংক", icon: "🏦" },
+                  { id: "foreign_bank", label: "প্রবাসী ব্যাংক", icon: "🌍" }
+                ];
+
+                return (
+                  <div className="flex items-center gap-1 overflow-x-auto pb-0.5 scrollbar-none text-[10px]">
+                    <span className="text-slate-500 font-bold shrink-0 flex items-center gap-0.5">
+                      <span>💳</span>
+                    </span>
+                    {methods.map((m) => {
+                      const { count, total } = calcMethodStats(m.id);
+                      const isSelected = headerPendingAddMoneyMethod === m.id;
+                      return (
+                        <button
+                          key={m.id}
+                          type="button"
+                          onClick={() => {
+                            setHeaderPendingAddMoneyMethod(m.id);
+                            // If a specific gateway is tapped and there are no items in the active status filter, auto-switch status to "all"
+                            if (m.id !== "all") {
+                              const matchInCurrent = transactions.filter(t => {
+                                const matchMethod = getTxMethodKey(t) === m.id;
+                                if (headerPendingStatusFilter === "pending") return matchMethod && t.status === "pending";
+                                if (headerPendingStatusFilter === "success") return matchMethod && t.status === "success";
+                                if (headerPendingStatusFilter === "rejected") return matchMethod && ((t.status as any) === "rejected" || (t.status as any) === "failed" || (t.status as any) === "canceled");
+                                return matchMethod;
+                              });
+                              if (matchInCurrent.length === 0) {
+                                setHeaderPendingStatusFilter("all");
+                              }
+                            }
+                          }}
+                          className={`px-2 py-0.5 rounded-md font-bold transition cursor-pointer whitespace-nowrap flex items-center gap-1 shrink-0 ${
+                            isSelected
+                              ? "bg-emerald-600 text-white shadow-xs ring-1 ring-emerald-400 font-black"
+                              : "bg-slate-100 text-slate-700 hover:bg-slate-200 border border-slate-200"
+                          }`}
+                          title={`${m.label}: মোট ${count} টি লেনদেন, ৳${total.toLocaleString("en-US", { maximumFractionDigits: 0 })}`}
+                        >
+                          <span>{m.icon}</span>
+                          <span>{m.label}</span>
+                          <span className={`px-1 rounded text-[9px] font-mono font-bold ${
+                            isSelected ? "bg-black/25 text-white" : "bg-slate-200 text-emerald-800"
+                          }`}>
+                            ৳{total.toLocaleString("en-US", { maximumFractionDigits: 0 })}
+                          </span>
+                          <span className="opacity-75 text-[8px]">({count})</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                );
+              })()}
+
+              {/* LINE 3: SEARCH INPUT */}
+              <div className="relative">
+                <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
+                <input
+                  type="text"
+                  placeholder="নাম, মোবাইল নম্বর, TrxID, বিবরণ লিখে দ্রুত সার্চ..."
+                  value={headerPendingSearchQuery}
+                  onChange={(e) => setHeaderPendingSearchQuery(e.target.value)}
+                  className="w-full pl-8 pr-7 py-1 text-xs bg-slate-50 border border-slate-300 rounded-lg text-slate-900 placeholder-slate-400 focus:bg-white focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500"
+                />
+                {headerPendingSearchQuery && (
+                  <button
+                    type="button"
+                    onClick={() => setHeaderPendingSearchQuery("")}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 text-[10px] font-bold cursor-pointer"
+                  >
+                    ✕
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* 3. DATE HIGHLIGHTS BAR (SINGLE SLIM LINE - CLEAN LIGHT THEME) */}
+            {(() => {
+              const todayStr = new Date().toISOString().split("T")[0];
+              const yDate = new Date();
+              yDate.setDate(yDate.getDate() - 1);
+              const yesterdayStr = yDate.toISOString().split("T")[0];
+
+              const todayTxs = transactions.filter(t => getTxDateString(t) === todayStr);
+              const todayTotalAmount = todayTxs.reduce((sum, t) => sum + (Number(t.amount) || 0), 0);
+              const todayTxCount = todayTxs.length;
+
+              const yesterdayTxs = transactions.filter(t => getTxDateString(t) === yesterdayStr);
+              const yesterdayTotalAmount = yesterdayTxs.reduce((sum, t) => sum + (Number(t.amount) || 0), 0);
+              const yesterdayTxCount = yesterdayTxs.length;
+
+              return (
+                <div className="bg-white px-2 sm:px-2.5 py-1 text-slate-800 flex items-center gap-1 sm:gap-1.5 overflow-x-auto whitespace-nowrap scrollbar-none shrink-0 border-b border-slate-200 text-[10px]">
+                  {/* 1. আজ */}
+                  <button
+                    type="button"
+                    onClick={() => { setHeaderPendingDateFilter("today"); setHeaderPendingCustomDate(""); }}
+                    className={`px-2 py-0.5 rounded-md font-bold transition cursor-pointer flex items-center gap-1 text-[10px] shrink-0 ${
+                      headerPendingDateFilter === "today"
+                        ? "bg-emerald-600 text-white shadow-xs ring-1 ring-emerald-400"
+                        : "bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 text-emerald-800"
+                    }`}
+                    title="আজকের সকল লেনদেন দেখতে ক্লিক করুন"
+                  >
+                    <span>📅 আজঃ</span>
+                    <span className="font-mono font-black">
+                      ৳{todayTotalAmount.toLocaleString("en-US", { maximumFractionDigits: 0 })}
+                    </span>
+                    <span className="bg-emerald-200/80 px-1 py-0.1 rounded text-[9px] font-bold text-emerald-900">
+                      ({todayTxCount})
+                    </span>
+                  </button>
+
+                  {/* 2. গতকাল */}
+                  <button
+                    type="button"
+                    onClick={() => { setHeaderPendingDateFilter("yesterday"); setHeaderPendingCustomDate(""); }}
+                    className={`px-2 py-0.5 rounded-md font-bold transition cursor-pointer flex items-center gap-1 text-[10px] shrink-0 ${
+                      headerPendingDateFilter === "yesterday"
+                        ? "bg-sky-600 text-white shadow-xs ring-1 ring-sky-400"
+                        : "bg-sky-50 hover:bg-sky-100 border border-sky-300 text-sky-800"
+                    }`}
+                    title="গতকালের সকল লেনদেন দেখতে ক্লিক করুন"
+                  >
+                    <span>📅 গতকালঃ</span>
+                    <span className="font-mono font-black">
+                      ৳{yesterdayTotalAmount.toLocaleString("en-US", { maximumFractionDigits: 0 })}
+                    </span>
+                    <span className="bg-sky-200/80 px-1 py-0.1 rounded text-[9px] font-bold text-sky-900">
+                      ({yesterdayTxCount})
+                    </span>
+                  </button>
+
+                  {/* 3. ক্যালেন্ডার */}
+                  <div className="flex items-center gap-1 bg-slate-50 border border-amber-400/80 px-1.5 py-0.5 rounded-md text-[10px] shrink-0">
+                    <span className="text-amber-700 font-bold flex items-center gap-0.5">
+                      <span>🗓️</span>
+                      <span className="hidden sm:inline">তারিখ:</span>
+                    </span>
+                    <input
+                      type="date"
+                      min="2026-01-01"
+                      max="2050-12-31"
+                      value={headerPendingCustomDate}
+                      onChange={(e) => {
+                        setHeaderPendingCustomDate(e.target.value);
+                        setHeaderPendingDateFilter(e.target.value ? "custom" : "all");
+                      }}
+                      className="bg-white text-slate-800 font-mono font-bold text-[10px] px-1 py-0.2 rounded border border-slate-300 outline-none cursor-pointer"
+                    />
+                    {headerPendingCustomDate && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setHeaderPendingCustomDate("");
+                          setHeaderPendingDateFilter("all");
+                        }}
+                        className="text-slate-500 hover:text-slate-800 font-bold text-[10px] px-1 cursor-pointer"
+                        title="ক্লিয়ার করুন"
+                      >
+                        ✕
+                      </button>
+                    )}
+                  </div>
+
+                  {/* 4. সব তারিখ */}
+                  <button
+                    type="button"
+                    onClick={() => { setHeaderPendingDateFilter("all"); setHeaderPendingCustomDate(""); }}
+                    className={`px-2 py-0.5 rounded font-black transition cursor-pointer shrink-0 ${
+                      headerPendingDateFilter === "all" && !headerPendingCustomDate
+                        ? "bg-amber-400 text-slate-950 font-black shadow-xs"
+                        : "bg-slate-100 text-slate-700 hover:bg-slate-200 border border-slate-200"
+                    }`}
+                  >
+                    🟡 সব তারিখ
+                  </button>
+                </div>
+              );
+            })()}
+
+            {/* 4. MAIN BODY (CLEAN WHITE / SLATE BACKGROUND WITH CRISP CARDS) */}
+            <div className="flex-1 overflow-y-auto p-2 sm:p-2.5 space-y-2 bg-[#f1f5f9]">
+              
+              {(() => {
+                let list = transactions;
+
+                const getTxMethodKey = (t: any): string => {
+                  const raw = (
+                    (t.paymentMethod || "") + " " +
+                    (t.method || "") + " " +
+                    (t.gateway || "") + " " +
+                    (t.bankName || "") + " " +
+                    (t.senderMethod || "") + " " +
+                    (t.operator || "") + " " +
+                    (t.provider || "") + " " +
+                    (t.description || "") + " " +
+                    (t.typeLabel || "") + " " +
+                    (t.title || "") + " " +
+                    (t.note || "")
+                  ).toLowerCase();
+
+                  if (raw.includes("nagad") || raw.includes("নগদ")) return "nagad";
+                  if (raw.includes("rocket") || raw.includes("রকেট") || raw.includes("dbbl rocket")) return "rocket";
+                  if (raw.includes("upay") || raw.includes("উপায়") || raw.includes("উপায়")) return "upay";
+                  if (raw.includes("cellfin") || raw.includes("সেলফিন") || raw.includes("ibbl cellfin")) return "cellfin";
+                  if (raw.includes("foreign") || raw.includes("abroad") || raw.includes("প্রবাসী") || raw.includes("রেমিট্যান্স") || raw.includes("remittance") || raw.includes("বিদেশি")) return "foreign_bank";
+                  if (raw.includes("bank") || raw.includes("bbc") || raw.includes("ব্যাংক") || raw.includes("islamic") || raw.includes("ইসলামী") || raw.includes("brac") || raw.includes("ব্র্যাক") || raw.includes("dutch") || raw.includes("city bank") || raw.includes("sonali")) return "bank";
+                  if (raw.includes("bkash") || raw.includes("বিকাশ") || raw.includes("b-kash")) return "bkash";
+                  return "bkash";
+                };
+
+                // Status Filter
+                if (headerPendingStatusFilter === "pending") {
+                  list = list.filter(t => t.status === "pending");
+                } else if (headerPendingStatusFilter === "success") {
+                  list = list.filter(t => t.status === "success");
+                } else if (headerPendingStatusFilter === "rejected") {
+                  list = list.filter(t => (t.status as any) === "rejected" || (t.status as any) === "failed" || (t.status as any) === "canceled");
+                }
+
+                // Service Category Filter
+                if (headerPendingTab === "add_money") {
+                  list = list.filter(t => ["add_money", "deposit", "balance_load", "samity_deposit"].includes(t.type as string));
+                } else if (headerPendingTab === "withdraw") {
+                  list = list.filter(t => ["withdraw", "cashout"].includes(t.type as string));
+                } else if (headerPendingTab === "telecom") {
+                  list = list.filter(t => ["telecom", "telecom_recharge", "drive_pack", "airtime"].includes(t.type as string));
+                } else if (headerPendingTab === "loan") {
+                  list = list.filter(t => ["loan", "coop_loan_apply", "qard_loan_request", "qard_hasana"].includes(t.type as string));
+                } else if (headerPendingTab === "other") {
+                  list = list.filter(t => !["add_money", "deposit", "balance_load", "samity_deposit", "withdraw", "cashout", "telecom", "telecom_recharge", "drive_pack", "airtime", "loan", "coop_loan_apply", "qard_loan_request", "qard_hasana"].includes(t.type as string));
+                }
+
+                // Payment Method Filter
+                if (headerPendingAddMoneyMethod !== "all") {
+                  list = list.filter(t => getTxMethodKey(t) === headerPendingAddMoneyMethod);
+                }
+
+                // Date Filter
+                if (headerPendingDateFilter === "today") {
+                  const todayStr = new Date().toISOString().split("T")[0];
+                  list = list.filter(t => getTxDateString(t) === todayStr);
+                } else if (headerPendingDateFilter === "yesterday") {
+                  const y = new Date();
+                  y.setDate(y.getDate() - 1);
+                  const yestStr = y.toISOString().split("T")[0];
+                  list = list.filter(t => getTxDateString(t) === yestStr);
+                } else if (headerPendingDateFilter === "custom" && headerPendingCustomDate) {
+                  list = list.filter(t => getTxDateString(t) === headerPendingCustomDate);
+                }
+
+                // Search Query Filter
+                if (headerPendingSearchQuery.trim()) {
+                  const q = headerPendingSearchQuery.trim().toLowerCase();
+                  list = list.filter(t => {
+                    const name = (t.userName || "").toLowerCase();
+                    const phone = (t.phone || (t as any).userPhone || (t as any).senderNumber || "").toLowerCase();
+                    const txn = (t.transactionId || (t as any).trxId || t.id || "").toLowerCase();
+                    const desc = (t.description || "").toLowerCase();
+                    return name.includes(q) || phone.includes(q) || txn.includes(q) || desc.includes(q);
+                  });
+                }
+
+                // Calculate Ledger Stats for this filtered list
+                const creditSum = list
+                  .filter(t => t.status === "success" && ["add_money", "deposit", "balance_load", "samity_deposit"].includes(t.type as string))
+                  .reduce((acc, t) => acc + (Number(t.amount) || 0), 0);
+
+                const debitSum = list
+                  .filter(t => t.status === "success" && ["withdraw", "loan_disbursment"].includes(t.type as string))
+                  .reduce((acc, t) => acc + (Number(t.amount) || 0), 0);
+
+                const pendingCountInList = list.filter(t => t.status === "pending").length;
+                const successCountInList = list.filter(t => t.status === "success").length;
+                const netImpact = creditSum - debitSum;
+
+                // Helper to cleanly extract unmasked phone numbers
+                const getCleanPhoneNumber = (raw: any): string => {
+                  if (!raw || typeof raw !== "string") return "";
+                  if (raw.includes("XXXX") || raw.includes("xxxx")) return "";
+                  const match = raw.match(/(?:880|0)?(1[3-9]\d{8})/);
+                  return match ? "0" + match[1] : (raw.trim().length >= 11 ? raw.trim() : "");
+                };
+
+                const extractPhoneFromText = (txt: any): string => {
+                  if (!txt || typeof txt !== "string") return "";
+                  const match = txt.match(/(?:880|0)?(1[3-9]\d{8})/);
+                  return match ? "0" + match[1] : "";
+                };
+
+                return (
+                  <>
+                    {/* 4A. LEDGER SUMMARY CARD (ELEGANT EMERALD GRADIENT) */}
+                    <div className="bg-gradient-to-r from-emerald-800 to-emerald-950 border border-emerald-700/80 rounded-xl px-3 py-2 text-white shadow-sm">
+                      <div className="flex items-center justify-between gap-1 border-b border-emerald-700/60 pb-1.5 text-[11px]">
+                        <div className="flex items-center gap-1.5">
+                          <span className="font-black text-emerald-100 text-[11px] sm:text-xs flex items-center gap-1">
+                            <span>🏢</span>
+                            <span>লেনদেন খতিয়ান হিসাব</span>
+                          </span>
+                          <span className="bg-emerald-700/90 text-white border border-emerald-500/60 px-1.5 py-0.2 rounded text-[9px] font-bold">
+                            {list.length} টি
+                          </span>
+                        </div>
+                        <div className="bg-emerald-600 border border-emerald-400 text-white px-2 py-0.5 rounded-md text-[10px] font-bold flex items-center gap-1 shadow-xs">
+                          <span className="text-emerald-100">নেট:</span>
+                          <span className="font-black text-white font-mono">
+                            {netImpact >= 0 ? "+" : ""}৳{netImpact.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* 4 Stats Grid */}
+                      <div className="grid grid-cols-4 gap-1.5 text-center pt-1.5">
+                        <div className="bg-black/25 border border-emerald-600/40 rounded-lg p-1">
+                          <span className="text-emerald-300 font-medium text-[8px] sm:text-[9px] block truncate">
+                            📥 মোট জমা
+                          </span>
+                          <span className="font-bold text-[10px] sm:text-[11px] text-emerald-100 font-mono block truncate">
+                            ৳{creditSum.toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                          </span>
+                        </div>
+
+                        <div className="bg-black/25 border border-rose-600/40 rounded-lg p-1">
+                          <span className="text-rose-300 font-medium text-[8px] sm:text-[9px] block truncate">
+                            📤 মোট উইথড্র
+                          </span>
+                          <span className="font-bold text-[10px] sm:text-[11px] text-rose-100 font-mono block truncate">
+                            ৳{debitSum.toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                          </span>
+                        </div>
+
+                        <div className="bg-black/25 border border-amber-600/40 rounded-lg p-1">
+                          <span className="text-amber-300 font-medium text-[8px] sm:text-[9px] block truncate">
+                            ⏳ পেন্ডিং
+                          </span>
+                          <span className="font-bold text-[10px] sm:text-[11px] text-amber-300 block truncate">
+                            {pendingCountInList} টি
+                          </span>
+                        </div>
+
+                        <div className="bg-black/25 border border-emerald-500/40 rounded-lg p-1">
+                          <span className="text-emerald-300 font-medium text-[8px] sm:text-[9px] block truncate">
+                            ✅ সফল
+                          </span>
+                          <span className="font-bold text-[10px] sm:text-[11px] text-emerald-300 block truncate">
+                            {successCountInList} টি
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* 4B. TRANSACTION CARDS LIST (CLEAN WHITE CARDS) */}
+                    {list.length === 0 ? (
+                      <div className="bg-white rounded-xl p-6 text-center border border-slate-200 text-slate-500 shadow-2xs space-y-2">
+                        <div className="w-10 h-10 rounded-full bg-slate-100 text-slate-400 flex items-center justify-center text-lg mx-auto">
+                          📋
+                        </div>
+                        <h4 className="text-xs font-bold text-slate-700">কোনো ট্রানজেকশন পাওয়া যায়নি</h4>
+                        <p className="text-[10px] text-slate-500">নির্বাচিত ফিল্টারের অধীনে কোনো রেকর্ড নেই</p>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setHeaderPendingStatusFilter("all");
+                            setHeaderPendingTab("all");
+                            setHeaderPendingAddMoneyMethod("all");
+                            setHeaderPendingDateFilter("all");
+                            setHeaderPendingCustomDate("");
+                            setHeaderPendingSearchQuery("");
+                          }}
+                          className="px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-md text-xs font-bold transition cursor-pointer shadow-xs"
+                        >
+                          🔄 সকল ফিল্টার রিসেট করুন
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="space-y-1.5">
+                        {list.map((tx) => {
+                          const isPending = tx.status === "pending";
+                          const isSuccess = tx.status === "success";
+                          const isRejected = (tx.status as any) === "rejected" || (tx.status as any) === "failed" || (tx.status as any) === "canceled";
+
+                          // Thorough member lookup with 0 masking
+                          const txUser = users.find(u => 
+                            (tx.userId && (u.id === tx.userId || u.uid === tx.userId || (u as any).docId === tx.userId || u.memberId === tx.userId)) ||
+                            (tx.memberId && (u.memberId === tx.memberId || u.id === tx.memberId || u.uid === tx.memberId)) ||
+                            (tx.phone && (u.phone === tx.phone || (u as any).phoneNumber === tx.phone)) ||
+                            ((tx as any).userPhone && (u.phone === (tx as any).userPhone || (u as any).phoneNumber === (tx as any).userPhone)) ||
+                            ((tx as any).senderNumber && (u.phone === (tx as any).senderNumber || (u as any).phoneNumber === (tx as any).senderNumber)) ||
+                            (tx.userName && u.name && u.name.trim().toLowerCase() === tx.userName.trim().toLowerCase())
+                          );
+
+                          const memberName = tx.userName || (tx as any).name || (tx as any).senderName || txUser?.name || "মেম্বার";
+
+                          // 100% Full Unmasked Phone Number
+                          let memberPhone = getCleanPhoneNumber(tx.phone) ||
+                                            getCleanPhoneNumber((tx as any).userPhone) ||
+                                            getCleanPhoneNumber((tx as any).phoneNumber) ||
+                                            getCleanPhoneNumber((tx as any).mobile) ||
+                                            getCleanPhoneNumber(txUser?.phone) ||
+                                            getCleanPhoneNumber((txUser as any)?.phoneNumber) ||
+                                            getCleanPhoneNumber((txUser as any)?.mobile) ||
+                                            extractPhoneFromText(tx.memberId) ||
+                                            extractPhoneFromText(tx.userId) ||
+                                            extractPhoneFromText(tx.description) ||
+                                            extractPhoneFromText((tx as any).note);
+
+                          if (!memberPhone && txUser?.phone && !txUser.phone.includes("XXXX")) {
+                            memberPhone = txUser.phone;
+                          }
+                          if (!memberPhone) {
+                            memberPhone = "ফোন নম্বর নেই";
+                          }
+
+                          // 100% Full Unmasked Sender Number
+                          let senderNumber = getCleanPhoneNumber((tx as any).senderNumber) ||
+                                             getCleanPhoneNumber((tx as any).accountNumber) ||
+                                             getCleanPhoneNumber((tx as any).senderPhone) ||
+                                             getCleanPhoneNumber((tx as any).fromNumber) ||
+                                             getCleanPhoneNumber((tx as any).targetNumber) ||
+                                             (memberPhone !== "ফোন নম্বর নেই" ? memberPhone : "");
+
+                          if (!senderNumber) {
+                            senderNumber = extractPhoneFromText(tx.description) || extractPhoneFromText(tx.userId) || memberPhone;
+                          }
+
+                          // Clean Member ID (no anon_ if real id/phone available)
+                          let memberId = (txUser?.memberId && !txUser.memberId.startsWith("anon_")) ? txUser.memberId :
+                                         (tx.memberId && !tx.memberId.startsWith("anon_")) ? tx.memberId :
+                                         ((tx as any).userMemberId && !(tx as any).userMemberId.startsWith("anon_")) ? (tx as any).userMemberId :
+                                         (txUser?.id && !txUser.id.startsWith("anon_")) ? txUser.id :
+                                         (memberPhone !== "ফোন নম্বর নেই" ? memberPhone : (tx.memberId || tx.userId || "BNB-User"));
+
+                          // Method label & icon
+                          let methodRaw = tx.paymentMethod || (tx as any).method || "bKash";
+                          let methodIcon = "💖";
+                          let methodBn = "বিকাশ";
+                          if (methodRaw.toLowerCase().includes("nagad")) { methodIcon = "🧡"; methodBn = "নগদ"; }
+                          else if (methodRaw.toLowerCase().includes("rocket")) { methodIcon = "🚀"; methodBn = "রকেট"; }
+                          else if (methodRaw.toLowerCase().includes("upay")) { methodIcon = "💛"; methodBn = "উপায়"; }
+                          else if (methodRaw.toLowerCase().includes("cellfin")) { methodIcon = "🔵"; methodBn = "সেলফিন"; }
+                          else if (methodRaw.toLowerCase().includes("bank")) { methodIcon = "🏦"; methodBn = "ব্যাংক"; }
+
+                          // Type label & icon
+                          let typeIcon = "💰";
+                          let typeBn = "ডিপোজিট / অ্যাড মানি";
+                          if ((tx.type as string) === "withdraw") { typeIcon = "💳"; typeBn = "উইথড্র / ক্যাশআউট"; }
+                          else if ((tx.type as string) === "telecom" || (tx.type as string) === "telecom_recharge") { typeIcon = "📱"; typeBn = "টেলিকম রিচার্জ"; }
+                          else if ((tx.type as string) === "drive_pack") { typeIcon = "🚀"; typeBn = "ড্রাইভ প্যাক"; }
+                          else if ((tx.type as string) === "loan" || (tx.type as string) === "coop_loan_apply") { typeIcon = "⚖️"; typeBn = "সমবায় ঋণ"; }
+                          else if ((tx.type as string) === "qard_loan_request" || (tx.type as string) === "qard_hasana") { typeIcon = "🤲"; typeBn = "কর্জের হাসানা"; }
+                          else if (tx.typeLabel) { typeBn = tx.typeLabel; }
+
+                          const trxId = tx.transactionId || (tx as any).trxId || tx.id || "N/A";
+                          const formattedAmount = Number(tx.amount || 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                          
+                          // Format exact date matching: 8/16/2026, 10:47:37 PM
+                          const formatDateTimeExact = (val: any): string => {
+                            if (!val) return "N/A";
+                            try {
+                              let d: Date;
+                              if (typeof val === "object" && val && "seconds" in val) {
+                                d = new Date(val.seconds * 1000);
+                              } else {
+                                d = new Date(val);
+                              }
+                              if (isNaN(d.getTime())) return String(val);
+                              const month = d.getMonth() + 1;
+                              const day = d.getDate();
+                              const year = d.getFullYear();
+                              let hours = d.getHours();
+                              const minutes = String(d.getMinutes()).padStart(2, "0");
+                              const seconds = String(d.getSeconds()).padStart(2, "0");
+                              const ampm = hours >= 12 ? "PM" : "AM";
+                              hours = hours % 12;
+                              hours = hours ? hours : 12;
+                              return `${month}/${day}/${year}, ${hours}:${minutes}:${seconds} ${ampm}`;
+                            } catch {
+                              return String(val);
+                            }
+                          };
+
+                          const timeFormatted = formatDateTimeExact(tx.createdAt || (tx as any).date || (tx as any).timestamp);
+                          
+                          const isExpanded = !!expandedTxIds[tx.id];
+                          const toggleExpand = () => {
+                            setExpandedTxIds(prev => ({
+                              ...prev,
+                              [tx.id]: !isExpanded
+                            }));
+                          };
+
+                          // Open user profile edit modal
+                          const handleOpenMemberProfile = () => {
+                            const targetUser = txUser || users.find(u => 
+                              u.id === tx.userId || 
+                              u.memberId === tx.userId || 
+                              (memberPhone !== "ফোন নম্বর নেই" && u.phone === memberPhone) || 
+                              (senderNumber !== "ফোন নম্বর নেই" && u.phone === senderNumber)
+                            ) || {
+                              id: tx.userId || tx.id,
+                              memberId: memberId,
+                              name: memberName,
+                              phone: memberPhone !== "ফোন নম্বর নেই" ? memberPhone : "01700000000",
+                              balance: 0,
+                              telecomBalance: 0,
+                              superShopBalance: 0,
+                              savings: 0,
+                              dueLoan: 0,
+                              role: "user",
+                              status: "active"
+                            };
+                            openUserEditModal(targetUser as User);
+                          };
+
+                          // Copy single item handler
+                          const handleCopySingle = (txt: string, label: string) => {
+                            if (!txt || txt === "ফোন নম্বর নেই") return;
+                            navigator.clipboard.writeText(txt);
+                            setCopiedNotice(`✅ ${label} কপি হয়েছে: ${txt}`);
+                            setTimeout(() => setCopiedNotice(""), 2500);
+                          };
+
+                          // Copy full WhatsApp template
+                          const handleCopyAllWhatsapp = () => {
+                            let statusTextBn = "পেন্ডিং (Pending)";
+                            if (isSuccess) statusTextBn = "সফল (Approved / Success)";
+                            else if (isRejected) statusTextBn = "বাতিল (Rejected)";
+
+                            const formattedText = `📋 লেনদেন আবেদন বিবরণী (BNB Network)
+━━━━━━━━━━━━━━━━━━━━━
+👤 মেম্বার নাম: ${memberName}
+🆔 মেম্বার আইডি: ${memberId}
+📱 মেম্বার ফোন: ${memberPhone}
+📂 ট্রানজেকশন ধরন: ${typeBn}
+💳 পেমেন্ট মেথড: ${methodBn}
+📞 প্রেরক/অ্যাকাউন্ট নম্বর: ${senderNumber}
+🔢 ট্রানজেকশন আইডি (TrxID): ${trxId}
+💵 টাকার পরিমাণ: ৳${formattedAmount} BDT
+⏰ আবেদনের সময়: ${timeFormatted}
+📌 বর্তমান স্ট্যাটাস: ${statusTextBn}
+━━━━━━━━━━━━━━━━━━━━━`;
+
+                            navigator.clipboard.writeText(formattedText);
+                            setCopiedNotice("✅ সম্পূর্ণ বিবরণী কপি হয়েছে! হোয়াটসঅ্যাপে পেস্ট করুন");
+                            setTimeout(() => setCopiedNotice(""), 3000);
+                          };
+
+                          return (
+                            <div
+                              key={tx.id}
+                              className="bg-white border border-slate-200 hover:border-emerald-500 rounded-xl p-2 sm:p-2.5 shadow-2xs text-left space-y-1.5 transition text-slate-800"
+                            >
+                              {/* 1. TOP ROW: STATUS BADGE, TYPE, METHOD, TIME, AMOUNT & "আরো দেখুন" */}
+                              <div className="flex items-center justify-between gap-1 flex-wrap">
+                                <div className="flex items-center gap-1 flex-wrap">
+                                  {isPending && (
+                                    <span className="bg-amber-100 text-amber-900 border border-amber-300 px-1.5 py-0.2 rounded font-bold text-[9px] sm:text-[10px] flex items-center gap-0.5">
+                                      🟡 পেন্ডিং
+                                    </span>
+                                  )}
+                                  {isSuccess && (
+                                    <span className="bg-emerald-100 text-emerald-900 border border-emerald-300 px-1.5 py-0.2 rounded font-bold text-[9px] sm:text-[10px] flex items-center gap-0.5">
+                                      ✅ সফল
+                                    </span>
+                                  )}
+                                  {isRejected && (
+                                    <span className="bg-rose-100 text-rose-900 border border-rose-300 px-1.5 py-0.2 rounded font-bold text-[9px] sm:text-[10px] flex items-center gap-0.5">
+                                      ❌ বাতিল
+                                    </span>
+                                  )}
+
+                                  <span className="bg-emerald-700 text-white px-1.5 py-0.2 rounded font-bold text-[9px] sm:text-[10px] flex items-center gap-0.5 shadow-2xs">
+                                    {typeIcon} {typeBn}
+                                  </span>
+
+                                  <span className="bg-rose-50 text-rose-800 border border-rose-200 px-1.5 py-0.2 rounded font-bold text-[9px] sm:text-[10px] flex items-center gap-0.5">
+                                    {methodIcon} {methodBn}
+                                  </span>
+
+                                  <span className="text-slate-500 font-mono text-[9px]">
+                                    {timeFormatted}
+                                  </span>
+                                </div>
+
+                                <div className="flex items-center gap-1.5 ml-auto">
+                                  <span className="text-emerald-700 font-black text-xs sm:text-sm font-mono">
+                                    ৳{formattedAmount}
+                                  </span>
+
+                                  <button
+                                    type="button"
+                                    onClick={toggleExpand}
+                                    className="bg-slate-100 hover:bg-slate-200 text-slate-800 border border-slate-300 px-2 py-0.5 rounded-md font-bold text-[9px] sm:text-[10px] flex items-center gap-0.5 cursor-pointer transition shadow-2xs active:scale-95"
+                                  >
+                                    <span>{isExpanded ? "সংক্ষেপ 🔼" : "আরো দেখুন 🔽"}</span>
+                                  </button>
+                                </div>
+                              </div>
+
+                              {/* 2. COMPACT INLINE INFO ROW - 100% REAL UNMASKED NUMBERS */}
+                              <div className="bg-slate-50 border border-slate-200 rounded-lg px-2 py-1 flex items-center justify-between gap-1 flex-wrap text-[10px] sm:text-[11px] text-slate-700">
+                                <div className="flex items-center gap-1 sm:gap-1.5 flex-wrap">
+                                  
+                                  {/* CLICKABLE USER NAME */}
+                                  <div 
+                                    onClick={handleOpenMemberProfile}
+                                    className="flex items-center gap-1 font-bold text-indigo-700 hover:text-indigo-900 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 px-1.5 py-0.2 rounded cursor-pointer transition active:scale-95 group"
+                                    title="মেম্বারের প্রোফাইল, ব্যালেন্স ও তথ্য এডিট করতে এখানে ক্লিক করুন"
+                                  >
+                                    <span className="text-indigo-600 font-black text-[10px]">👤</span>
+                                    <span className="underline decoration-slate-400 group-hover:decoration-indigo-600 font-extrabold text-[10px] sm:text-[11px]">
+                                      {memberName}
+                                    </span>
+                                    <span className="bg-amber-400 text-slate-950 px-1 rounded text-[8px] font-black group-hover:bg-amber-300">
+                                      🔍 প্রোফাইল
+                                    </span>
+                                  </div>
+
+                                  <span className="text-slate-300">|</span>
+
+                                  {/* Member Phone with Copy (100% UNMASKED) */}
+                                  <div className="flex items-center gap-0.5">
+                                    <span className="text-slate-400">📱</span>
+                                    <span className="font-mono font-bold text-emerald-800 text-[10px] sm:text-[11px]">{memberPhone}</span>
+                                    {memberPhone !== "ফোন নম্বর নেই" && (
+                                      <button
+                                        type="button"
+                                        onClick={(e) => { e.stopPropagation(); handleCopySingle(memberPhone, "মেম্বার ফোন নম্বর"); }}
+                                        className="text-slate-400 hover:text-emerald-700 text-[9px] cursor-pointer"
+                                        title="নম্বর কপি করুন"
+                                      >
+                                        📋
+                                      </button>
+                                    )}
+                                  </div>
+
+                                  <span className="text-slate-300">|</span>
+
+                                  {/* Member ID with Copy */}
+                                  <div className="flex items-center gap-0.5">
+                                    <span className="text-slate-400">🆔</span>
+                                    <span className="font-mono font-bold text-sky-800 text-[10px] sm:text-[11px]">{memberId}</span>
+                                    <button
+                                      type="button"
+                                      onClick={(e) => { e.stopPropagation(); handleCopySingle(memberId, "মেম্বার আইডি"); }}
+                                      className="text-slate-400 hover:text-sky-700 text-[9px] cursor-pointer"
+                                      title="আইডি কপি করুন"
+                                    >
+                                      📋
+                                    </button>
+                                  </div>
+                                </div>
+
+                                {/* Right: TrxID & Sender Number (100% UNMASKED) */}
+                                <div className="flex items-center gap-1 sm:gap-1.5 text-[10px] flex-wrap">
+                                  <span className="text-slate-500 font-bold">প্রেরক:</span>
+                                  <span className="font-mono font-bold text-amber-900 bg-amber-50 px-1 rounded border border-amber-200">
+                                    {senderNumber}
+                                  </span>
+                                  {senderNumber && senderNumber !== "ফোন নম্বর নেই" && (
+                                    <button
+                                      type="button"
+                                      onClick={(e) => { e.stopPropagation(); handleCopySingle(senderNumber, "প্রেরক নম্বর"); }}
+                                      className="text-slate-400 hover:text-amber-700 text-[9px] cursor-pointer"
+                                      title="প্রেরক নম্বর কপি করুন"
+                                    >
+                                      📋
+                                    </button>
+                                  )}
+
+                                  <span className="text-slate-300">|</span>
+
+                                  <span className="text-slate-500 font-bold">TrxID:</span>
+                                  <span className="font-mono font-bold text-rose-800 bg-rose-50 px-1 rounded border border-rose-200">
+                                    {trxId}
+                                  </span>
+                                  <button
+                                    type="button"
+                                    onClick={(e) => { e.stopPropagation(); handleCopySingle(trxId, "TrxID"); }}
+                                    className="text-slate-400 hover:text-rose-700 text-[9px] cursor-pointer"
+                                    title="TrxID কপি করুন"
+                                  >
+                                    📋
+                                  </button>
+                                </div>
+                              </div>
+
+                              {/* 3. EXPANDABLE DETAIL DRAWER (SHOWN ONLY ON "আরো দেখুন") */}
+                              {isExpanded && (
+                                <div className="bg-slate-50 border border-slate-200 rounded-lg p-2.5 space-y-2 text-[11px] animate-fade-in text-slate-700">
+                                  {/* Details Grid */}
+                                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
+                                    <div className="bg-white p-1.5 rounded border border-slate-200 shadow-2xs">
+                                      <span className="text-[9px] text-slate-500 block">ট্রানজেকশন টাইপ</span>
+                                      <span className="font-bold text-slate-800 text-[10px]">{typeBn}</span>
+                                    </div>
+                                    <div className="bg-white p-1.5 rounded border border-slate-200 shadow-2xs">
+                                      <span className="text-[9px] text-slate-500 block">পেমেন্ট মেথড</span>
+                                      <span className="font-bold text-slate-800 text-[10px]">{methodBn} ({methodRaw})</span>
+                                    </div>
+                                    <div className="bg-white p-1.5 rounded border border-slate-200 shadow-2xs">
+                                      <span className="text-[9px] text-slate-500 block">আবেদনের পরিমাণ</span>
+                                      <span className="font-mono font-black text-emerald-700 text-[11px]">৳{formattedAmount}</span>
+                                    </div>
+                                    <div className="bg-white p-1.5 rounded border border-slate-200 shadow-2xs">
+                                      <span className="text-[9px] text-slate-500 block">সার্ভিস চার্জ / ফি</span>
+                                      <span className="font-mono font-bold text-slate-700 text-[10px]">৳{Number(tx.charge || (tx as any).fee || 0)}</span>
+                                    </div>
+                                  </div>
+
+                                  {/* Note / Description */}
+                                  {tx.description && (
+                                    <div className="bg-amber-50 p-2 rounded border border-amber-200 text-[10px] text-amber-900">
+                                      <span className="font-bold text-amber-800">📝 বিবরণ / নোট: </span>
+                                      <span>{tx.description}</span>
+                                    </div>
+                                  )}
+
+                                  {/* Rejection Details if present */}
+                                  {((tx as any).rejectReason || (tx as any).rejectionReason) && (
+                                    <div className="bg-rose-50 p-2 rounded border border-rose-200 text-[10px] text-rose-900">
+                                      <span className="font-bold text-rose-800">❌ বাতিলের কারণ: </span>
+                                      <span>{(tx as any).rejectReason || (tx as any).rejectionReason}</span>
+                                    </div>
+                                  )}
+
+                                  {/* Profit Note if present */}
+                                  {((tx as any).profitNote || (tx as any).adminProfit) && (
+                                    <div className="bg-emerald-50 p-2 rounded border border-emerald-200 text-[10px] text-emerald-900">
+                                      <span className="font-bold text-emerald-800">📈 কোম্পানি প্রফিট: </span>
+                                      <span className="font-mono font-black text-emerald-700">৳{Number((tx as any).adminProfit || (tx as any).companyProfit || 0)}</span>
+                                      <span className="ml-1 text-slate-500">({(tx as any).profitNote || "সার্ভিস প্রফিট"})</span>
+                                    </div>
+                                  )}
+
+                                  {/* Action Buttons inside Expanded Drawer */}
+                                  <div className="flex items-center justify-between gap-1.5 pt-1.5 border-t border-slate-200 flex-wrap">
+                                    <div className="flex items-center gap-1.5 flex-wrap">
+                                      {isPending && (
+                                        <>
+                                          <button
+                                            type="button"
+                                            onClick={() => handleApproveTransaction(tx)}
+                                            className="px-3 py-1 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-bold rounded-md text-[10px] sm:text-[11px] flex items-center gap-1 transition cursor-pointer shadow-xs"
+                                          >
+                                            <CheckCircle2 className="w-3.5 h-3.5" />
+                                            <span>অনুমোদন</span>
+                                          </button>
+
+                                          <button
+                                            type="button"
+                                            onClick={() => handleRejectTransaction(tx)}
+                                            className="px-3 py-1 bg-rose-600 hover:bg-rose-700 active:scale-95 text-white font-bold rounded-md text-[10px] sm:text-[11px] flex items-center gap-1 transition cursor-pointer shadow-xs"
+                                          >
+                                            <XCircle className="w-3.5 h-3.5" />
+                                            <span>বাতিল</span>
+                                          </button>
+                                        </>
+                                      )}
+
+                                      {isSuccess && (
+                                        <div className="flex items-center gap-1 text-[10px] text-emerald-800 font-bold bg-emerald-50 px-2 py-0.5 rounded border border-emerald-300">
+                                          <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                                          <span>অনুমোদিত ও সম্পন্ন</span>
+                                        </div>
+                                      )}
+
+                                      {isRejected && (
+                                        <div className="flex items-center gap-1 text-[10px] text-rose-800 font-bold bg-rose-50 px-2 py-0.5 rounded border border-rose-300">
+                                          <XCircle className="w-3.5 h-3.5 text-rose-600" />
+                                          <span>বাতিলকৃত আবেদন</span>
+                                        </div>
+                                      )}
+                                    </div>
+
+                                    <div className="flex items-center gap-1 ml-auto flex-wrap">
+                                      <button
+                                        type="button"
+                                        onClick={handleCopyAllWhatsapp}
+                                        className="px-2 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 font-bold rounded-md text-[10px] cursor-pointer flex items-center gap-1 shadow-2xs"
+                                      >
+                                        <span>📋 সম্পূর্ণ বিবরণী কপি (হোয়াটসঅ্যাপ)</span>
+                                      </button>
+
+                                      <button
+                                        type="button"
+                                        onClick={handleOpenMemberProfile}
+                                        className="px-2 py-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-800 border border-indigo-300 font-bold rounded-md text-[10px] cursor-pointer flex items-center gap-1 shadow-2xs"
+                                      >
+                                        <span>👤 মেম্বার প্রোফাইল ও ব্যালেন্স</span>
+                                      </button>
+                                    </div>
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </>
+                );
+              })()}
+            </div>
+          </div>
+        </div>
+      )}
+
+      

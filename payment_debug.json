@@ -1,0 +1,38 @@
+{
+  "timestamp": "2026-08-16T09:11:12.190Z",
+  "frontend_payload": {
+    "amount": 10,
+    "userId": "admin_master",
+    "phone": "01700000000"
+  },
+  "user_profile_data": {
+    "fetched_name": "Bangladesh BNB Administrator",
+    "fetched_phone": "+8800011112222",
+    "fetched_email": "networkbangladeshbnbbusiness@gmail.com"
+  },
+  "outgoing_nagorikpay_payload": {
+    "amount": 10,
+    "cus_name": "Bangladesh BNB Administrator",
+    "cus_phone": "+8800011112222",
+    "cus_email": "networkbangladeshbnbbusiness@gmail.com",
+    "success_url": "http://localhost:3000/api/payment/nagorikpay-callback?userId=admin_master&amount=10",
+    "cancel_url": "http://localhost:3000/api/payment/nagorikpay-cancel?userId=admin_master&amount=10",
+    "webhook_url": "http://localhost:3000/api/payment/nagorikpay-webhook",
+    "metadata": {
+      "userId": "admin_master",
+      "amount": 10,
+      "phone": "+8800011112222"
+    }
+  },
+  "outgoing_headers": {
+    "Content-Type": "application/json",
+    "api_key": "vk5JYpiHRbSG7QYfMDeOdMQddh2L54jmhtAGki1dFea9yrmVjD"
+  },
+  "nagorikpay_response_status": 200,
+  "nagorikpay_response_body": {
+    "status": 1,
+    "message": "Payment Link",
+    "payment_url": "https://secure-pay.nagorikpay.com/api/execute/e6fa8d32a3b44f256c4fea0c389e47ee"
+  },
+  "error": null
+}

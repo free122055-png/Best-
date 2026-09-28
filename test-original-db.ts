@@ -1,0 +1,21 @@
+import { initializeApp } from 'firebase/app';
+import { getFirestore, doc, setDoc, getDoc } from 'firebase/firestore';
+import * as fs from 'fs';
+import * as path from 'path';
+
+async function main() {
+  const configPath = path.resolve(process.cwd(), 'firebase-applet-config.json');
+  const firebaseConfig = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+  const app = initializeApp(firebaseConfig);
+  const db = getFirestore(app, "ai-studio-67ad61be-8028-48df-ad0c-06f8544ecb1b");
+  
+  try {
+    const docRef = doc(db, 'system_settings', 'app_config');
+    const snap = await getDoc(docRef);
+    console.log("Success! Read from original db:", snap.exists());
+  } catch (err) {
+    console.error("Failed:", err);
+  }
+  process.exit(0);
+}
+main();

@@ -1,0 +1,155 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Hind Siliguri", "Noto Sans Bengali", "Plus Jakarta Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "Plus Jakarta Sans", "Inter", monospace;
+
+  /* Custom App Palette Mappings for fully visible rendering */
+  --color-emerald-250: #a7f3d0;
+  --color-emerald-555: #10b981;
+  --color-emerald-850: #064e3b;
+  --color-emerald-905: #022c22;
+  --color-emerald-955: #011c15;
+  
+  --color-slate-250: #cbd5e1;
+  --color-slate-205: #e2e8f0;
+  --color-slate-805: #1e293b;
+  --color-slate-850: #0f172a;
+  
+  --color-orange-205: #fed7aa;
+  --color-orange-850: #7c2d12;
+  
+  --color-indigo-205: #c7d2fe;
+  --color-indigo-850: #312e81;
+  
+  --color-cyan-205: #cffafe;
+  --color-cyan-850: #164e63;
+}
+
+/* Custom supportive styles for scrollbars and active selections */
+body {
+  font-family: var(--font-sans);
+  background-color: #f8fafc;
+}
+
+/* Hide scrollbar for Chrome, Safari and Opera */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+/* Hide scrollbar for IE, Edge and Firefox */
+.no-scrollbar {
+  -ms-overflow-style: none;  /* IE and Edge */
+  scrollbar-width: none;  /* Firefox */
+}
+
+::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(16, 185, 129, 0.2);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(16, 185, 129, 0.4);
+}
+
+/* Custom premium Dark Mode global styles */
+.dark body {
+  background-color: #0a0e17;
+  color: #f3f4f6;
+}
+
+.dark .bg-white {
+  background-color: #121824 !important;
+  color: #f3f4f6 !important;
+}
+
+.dark .bg-slate-50 {
+  background-color: #0a0e17 !important;
+}
+
+.dark .bg-slate-100 {
+  background-color: #182232 !important;
+}
+
+.dark .text-slate-800,
+.dark .text-slate-900,
+.dark .text-slate-705,
+.dark .text-slate-805 {
+  color: #f3f4f6 !important;
+}
+
+.dark .text-slate-600,
+.dark .text-slate-500 {
+  color: #9ca3af !important;
+}
+
+.dark .border-slate-100,
+.dark .border-slate-150,
+.dark .border-slate-200 {
+  border-color: #222e43 !important;
+}
+
+.dark input, 
+.dark select, 
+.dark textarea {
+  background-color: #182232 !important;
+  border-color: #222e43 !important;
+  color: #ffffff !important;
+}
+
+.dark .bg-emerald-50 {
+  background-color: rgba(16, 185, 129, 0.1) !important;
+}
+
+.dark nav.fixed {
+  background-color: #121824 !important;
+  border-color: #222e43 !important;
+}
+
+.dark .text-emerald-900,
+.dark .text-emerald-850 {
+  color: #10b981 !important;
+}
+
+.dark .text-emerald-950 {
+  color: #34d399 !important;
+}
+
+/* Global soft keyboard viewport scroll spacing on mobile devices */
+@media (max-width: 640px) {
+  body.keyboard-active #login-container,
+  body.keyboard-active #money-exchange-module-root,
+  body.keyboard-active #samity-screen-root,
+  body.keyboard-active .overflow-y-auto,
+  body.keyboard-active form {
+    padding-bottom: 240px !important;
+  }
+
+  /* Prevent full-screen modals from shifting off-screen when keyboard is active */
+  body.keyboard-active .fixed.inset-0 {
+    align-items: flex-start !important;
+    justify-content: center !important;
+    padding-top: 16px !important;
+    padding-bottom: 240px !important;
+    overflow-y: auto !important;
+  }
+}
+
+@keyframes bnb-blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+
+.animate-bnb-blink {
+  animation: bnb-blink 1.2s infinite;
+}
+
+

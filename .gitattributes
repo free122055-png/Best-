@@ -1,0 +1,4 @@
+*.jar binary
+*.keystore binary
+*.aab binary
+*.apk binary

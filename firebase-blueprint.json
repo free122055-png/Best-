@@ -1,0 +1,324 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "User account registration with balance, savings, due loans and setup PIN",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "description": "Auth user ID" },
+        "name": { "type": "string", "description": "Human name of user" },
+        "phone": { "type": "string", "description": "BNB network user phone number" },
+        "memberId": { "type": "string", "description": "Formated ID like SM-10001" },
+        "pin": { "type": "string", "description": "4-digit or 5-digit security pin" },
+        "role": { "type": "string", "enum": ["user", "admin"], "description": "Role of the user" },
+        "balance": { "type": "number", "description": "Wallet total balance" },
+        "savings": { "type": "number", "description": "Savings fund" },
+        "dueLoan": { "type": "number", "description": "Current due loan" },
+        "nid": { "type": "string", "description": "NID number" },
+        "birthReg": { "type": "string", "description": "Birth registration number" },
+        "nomineeName": { "type": "string", "description": "Nominee name" },
+        "nomineeRelation": { "type": "string", "description": "Nominee relationship" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "name", "phone", "memberId", "pin", "role", "balance", "savings", "dueLoan"]
+    },
+    "Transaction": {
+      "title": "Transaction",
+      "description": "Logs of deposit, loan, interest, transfers, recharges, shop purchases, and bill payments",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "userName": { "type": "string" },
+        "memberId": { "type": "string" },
+        "type": { "type": "string", "description": "deposit, loan_repayment, loan_disbursment, interest, telecom_recharge, shop_purchase, bill_pay, etc." },
+        "typeLabel": { "type": "string", "description": "Bengali title representation e.g. সঞ্চয় জমা" },
+        "amount": { "type": "number" },
+        "status": { "type": "string", "enum": ["pending", "success", "failed"] },
+        "description": { "type": "string" },
+        "billImage": { "type": "string", "description": "Base64 or image URL of the utility bill receipt" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "userId", "userName", "type", "typeLabel", "amount", "status", "createdAt"]
+    },
+    "Notice": {
+      "title": "Notice",
+      "description": "Notice broadcasted by Admin to all cooperative members",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "content": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "title", "content", "createdAt"]
+    },
+    "Offer": {
+      "title": "Offer",
+      "description": "Telecom offer packages with operator details, pricing, and category filters",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string", "description": "Package name e.g. 50GB INTERNET" },
+        "operator": { "type": "string", "description": "GP, Robi, Airtel, Banglalink, Teletalk, Skitto, Brilliant, Alaap" },
+        "category": { "type": "string", "enum": ["internet", "minute", "bundle"], "description": "Categorization of offers" },
+        "validity": { "type": "string", "description": "Package validity like 30 Days" },
+        "price": { "type": "number", "description": "Cost in BDT" },
+        "isHot": { "type": "boolean", "description": "To feature the offer with HOT flag badge" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "title", "operator", "category", "validity", "price", "isHot", "createdAt"]
+    },
+    "PushNotification": {
+      "title": "PushNotification",
+      "description": "Owner controlled real-time push notifications sent to all members",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "body": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "title", "body", "createdAt"]
+    },
+    "BapReport": {
+      "title": "BapReport",
+      "description": "Scam or warning report against a user with proof screenshots",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "accusedName": { "type": "string" },
+        "accusedPhone": { "type": "string" },
+        "type": { "type": "string", "enum": ["fraud", "late_payment", "warning", "suspicious"] },
+        "details": { "type": "string" },
+        "createdAt": { "type": "string" },
+        "reporterName": { "type": "string" },
+        "reporterId": { "type": "string" },
+        "groupName": { "type": "string" }
+      },
+      "required": ["id", "accusedName", "accusedPhone", "type", "details", "createdAt", "reporterName", "reporterId", "groupName"]
+    },
+    "BapGroup": {
+      "title": "BapGroup",
+      "description": "WhatsApp Group registration for central verification platform",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "link": { "type": "string" },
+        "category": { "type": "string" },
+        "adminsInfo": { "type": "string" },
+        "memberCount": { "type": "number" },
+        "foundedDate": { "type": "string" },
+        "status": { "type": "string", "enum": ["pending", "verified", "rejected"] },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["id", "name", "link", "category", "adminsInfo", "memberCount", "foundedDate", "status", "createdAt"]
+    },
+    "BapAdminRequest": {
+      "title": "BapAdminRequest",
+      "description": "Application from a group admin to be verified for publishing privileges",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "userName": { "type": "string" },
+        "userPhone": { "type": "string" },
+        "groupName": { "type": "string" },
+        "details": { "type": "string" },
+        "status": { "type": "string", "enum": ["pending", "approved", "rejected"] },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["id", "userId", "userName", "userPhone", "groupName", "details", "status", "createdAt"]
+    },
+    "LedgerTransaction": {
+      "title": "LedgerTransaction",
+      "description": "User business income/expense/receivable/payable records in the ledger book",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "type": { "type": "string", "enum": ["income", "expense", "receivable", "payable"] },
+        "amount": { "type": "number" },
+        "title": { "type": "string" },
+        "category": { "type": "string" },
+        "phone": { "type": "string" },
+        "date": { "type": "string" },
+        "time": { "type": "string" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["userId", "type", "amount", "title", "category", "date", "time", "createdAt"]
+    },
+    "LedgerNote": {
+      "title": "LedgerNote",
+      "description": "User notebook sticky notes and checklists in the ledger book",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "title": { "type": "string" },
+        "content": { "type": "string" },
+        "type": { "type": "string", "enum": ["note", "todo"] },
+        "color": { "type": "string", "enum": ["yellow", "green", "blue"] },
+        "pinned": { "type": "boolean" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["userId", "title", "type", "color", "pinned", "createdAt"]
+    },
+    "MoneyExchangeDeal": {
+      "title": "MoneyExchangeDeal",
+      "description": "Escrow money exchange marketplace deals",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "creatorId": { "type": "string" },
+        "creatorName": { "type": "string" },
+        "creatorPhone": { "type": "string" },
+        "giveMethod": { "type": "string" },
+        "giveAmount": { "type": "number" },
+        "receiveMethod": { "type": "string" },
+        "receiveAmount": { "type": "number" },
+        "rateDisplay": { "type": "string" },
+        "note": { "type": "string" },
+        "status": { "type": "string" },
+        "accepterId": { "type": "string" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["id", "creatorId", "creatorName", "giveMethod", "giveAmount", "receiveMethod", "receiveAmount", "status", "createdAt"]
+    },
+    "AgentLocation": {
+      "title": "AgentLocation",
+      "description": "High precision real-time GPS position per user/agent",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "description": "User or agent ID" },
+        "name": { "type": "string", "description": "Agent name" },
+        "phone": { "type": "string", "description": "Contact phone number" },
+        "memberId": { "type": "string", "description": "Formatted member ID" },
+        "role": { "type": "string", "description": "Agent or member role" },
+        "latitude": { "type": "number", "description": "Exact GPS latitude" },
+        "longitude": { "type": "number", "description": "Exact GPS longitude" },
+        "accuracy": { "type": "number", "description": "GPS accuracy in meters" },
+        "altitude": { "type": "number", "description": "GPS altitude in meters" },
+        "heading": { "type": "number", "description": "Movement direction in degrees" },
+        "speed": { "type": "number", "description": "Movement speed in m/s" },
+        "lastUpdated": { "type": "string", "description": "Formatted timestamp" },
+        "lastUpdatedTs": { "type": "number", "description": "Epoch timestamp in milliseconds" },
+        "isOnline": { "type": "boolean", "description": "Online presence flag" },
+        "isSharingLocation": { "type": "boolean", "description": "Location broadcast flag" },
+        "profileImage": { "type": "string", "description": "Avatar image URL" },
+        "city": { "type": "string", "description": "City or area" },
+        "district": { "type": "string", "description": "District" },
+        "country": { "type": "string", "description": "Country name" }
+      },
+      "required": ["userId", "name", "phone", "latitude", "longitude", "accuracy", "lastUpdated", "lastUpdatedTs", "isOnline"]
+    },
+    "FcmToken": {
+      "title": "FcmToken",
+      "description": "User device FCM tokens for push notifications",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "token": { "type": "string" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "token", "updatedAt"]
+    },
+    "DeviceReleaseRequest": {
+      "title": "DeviceReleaseRequest",
+      "description": "Member complain and device release requests when phone is lost or broken",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "userName": { "type": "string" },
+        "userPhone": { "type": "string" },
+        "memberId": { "type": "string" },
+        "reason": { "type": "string" },
+        "status": { "type": "string", "enum": ["pending", "approved", "rejected"] },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["userId", "userName", "userPhone", "reason", "status", "createdAt"]
+    },
+    "SamityInvestment": {
+      "title": "SamityInvestment",
+      "description": "Portfolio investment and buy/sell profit logs across gold, real estate, land and agriculture",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "category": { "type": "string", "enum": ["gold", "land", "agro", "business", "other"] },
+        "status": { "type": "string", "enum": ["active", "sold", "new"] },
+        "description": { "type": "string" },
+        "buyAmount": { "type": "number" },
+        "sellAmount": { "type": "number" },
+        "profitAmount": { "type": "number" },
+        "location": { "type": "string" },
+        "imageUrl": { "type": "string" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["id", "title", "category", "status", "description", "buyAmount", "createdAt"]
+    }
+  },
+  "firestore": {
+    "device_release_requests/{requestId}": {
+      "schema": "DeviceReleaseRequest",
+      "description": "Stores user device reset / zero-device complaints and requests"
+    },
+    "users/{userId}": {
+      "schema": "User",
+      "description": "Stores cooperative user records including security PIN configurations"
+    },
+    "transactions/{transactionId}": {
+      "schema": "Transaction",
+      "description": "Stores user transactions of the BNB cooperative"
+    },
+    "notices/{noticeId}": {
+      "schema": "Notice",
+      "description": "Broadcasting of cooperative notifications"
+    },
+    "offers/{offerId}": {
+      "schema": "Offer",
+      "description": "Dynamic store of telecom data packs and minute offers"
+    },
+    "push_notifications/{notificationId}": {
+      "schema": "PushNotification",
+      "description": "Stores push notifications sent by the owner"
+    },
+    "bap_reports/{reportId}": {
+      "schema": "BapReport",
+      "description": "Stores warning and fraud reports published in the BNB Admin Panel (BAP)"
+    },
+    "bap_groups/{groupId}": {
+      "schema": "BapGroup",
+      "description": "Stores registered other WhatsApp groups for national directory"
+    },
+    "bap_admin_requests/{requestId}": {
+      "schema": "BapAdminRequest",
+      "description": "Group Admin verification enrollment requests"
+    },
+    "hisab_transactions/{transactionId}": {
+      "schema": "LedgerTransaction",
+      "description": "Stores individual user business accounting/ledger transactions"
+    },
+    "hisab_notes/{noteId}": {
+      "schema": "LedgerNote",
+      "description": "Stores individual user notebook stickies and to-do checklists"
+    },
+    "money_exchange_deals/{dealId}": {
+      "schema": "MoneyExchangeDeal",
+      "description": "Stores escrow money exchange deals"
+    },
+    "agentLocations/{userId}": {
+      "schema": "AgentLocation",
+      "description": "Real-time single latest high-precision GPS position per agent/user"
+    },
+    "samity_investments/{investmentId}": {
+      "schema": "SamityInvestment",
+      "description": "Stores company portfolio investments like gold, real estate, farm projects and transparency Facebook-style posts"
+    },
+    "users/{userId}/fcmTokens/{tokenId}": {
+      "schema": "FcmToken",
+      "description": "Stores user device FCM tokens"
+    }
+  }
+}

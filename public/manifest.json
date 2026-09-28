@@ -1,0 +1,27 @@
+{
+  "short_name": "BNB Network",
+  "name": "BNB BUSINESS Network Bangladesh",
+  "icons": [
+    {
+      "src": "/favicon.png",
+      "type": "image/png",
+      "sizes": "64x64"
+    },
+    {
+      "src": "/apple-touch-icon.png",
+      "type": "image/png",
+      "sizes": "180x180"
+    },
+    {
+      "src": "/app_icon.png",
+      "type": "image/png",
+      "sizes": "512x512",
+      "purpose": "any maskable"
+    }
+  ],
+  "start_url": "/",
+  "background_color": "#000000",
+  "theme_color": "#064e3b",
+  "display": "standalone",
+  "orientation": "portrait"
+}
