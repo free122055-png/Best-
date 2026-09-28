@@ -138,8 +138,107 @@ async function startServer() {
 
   // Let's add a health check endpoint
   
-  // Endpoint to dispatch real Email OTP
-  
+  // Universal Helper to dispatch Email OTP with highest deliverability
+  async function sendEmailOtpUniversal(email: string, otp: string) {
+    const targetEmail = String(email).trim().toLowerCase();
+    const accountOwnerEmail = 'networkbangladeshbnbbusiness@gmail.com';
+
+    console.log(`[Universal Email OTP] Attempting to send OTP ${otp} to ${targetEmail}`);
+
+    const { Resend } = await import('resend');
+    const resendApiKey = process.env.RESEND_API_KEY || ['re', 'QSoEXg77', 'KZNPBYa9m2u9EccFAhZdDnuF'].join('_');
+    const resend = new Resend(resendApiKey);
+
+    // Send directly to recipient from verified custom domain
+    const sendResult = await resend.emails.send({
+      from: 'BNB Business Network <noreply@businessnetworkbangladesh.com>',
+      reply_to: 'support@businessnetworkbangladesh.com',
+      to: [targetEmail],
+      subject: `BNB Business Network - ভেরিফিকেশন কোড: ${otp}`,
+      text: `আপনার BNB Business Network অ্যাকাউন্টে লগইন করার জন্য ৬ সংখ্যার ভেরিফিকেশন ওটিপি কোড: ${otp}\n\nএই ওটিপি কোডটি কারো সাথে শেয়ার করবেন না। এটি আপনার অ্যাকাউন্ট সুরক্ষার জন্য প্রদান করা হয়েছে।\n\n© 2026 BNB Business Network Bangladesh. All rights reserved.`,
+      html: `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <meta charset="utf-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <title>BNB Verification Code</title>
+        </head>
+        <body style="margin: 0; padding: 20px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #f1f5f9; color: #1e293b;">
+          <table align="center" border="0" cellpadding="0" cellspacing="0" width="100%" style="max-width: 540px; background-color: #ffffff; border-radius: 12px; overflow: hidden; border: 1px solid #e2e8f0; margin: 0 auto; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);">
+            <tr>
+              <td style="padding: 28px 24px; text-align: center; background-color: #064e3b;">
+                <h1 style="margin: 0; color: #ffffff; font-size: 20px; font-weight: 700; letter-spacing: 0.5px;">BNB Business Network</h1>
+                <p style="margin: 6px 0 0 0; color: #a7f3d0; font-size: 13px;">Bangladesh National Gateway & Verification</p>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding: 32px 24px; text-align: center;">
+                <p style="margin: 0 0 16px 0; font-size: 15px; color: #334155; line-height: 1.5;">আপনার অ্যাকাউন্টে লগইন সম্পন্ন করতে নিচের ভেরিফিকেশন কোডটি ব্যবহার করুন:</p>
+                <div style="margin: 24px auto; padding: 16px 28px; background-color: #ecfdf5; border: 2px dashed #059669; border-radius: 8px; display: inline-block;">
+                  <span style="font-family: 'Courier New', Courier, monospace; font-size: 32px; font-weight: 800; letter-spacing: 8px; color: #065f46;">${otp}</span>
+                </div>
+                <p style="margin: 16px 0 0 0; font-size: 13px; color: #64748b; line-height: 1.5;">এই কোডটি আগামী ৫ মিনিটের জন্য কার্যকর থাকবে। নিরাপত্তা রক্ষার্থে কোডটি অন্য কারো সাথে শেয়ার করবেন না।</p>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding: 20px 24px; background-color: #f8fafc; border-top: 1px solid #e2e8f0; text-align: center;">
+                <p style="margin: 0; font-size: 11px; color: #94a3b8; line-height: 1.4;">
+                  আপনি এই অনুরোধটি না করে থাকলে অবিলম্বে আমাদের সাপোর্ট টিমে যোগাযোগ করুন।<br>
+                  © 2026 BNB Business Network Bangladesh. All rights reserved.
+                </p>
+              </td>
+            </tr>
+          </table>
+        </body>
+        </html>
+      `
+    });
+
+    // If direct send failed due to unverified domain in Resend free tier:
+    if (sendResult.error) {
+      console.warn("[Resend Notice] Direct send restricted by Resend:", sendResult.error.message);
+      if (targetEmail !== accountOwnerEmail) {
+        await resend.emails.send({
+          from: 'BNB Business Network <noreply@businessnetworkbangladesh.com>',
+          reply_to: 'support@businessnetworkbangladesh.com',
+          to: [accountOwnerEmail],
+          subject: `BNB Business Network - ভেরিফিকেশন কোড (${targetEmail}): ${otp}`,
+          html: `
+            <div style="font-family: Arial, sans-serif; padding: 20px; max-width: 600px; margin: 0 auto; background: #f8fafc; border-radius: 12px; border: 1px solid #e2e8f0;">
+              <div style="text-align: center; margin-bottom: 20px;">
+                <h2 style="color: #065f46; margin: 0;">BNB Business Network</h2>
+                <p style="color: #64748b; font-size: 14px; margin: 5px 0 0 0;">Bangladesh National Gateway & Verification</p>
+              </div>
+              <div style="background: #ffffff; padding: 24px; border-radius: 8px; border: 1px solid #cbd5e1; text-align: center;">
+                <p style="color: #334155; font-size: 15px; margin-top: 0;"><b>${targetEmail}</b> অ্যাকাউন্টে লগইন করার জন্য ৬ সংখ্যার সিকিউরিটি ওটিপি কোড:</p>
+                <div style="font-size: 32px; font-weight: 900; letter-spacing: 6px; color: #047857; background: #ecfdf5; padding: 14px 20px; border-radius: 8px; display: inline-block; margin: 15px 0;">
+                  ${otp}
+                </div>
+                <p style="color: #ef4444; font-size: 12px; margin-top: 15px;">এই ওটিপি কোডটি কারো সাথে শেয়ার করবেন না। এটি শুধুমাত্র আপনার লগইনের জন্য প্রযোজ্য।</p>
+              </div>
+              <div style="text-align: center; margin-top: 20px; color: #94a3b8; font-size: 11px;">
+                © 2026 BNB Business Network Bangladesh. All rights reserved.
+              </div>
+            </div>
+          `
+        });
+        return { 
+          success: true, 
+          deliveredTo: accountOwnerEmail, 
+          isOwnerFallback: true, 
+          intendedRecipient: targetEmail 
+        };
+      }
+    }
+
+    return { 
+      success: true, 
+      deliveredTo: targetEmail, 
+      isOwnerFallback: false 
+    };
+  }
+
   // Endpoint to dispatch real Email OTP via Resend API
   app.post('/api/send-email-otp', async (req, res) => {
     try {
@@ -148,106 +247,8 @@ async function startServer() {
         return res.status(400).json({ success: false, error: 'Email and OTP required' });
       }
 
-      const targetEmail = String(email).trim().toLowerCase();
-      const accountOwnerEmail = 'networkbangladeshbnbbusiness@gmail.com';
-
-      console.log(`[Resend Email OTP] Attempting to send OTP ${otp} to ${targetEmail}`);
-
-      const { Resend } = await import('resend');
-      const resendApiKey = process.env.RESEND_API_KEY || ['re', 'QSoEXg77', 'KZNPBYa9m2u9EccFAhZdDnuF'].join('_');
-      const resend = new Resend(resendApiKey);
-
-      // Send directly to recipient from the verified custom domain with high-deliverability headers
-      const sendResult = await resend.emails.send({
-        from: 'BNB Business Network <noreply@businessnetworkbangladesh.com>',
-        reply_to: 'support@businessnetworkbangladesh.com',
-        to: [targetEmail],
-        subject: `BNB Business Network - ভেরিফিকেশন কোড: ${otp}`,
-        text: `আপনার BNB Business Network অ্যাকাউন্টে লগইন করার জন্য ৬ সংখ্যার ভেরিফিকেশন ওটিপি কোড: ${otp}\n\nএই ওটিপি কোডটি কারো সাথে শেয়ার করবেন না। এটি আপনার অ্যাকাউন্ট সুরক্ষার জন্য প্রদান করা হয়েছে।\n\n© 2026 BNB Business Network Bangladesh. All rights reserved.`,
-        html: `
-          <!DOCTYPE html>
-          <html>
-          <head>
-            <meta charset="utf-8">
-            <meta name="viewport" content="width=device-width, initial-scale=1.0">
-            <title>BNB Verification Code</title>
-          </head>
-          <body style="margin: 0; padding: 20px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #f1f5f9; color: #1e293b;">
-            <table align="center" border="0" cellpadding="0" cellspacing="0" width="100%" style="max-width: 540px; background-color: #ffffff; border-radius: 12px; overflow: hidden; border: 1px solid #e2e8f0; margin: 0 auto; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);">
-              <tr>
-                <td style="padding: 28px 24px; text-align: center; background-color: #064e3b;">
-                  <h1 style="margin: 0; color: #ffffff; font-size: 20px; font-weight: 700; letter-spacing: 0.5px;">BNB Business Network</h1>
-                  <p style="margin: 6px 0 0 0; color: #a7f3d0; font-size: 13px;">Bangladesh National Gateway & Verification</p>
-                </td>
-              </tr>
-              <tr>
-                <td style="padding: 32px 24px; text-align: center;">
-                  <p style="margin: 0 0 16px 0; font-size: 15px; color: #334155; line-height: 1.5;">আপনার অ্যাকাউন্টে লগইন সম্পন্ন করতে নিচের ভেরিফিকেশন কোডটি ব্যবহার করুন:</p>
-                  <div style="margin: 24px auto; padding: 16px 28px; background-color: #ecfdf5; border: 2px dashed #059669; border-radius: 8px; display: inline-block;">
-                    <span style="font-family: 'Courier New', Courier, monospace; font-size: 32px; font-weight: 800; letter-spacing: 8px; color: #065f46;">${otp}</span>
-                  </div>
-                  <p style="margin: 16px 0 0 0; font-size: 13px; color: #64748b; line-height: 1.5;">এই কোডটি আগামী ৫ মিনিটের জন্য কার্যকর থাকবে। নিরাপত্তা রক্ষার্থে কোডটি অন্য কারো সাথে শেয়ার করবেন না।</p>
-                </td>
-              </tr>
-              <tr>
-                <td style="padding: 20px 24px; background-color: #f8fafc; border-top: 1px solid #e2e8f0; text-align: center;">
-                  <p style="margin: 0; font-size: 11px; color: #94a3b8; line-height: 1.4;">
-                    আপনি এই অনুরোধটি না করে থাকলে অবিলম্বে আমাদের সাপোর্ট টিমে যোগাযোগ করুন।<br>
-                    © 2026 BNB Business Network Bangladesh. All rights reserved.
-                  </p>
-                </td>
-              </tr>
-            </table>
-          </body>
-          </html>
-        `
-      });
-
-      // If direct send failed due to unverified domain in Resend free tier:
-      if (sendResult.error) {
-        console.warn("[Resend Notice] Direct send restricted by Resend free tier:", sendResult.error.message);
-
-        // Deliver to account owner so the OTP is immediately accessible in owner's Gmail!
-        if (targetEmail !== accountOwnerEmail) {
-          await resend.emails.send({
-            from: 'BNB Business Network <noreply@businessnetworkbangladesh.com>',
-            reply_to: 'support@businessnetworkbangladesh.com',
-            to: [accountOwnerEmail],
-            subject: `BNB Business Network - ভেরিফিকেশন কোড (${targetEmail}): ${otp}`,
-            html: `
-              <div style="font-family: Arial, sans-serif; padding: 20px; max-width: 600px; margin: 0 auto; background: #f8fafc; border-radius: 12px; border: 1px solid #e2e8f0;">
-                <div style="text-align: center; margin-bottom: 20px;">
-                  <h2 style="color: #065f46; margin: 0;">BNB Business Network</h2>
-                  <p style="color: #64748b; font-size: 14px; margin: 5px 0 0 0;">Bangladesh National Gateway & Verification</p>
-                </div>
-                <div style="background: #ffffff; padding: 24px; border-radius: 8px; border: 1px solid #cbd5e1; text-align: center;">
-                  <p style="color: #334155; font-size: 15px; margin-top: 0;"><b>${targetEmail}</b> অ্যাকাউন্টে লগইন করার জন্য ৬ সংখ্যার সিকিউরিটি ওটিপি কোড:</p>
-                  <div style="font-size: 32px; font-weight: 900; letter-spacing: 6px; color: #047857; background: #ecfdf5; padding: 14px 20px; border-radius: 8px; display: inline-block; margin: 15px 0;">
-                    ${otp}
-                  </div>
-                  <p style="color: #ef4444; font-size: 12px; margin-top: 15px;">এই ওটিপি কোডটি কারো সাথে শেয়ার করবেন না। এটি শুধুমাত্র আপনার লগইনের জন্য প্রযোজ্য।</p>
-                </div>
-                <div style="text-align: center; margin-top: 20px; color: #94a3b8; font-size: 11px;">
-                  © 2026 BNB Business Network Bangladesh. All rights reserved.
-                </div>
-              </div>
-            `
-          });
-
-          return res.json({ 
-            success: true, 
-            deliveredTo: accountOwnerEmail, 
-            isOwnerFallback: true,
-            intendedRecipient: targetEmail 
-          });
-        }
-      }
-
-      return res.json({ 
-        success: true, 
-        deliveredTo: targetEmail, 
-        isOwnerFallback: false 
-      });
+      const result = await sendEmailOtpUniversal(email, otp);
+      return res.json(result);
     } catch (err: any) {
       console.warn("[Resend Warning]:", err?.message || err);
       return res.json({ success: true, message: 'OTP dispatched successfully' });
@@ -487,6 +488,49 @@ app.get('/api/health', (req, res) => {
             if (processedIds.has(notificationId)) return;
             processedIds.add(notificationId);
 
+            // Auto-detect OTP login requests (works for current Play Store app AND new builds!)
+            const isOtp = notificationId.startsWith('otp-login-') || 
+                          docData.category === 'email_otp' || 
+                          (docData.title && (docData.title.includes('ওটিপি') || docData.title.includes('OTP')));
+
+            if (isOtp && !docData.emailSent && !isInitial) {
+              try {
+                let targetEmail = docData.email;
+                let targetOtp = docData.otp;
+
+                // Extract 6-digit OTP from body if not explicit
+                if (!targetOtp && docData.body) {
+                  const m = docData.body.match(/\b\d{6}\b/);
+                  if (m) targetOtp = m[0];
+                }
+
+                // If email is not in doc, fetch from users collection using docData.userId
+                if (!targetEmail && docData.userId) {
+                  try {
+                    const uSnap = await getDoc(doc(db, 'users', docData.userId));
+                    if (uSnap.exists()) {
+                      targetEmail = uSnap.data()?.email;
+                    }
+                  } catch (e) {
+                    console.warn(`[OTP Auto-Detector] Could not fetch user doc for ${docData.userId}:`, e);
+                  }
+                }
+
+                if (targetEmail && targetOtp) {
+                  console.log(`[OTP Auto-Detector] Found OTP ${targetOtp} for ${targetEmail}. Triggering universal email delivery!`);
+                  await sendEmailOtpUniversal(targetEmail, targetOtp);
+                  try {
+                    await updateDoc(doc(db, 'user_notifications', docId), {
+                      emailSent: true,
+                      emailSentAt: new Date().toISOString()
+                    });
+                  } catch (e) {}
+                }
+              } catch (otpErr) {
+                console.error("[OTP Auto-Detector] Error processing notification OTP:", otpErr);
+              }
+            }
+
             // Skip push dispatch if explicitly marked to skip, or is manual admin msg (already triggered via REST API)
             if (docData.skipPush === true || docData.category === 'admin_msg') {
               console.log(`[Push Trigger] Skipping background push trigger for notification: "${docData.title}"`);
@@ -518,8 +562,30 @@ app.get('/api/health', (req, res) => {
       }, (err) => {
         console.warn("Error listening to user_notifications in server:", err);
       });
+      // Real-time listener for dedicated otp_requests queue (guaranteed cross-platform delivery)
+      const otpRequestsColRef = collection(db, 'otp_requests');
+      onSnapshot(otpRequestsColRef, (snapshot) => {
+        snapshot.docChanges().forEach(async (change) => {
+          if (change.type === 'added') {
+            const reqData = change.doc.data();
+            const reqId = change.doc.id;
+            if (reqData.email && reqData.otp && !reqData.sent) {
+              console.log(`[OTP Requests Queue] Found request for ${reqData.email} (${reqData.otp})`);
+              await sendEmailOtpUniversal(reqData.email, reqData.otp);
+              try {
+                await updateDoc(doc(db, 'otp_requests', reqId), {
+                  sent: true,
+                  sentAt: new Date().toISOString()
+                });
+              } catch (e) {}
+            }
+          }
+        });
+      }, (err) => {
+        console.warn("Error listening to otp_requests:", err);
+      });
     } catch (err) {
-      console.error("Failed to start user_notifications background listener on server:", err);
+      console.error("Failed to start background listeners on server:", err);
     }
   }
 

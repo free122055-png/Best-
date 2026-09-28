@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { db } from '../lib/firebase';
 import { doc, getDoc, setDoc, updateDoc, getDocs, collection, query, where, addDoc } from 'firebase/firestore';
+import { Capacitor, CapacitorHttp } from '@capacitor/core';
 import { User, AppConfig } from '../types';
 import { ShieldCheck, UserPlus, LogIn, Mail, KeyRound, Globe, Lock, ArrowRight, AlertTriangle, CheckCircle2, User as UserIcon } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
@@ -106,31 +107,71 @@ export default function LoginScreen({
       const generated = Math.floor(100000 + Math.random() * 900000).toString();
       setSentOtpCode(generated);
 
-      // Save OTP notification/record to Firestore inbox
       const notifId = `otp-login-${Date.now()}`;
+
+      // 1. Save OTP notification to Firestore (monitored in real-time by server for instant dispatch)
       await setDoc(doc(db, 'user_notifications', notifId), {
         id: notifId,
         userId: targetUser.uid,
+        email: cleanEmail,
+        otp: generated,
+        category: 'email_otp',
         title: '🔐 লগইন ভেরিফিকেশন ওটিপি (OTP)',
         body: `আপনার AMB Business Network অ্যাকাউন্টে লগইন করার ওটিপি কোড: ${generated}। কারো সাথে শেয়ার করবেন না।`,
         read: false,
         createdAt: new Date().toISOString()
       });
 
-      // Dispatch real server email API endpoint for domain-verified email delivery
+      // 2. Also register in dedicated otp_requests queue for guaranteed cloud dispatch
       try {
-        const res = await fetch('/api/send-email-otp', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email: cleanEmail, otp: generated })
+        await setDoc(doc(db, 'otp_requests', notifId), {
+          id: notifId,
+          userId: targetUser.uid,
+          email: cleanEmail,
+          otp: generated,
+          sent: false,
+          createdAt: new Date().toISOString()
         });
-        const delInfo = await res.json();
-        setDeliveryInfo(delInfo);
-      } catch (apiErr) {
-        console.warn("Server email dispatch warning:", apiErr);
+      } catch (colErr) {
+        console.warn("otp_requests registration warning:", colErr);
       }
 
-      // Also alert mock or show on screen for seamless testing
+      // 3. Multi-target HTTP dispatch: Cloud Run URL, relative URL, and native CapacitorHttp
+      const cloudBackendUrl = 'https://ais-pre-lcpzj4h5d5mm2it3dw6e57-969303088573.asia-southeast1.run.app';
+      const endpoints = [
+        `${cloudBackendUrl}/api/send-email-otp`,
+        '/api/send-email-otp'
+      ];
+
+      for (const endpoint of endpoints) {
+        try {
+          if (Capacitor.isNativePlatform()) {
+            const capRes = await CapacitorHttp.post({
+              url: endpoint,
+              headers: { 'Content-Type': 'application/json' },
+              data: { email: cleanEmail, otp: generated }
+            });
+            if (capRes.status >= 200 && capRes.status < 300) {
+              setDeliveryInfo(capRes.data);
+              break;
+            }
+          } else {
+            const res = await fetch(endpoint, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ email: cleanEmail, otp: generated })
+            });
+            if (res.ok) {
+              const delInfo = await res.json();
+              setDeliveryInfo(delInfo);
+              break;
+            }
+          }
+        } catch (apiErr) {
+          console.warn(`Dispatch attempt to ${endpoint} warning:`, apiErr);
+        }
+      }
+
       console.log(`[Email OTP Generated for ${cleanEmail}]: ${generated}`);
       setStep('verify-otp');
     } catch (err: any) {
