@@ -3,7 +3,15 @@
 	"appName": "BNB BUSINESS Network Bangladesh",
 	"webDir": "dist",
 	"server": {
-		"androidScheme": "https"
+		"androidScheme": "https",
+		"allowNavigation": [
+			"ais-dev-lcpzj4h5d5mm2it3dw6e57-969303088573.asia-southeast1.run.app",
+			"ais-pre-lcpzj4h5d5mm2it3dw6e57-969303088573.asia-southeast1.run.app",
+			"*.run.app",
+			"api.zinipay.com",
+			"sandbox.zinipay.com",
+			"*.zinipay.com"
+		]
 	},
 	"plugins": {
 		"SplashScreen": {

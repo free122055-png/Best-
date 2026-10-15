@@ -1,4 +1,4 @@
-import React, { Component } from 'react';
+import React, { Component, useState } from 'react';
 import { 
   SAMITY_MONTHS, 
   SAMITY_YEARS, 
@@ -331,9 +331,23 @@ function AdminUserEditModalContent(props: any) {
     editTrackerSelectedYear,
     setEditTrackerSelectedYear,
     setEditSamityPaidMonths,
+    editMemberCategory,
+    setEditMemberCategory,
+    editNominees,
+    setEditNominees,
+    editSamityAutoSavingsActive,
+    setEditSamityAutoSavingsActive,
+    editSamitySwitchStatus,
+    setEditSamitySwitchStatus,
     transactions,
     handleAdminDeleteTransaction
   } = props;
+
+  // Local state for adding new nominee in Admin modal
+  const [adminNomName, setAdminNomName] = useState('');
+  const [adminNomRel, setAdminNomRel] = useState('');
+  const [adminNomPhone, setAdminNomPhone] = useState('');
+  const [adminNomNid, setAdminNomNid] = useState('');
 
   if (!editingUser) return null;
 
@@ -850,6 +864,228 @@ function AdminUserEditModalContent(props: any) {
         </div>
 
         {/* ========================================================================= */}
+        {/* 2.5 🔴🟡⚪ সদস্য ক্যাটাগরি, কিস্তি ও নমিনি কন্ট্রোল (Owner, Shareholder, Investor, Switch ON/OFF) */}
+        {/* ========================================================================= */}
+        <div className="bg-slate-900 border border-slate-700/80 p-2.5 rounded-xl text-white space-y-2.5 text-left">
+          <div className="flex items-center justify-between border-b border-slate-800 pb-1.5 flex-wrap gap-1">
+            <h4 className="text-xs font-black text-rose-400 flex items-center gap-1.5">
+              <span>🔴🟡⚪</span>
+              <span>সদস্য পদবী ক্যাটাগরি ও কিস্তি কন্ট্রোল (৪টি সেকশন)</span>
+            </h4>
+            <span className="text-[9.5px] font-mono font-bold bg-slate-800 px-2 py-0.5 rounded text-amber-300 border border-slate-700">
+              বর্তমান: {editMemberCategory === 'owner' ? '🔴 ওনার' : editMemberCategory === 'shareholder' ? '🟡 শেয়ার হোল্ডার' : editMemberCategory === 'investor' ? '⚪ ইনভেস্টার' : '👤 সাধারণ'}
+            </span>
+          </div>
+
+          {/* 4 Category Selection Buttons (Single Line Grid) */}
+          <div className="grid grid-cols-4 gap-1 text-center">
+            {/* 1. 🔴 ওনার — Red */}
+            <button
+              type="button"
+              onClick={() => {
+                if (typeof setEditMemberCategory === 'function') setEditMemberCategory('owner');
+                if (typeof setEditMonthlySavingsTarget === 'function') setEditMonthlySavingsTarget(4000);
+              }}
+              className={`p-1 sm:p-1.5 rounded-lg border transition cursor-pointer flex flex-col items-center justify-between min-h-[58px] ${
+                editMemberCategory === 'owner'
+                  ? 'bg-gradient-to-b from-rose-600 to-red-800 border-rose-400 text-white ring-2 ring-rose-400 shadow-md'
+                  : 'bg-slate-800/80 border-slate-700 hover:border-rose-500 text-slate-200'
+              }`}
+            >
+              <span className="text-[10px] sm:text-[11px] font-black leading-tight">🔴 ওনার</span>
+              <span className="text-[9px] sm:text-[10px] font-mono font-black text-rose-200 mt-0.5">৳৪,০০০/মাস</span>
+              <span className="text-[7.5px] bg-black/30 text-rose-100 px-1 py-0.2 rounded mt-0.5 font-bold">
+                ৩ মাসে ১০হাজার • নমিনি ৩
+              </span>
+            </button>
+
+            {/* 2. 🟡 শেয়ার হোল্ডার — Golden */}
+            <button
+              type="button"
+              onClick={() => {
+                if (typeof setEditMemberCategory === 'function') setEditMemberCategory('shareholder');
+                if (typeof setEditMonthlySavingsTarget === 'function') setEditMonthlySavingsTarget(2000);
+              }}
+              className={`p-1 sm:p-1.5 rounded-lg border transition cursor-pointer flex flex-col items-center justify-between min-h-[58px] ${
+                editMemberCategory === 'shareholder'
+                  ? 'bg-gradient-to-b from-amber-600 to-yellow-700 border-amber-400 text-white ring-2 ring-amber-400 shadow-md'
+                  : 'bg-slate-800/80 border-slate-700 hover:border-amber-500 text-slate-200'
+              }`}
+            >
+              <span className="text-[10px] sm:text-[11px] font-black leading-tight">🟡 শেয়ার</span>
+              <span className="text-[9px] sm:text-[10px] font-mono font-black text-amber-200 mt-0.5">৳২,০০০/মাস</span>
+              <span className="text-[7.5px] bg-black/30 text-amber-100 px-1 py-0.2 rounded mt-0.5 font-bold">
+                ৩ মাসে ৫হাজার • নমিনি ২
+              </span>
+            </button>
+
+            {/* 3. ⚪ ইনভেস্টার — Silver */}
+            <button
+              type="button"
+              onClick={() => {
+                if (typeof setEditMemberCategory === 'function') setEditMemberCategory('investor');
+                if (typeof setEditMonthlySavingsTarget === 'function') setEditMonthlySavingsTarget(1000);
+              }}
+              className={`p-1 sm:p-1.5 rounded-lg border transition cursor-pointer flex flex-col items-center justify-between min-h-[58px] ${
+                editMemberCategory === 'investor'
+                  ? 'bg-gradient-to-b from-slate-600 to-slate-800 border-slate-400 text-white ring-2 ring-slate-400 shadow-md'
+                  : 'bg-slate-800/80 border-slate-700 hover:border-slate-500 text-slate-200'
+              }`}
+            >
+              <span className="text-[10px] sm:text-[11px] font-black leading-tight">⚪ ইনভেস্টার</span>
+              <span className="text-[9px] sm:text-[10px] font-mono font-black text-slate-200 mt-0.5">৳১,০০০/মাস</span>
+              <span className="text-[7.5px] bg-black/30 text-slate-200 px-1 py-0.2 rounded mt-0.5 font-bold">
+                অতিরিক্ত নেই • নমিনি ১
+              </span>
+            </button>
+
+            {/* 4. 🔘 Switch ON/OFF — Neutral */}
+            <button
+              type="button"
+              onClick={() => {
+                const nextActive = !editSamityAutoSavingsActive;
+                if (typeof setEditSamityAutoSavingsActive === 'function') setEditSamityAutoSavingsActive(nextActive);
+                if (typeof setEditSamitySwitchStatus === 'function') setEditSamitySwitchStatus(nextActive ? 'ON' : 'OFF');
+              }}
+              className={`p-1 sm:p-1.5 rounded-lg border transition cursor-pointer flex flex-col items-center justify-between min-h-[58px] ${
+                editSamityAutoSavingsActive
+                  ? 'bg-emerald-950/80 border-emerald-500 text-emerald-200 hover:bg-emerald-900/80'
+                  : 'bg-rose-950/90 border-rose-500 text-rose-200 ring-2 ring-rose-400 shadow-md'
+              }`}
+            >
+              <span className="text-[10px] sm:text-[11px] font-black leading-tight">🔘 সুইচ</span>
+              <span className={`text-[9px] sm:text-[10px] font-black mt-0.5 ${editSamityAutoSavingsActive ? 'text-emerald-300' : 'text-rose-300'}`}>
+                {editSamityAutoSavingsActive ? '🟢 ON' : '🔴 OFF'}
+              </span>
+              <span className="text-[7.5px] bg-black/30 text-slate-200 px-1 py-0.2 rounded mt-0.5 font-bold">
+                {editSamityAutoSavingsActive ? 'অটো চালু' : '২৫ ডিসে ফেরত'}
+              </span>
+            </button>
+          </div>
+
+          {/* Policy Banner for Switch */}
+          {!editSamityAutoSavingsActive && (
+            <div className="bg-rose-950/80 border border-rose-500/80 p-2 rounded-lg text-[10px] text-rose-200 leading-snug">
+              ⚠️ <strong>সুইচ বন্ধ (OFF) অবস্থা:</strong> এই সদস্যের পরবর্তী কার্যক্রম ও কিস্তি কর্তন বন্ধ রয়েছে। প্রতি বছর ২৫শে ডিসেম্বর জমাকৃত সঞ্চয় (৳{safePrimitiveNumber(editSavings, 0).toLocaleString('bn-BD')}) কোনো কর্তন ছাড়াই ফেরত প্রদান করা হবে।
+            </div>
+          )}
+
+          {/* Nominee Management Section */}
+          {(() => {
+            const maxNominees = editMemberCategory === 'owner' ? 3 : editMemberCategory === 'shareholder' ? 2 : 1;
+            const currentNominees: any[] = Array.isArray(editNominees) ? editNominees : [];
+            const canAddMore = currentNominees.length < maxNominees;
+
+            return (
+              <div className="bg-slate-800/80 border border-slate-700 p-2 rounded-xl space-y-2 text-xs">
+                <div className="flex items-center justify-between text-[11px]">
+                  <span className="font-bold text-slate-200 flex items-center gap-1">
+                    <span>👥</span>
+                    <span>মনোনীত নমিনি তালিকা ({currentNominees.length} / {maxNominees} জন)</span>
+                  </span>
+                  <span className="text-[10px] text-amber-400 font-mono font-bold">
+                    ক্যাটাগরি সীমা: সর্বোচ্চ {maxNominees} জন
+                  </span>
+                </div>
+
+                {/* List existing nominees */}
+                {currentNominees.length > 0 ? (
+                  <div className="space-y-1">
+                    {currentNominees.map((nom, nIdx) => (
+                      <div key={nIdx} className="bg-slate-900/90 p-1.5 rounded-lg border border-slate-700 flex items-center justify-between text-[10.5px]">
+                        <div>
+                          <span className="font-black text-white">{nIdx + 1}. {nom.name}</span>
+                          {nom.relation && <span className="text-slate-400 ml-1">({nom.relation})</span>}
+                          <div className="text-[9px] text-slate-400 font-mono">
+                            ফোন: {nom.phone || 'N/A'} | NID: {nom.nid || 'N/A'}
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (typeof setEditNominees === 'function') {
+                              const updated = currentNominees.filter((_, idx) => idx !== nIdx);
+                              setEditNominees(updated);
+                            }
+                          }}
+                          className="p-1 text-rose-400 hover:text-rose-200 hover:bg-rose-950 rounded transition cursor-pointer"
+                          title="নমিনি মুছুন"
+                        >
+                          <Trash2 className="w-3 h-3" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-[10px] text-slate-400 italic">এখনো কোনো নমিনি যুক্ত করা হয়নি।</p>
+                )}
+
+                {/* Form to add nominee if under max */}
+                {canAddMore && (
+                  <div className="pt-1.5 border-t border-slate-700 space-y-1.5">
+                    <span className="text-[10px] font-bold text-slate-300 block">+ নতুন নমিনির তথ্য যোগ করুনঃ</span>
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
+                      <input
+                        type="text"
+                        value={adminNomName}
+                        onChange={(e) => setAdminNomName(e.target.value)}
+                        placeholder="নমিনির নাম *"
+                        className="px-2 py-1 bg-slate-950 border border-slate-700 rounded text-[10px] font-bold text-white focus:outline-none"
+                      />
+                      <input
+                        type="text"
+                        value={adminNomRel}
+                        onChange={(e) => setAdminNomRel(e.target.value)}
+                        placeholder="সম্পর্ক (স্ত্রী/মাতা)"
+                        className="px-2 py-1 bg-slate-950 border border-slate-700 rounded text-[10px] font-bold text-white focus:outline-none"
+                      />
+                      <input
+                        type="tel"
+                        value={adminNomPhone}
+                        onChange={(e) => setAdminNomPhone(e.target.value)}
+                        placeholder="মোবাইল নম্বর"
+                        className="px-2 py-1 bg-slate-950 border border-slate-700 rounded text-[10px] font-mono text-white focus:outline-none"
+                      />
+                      <input
+                        type="text"
+                        value={adminNomNid}
+                        onChange={(e) => setAdminNomNid(e.target.value)}
+                        placeholder="জাতীয় পরিচয়পত্র (NID)"
+                        className="px-2 py-1 bg-slate-950 border border-slate-700 rounded text-[10px] font-mono text-white focus:outline-none"
+                      />
+                    </div>
+                    <button
+                      type="button"
+                      disabled={!adminNomName.trim()}
+                      onClick={() => {
+                        if (!adminNomName.trim()) return;
+                        if (typeof setEditNominees === 'function') {
+                          const newNom = {
+                            id: `nom_${Date.now()}`,
+                            name: adminNomName.trim(),
+                            relation: adminNomRel.trim(),
+                            phone: adminNomPhone.trim(),
+                            nid: adminNomNid.trim()
+                          };
+                          setEditNominees([...currentNominees, newNom]);
+                          setAdminNomName('');
+                          setAdminNomRel('');
+                          setAdminNomPhone('');
+                          setAdminNomNid('');
+                        }
+                      }}
+                      className="px-3 py-1 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 text-white font-bold text-[10px] rounded-lg transition cursor-pointer flex items-center gap-1"
+                    >
+                      <span>➕ নমিনি তালিকায় যুক্ত করুন</span>
+                    </button>
+                  </div>
+                )}
+              </div>
+            );
+          })()}
+        </div>
+
+        {/* ========================================================================= */}
         {/* 3. 🔒 জিরো ডিভাইস অপশন, সিকিউরিটি ও অ্যাপ লক */}
         {/* ========================================================================= */}
         <div className="bg-slate-900 border border-slate-800 p-2.5 rounded-xl text-white space-y-2 text-left">
@@ -1068,7 +1304,7 @@ function AdminUserEditModalContent(props: any) {
                 required
                 value={editUserMemberId || ''}
                 onChange={(e) => setEditUserMemberId(e.target.value.toUpperCase())}
-                placeholder="AMB00000001"
+                placeholder="BNB00000001"
                 className="block w-full px-2 py-1 bg-white border border-emerald-400 rounded-lg text-xs font-mono font-black text-emerald-950 uppercase focus:outline-none focus:ring-1 focus:ring-emerald-500"
               />
             </div>

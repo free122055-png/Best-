@@ -141,6 +141,11 @@ export default function AgentScreen({ user, onBack, appConfig }: AgentScreenProp
     return localStorage.getItem('amb_share_location') !== 'false';
   });
 
+  // Manual Static Location States
+  const [manualLat, setManualLat] = useState<string>('');
+  const [manualLng, setManualLng] = useState<string>('');
+  const [isSavingManualLoc, setIsSavingManualLoc] = useState<boolean>(false);
+
   // Favorites state
   const [favorites, setFavorites] = useState<string[]>([]);
   useEffect(() => {
@@ -203,13 +208,14 @@ export default function AgentScreen({ user, onBack, appConfig }: AgentScreenProp
   const [applyLng, setApplyLng] = useState<number | null>(null);
   const [shopMapLink, setShopMapLink] = useState<string>('');
   const [locationNumber, setLocationNumber] = useState<string>('');
+  const [writtenLocation, setWrittenLocation] = useState<string>('');
 
   // Multi-Language translations dictionary
   const trans = {
     bn: {
-      title: 'AMB এজেন্ট ম্যাপ',
-      subtitle: 'বিশ্বজুড়ে আমাদের অনুমোদিত এজেন্ট নেটওয়ার্ক',
-      onlineBadge: '24/7 লাইভ',
+      title: 'BNB এজেন্ট নেটওয়ার্ক',
+      subtitle: 'সারাদেশে আমাদের অনুমোদিত এজেন্ট ও প্রতিনিধিদের অবস্থান',
+      onlineBadge: 'সরাসরি লাইভ',
       locateBtn: 'লোকেশন সনাক্ত করুন 📍',
       locateBtnActive: 'লোকেশন আপডেট করুন',
       locating: 'খোঁজা হচ্ছে...',
@@ -265,7 +271,7 @@ export default function AgentScreen({ user, onBack, appConfig }: AgentScreenProp
       saveProfileBtn: 'প্রোফাইল তথ্য সংরক্ষণ করুন 💾'
     },
     en: {
-      title: 'AMB Agent Map Portal',
+      title: 'BNB Agent Map Portal',
       subtitle: 'Our Approved Cooperative Agent Network Worldwide',
       onlineBadge: '24/7 Live',
       locateBtn: 'Detect Location 📍',
@@ -941,72 +947,26 @@ const assignUniqueAgentCoordinates = (list: Agent[]): Agent[] => {
         console.error('Error loading agent_requests collection:', e);
       }
 
-      // 4. Query 'users' collection (loads all registered users/agents)
+      // 4. Query 'users' collection - ONLY load those with agent roles
       try {
-        const snap4 = await getDocs(collection(db, 'users'));
+        const snap4 = await getDocs(query(collection(db, 'users'), where('role', '==', 'agent')));
         snap4.forEach((doc) => {
           const data = doc.data();
           processDataAndAdd(doc.id, data);
         });
       } catch (e) {
-        console.error('Error loading users collection:', e);
+        console.error('Error loading agent users:', e);
       }
 
-      // 5. Query 'agentLocations' collection (High precision real-time GPS coordinates)
+      // 5. Query 'agentLocations' - REMOVED live tracking consumption to prioritize static locations from profile
+      /* 
       try {
         const snapLocs = await getDocs(collection(db, 'agentLocations'));
-        snapLocs.forEach((docSnap) => {
-          const loc = docSnap.data();
-          if (loc && loc.userId) {
-            const existing = agentsMap.get(loc.userId) || Array.from(agentsMap.values()).find((a: Agent) => a.phone === loc.phone);
-            if (existing) {
-              existing.lat = loc.latitude;
-              existing.lng = loc.longitude;
-              existing.realLat = loc.latitude;
-              existing.realLng = loc.longitude;
-              existing.hasRealGPS = true;
-              existing.accuracy = loc.accuracy;
-              existing.altitude = loc.altitude;
-              existing.heading = loc.heading;
-              existing.speed = loc.speed;
-              existing.lastUpdatedTs = loc.lastUpdatedTs;
-              if (loc.isOnline !== undefined) {
-                existing.status = loc.isOnline ? 'Available' : 'Offline';
-              }
-              if (loc.isSharingLocation !== undefined) {
-                existing.isSharingLocation = loc.isSharingLocation;
-              }
-            } else {
-              const newFromLoc: Agent = {
-                id: loc.userId,
-                name: loc.name || 'এজেন্ট',
-                role: loc.role || 'অফিসিয়াল এজেন্ট',
-                country: loc.country || 'Bangladesh',
-                flag: '🇧🇩',
-                city: loc.city || 'ঢাকা',
-                phone: loc.phone || '',
-                lat: loc.latitude,
-                lng: loc.longitude,
-                realLat: loc.latitude,
-                realLng: loc.longitude,
-                hasRealGPS: true,
-                accuracy: loc.accuracy,
-                altitude: loc.altitude,
-                heading: loc.heading,
-                speed: loc.speed,
-                lastUpdatedTs: loc.lastUpdatedTs,
-                img: loc.profileImage || `https://ui-avatars.com/api/?name=${encodeURIComponent(loc.name || 'Agent')}&background=0D9488&color=fff`,
-                verified: true,
-                status: loc.isOnline ? 'Available' : 'Offline',
-                isSharingLocation: loc.isSharingLocation
-              };
-              agentsMap.set(loc.userId, newFromLoc);
-            }
-          }
-        });
+        // ... (Disabled to prevent live tracking overwriting static points)
       } catch (e) {
-        console.error('Error loading agentLocations collection:', e);
+        console.error('Error loading agentLocations:', e);
       }
+      */
 
       let fetchedAgentsList: Agent[] = Array.from(agentsMap.values());
 
@@ -1068,7 +1028,8 @@ const assignUniqueAgentCoordinates = (list: Agent[]): Agent[] => {
     fetchAgents();
     detectUserLocation();
 
-    // High precision watcher for continuous background sync
+    // Static Location Mode: Live watcher disabled to save data and maintain permanent coordinates
+    /*
     let stopWatcher: (() => void) | null = null;
     if (user.uid && isSharingLocation) {
       stopWatcher = startWatchingHighPrecisionLocation(
@@ -1085,6 +1046,7 @@ const assignUniqueAgentCoordinates = (list: Agent[]): Agent[] => {
         }
       );
     }
+    */
 
     // Subscribe to system settings / app_config for real-time manual vs auto location setting
     const unsubConfig = onSnapshot(doc(db, 'system_settings', 'app_config'), (snap) => {
@@ -1100,17 +1062,15 @@ const assignUniqueAgentCoordinates = (list: Agent[]): Agent[] => {
     const unsub1 = onSnapshot(collection(db, 'agents'), () => fetchAgents(), err => console.error(err));
     const unsub2 = onSnapshot(collection(db, 'bap_agents'), () => fetchAgents(), err => console.error(err));
     const unsub3 = onSnapshot(collection(db, 'agent_requests'), () => fetchAgents(), err => console.error(err));
-    const unsub4 = onSnapshot(collection(db, 'users'), () => fetchAgents(), err => console.error(err));
-    const unsub5 = onSnapshot(collection(db, 'agentLocations'), () => fetchAgents(), err => console.error(err));
+    const unsub4 = onSnapshot(query(collection(db, 'users'), where('role', '==', 'agent')), () => fetchAgents(), err => console.error(err));
 
     return () => {
-      if (stopWatcher) stopWatcher();
+      // if (stopWatcher) stopWatcher();
       unsubConfig();
       unsub1();
       unsub2();
       unsub3();
       unsub4();
-      unsub5();
     };
   }, [user.uid, isSharingLocation]);
 
@@ -1165,7 +1125,7 @@ const assignUniqueAgentCoordinates = (list: Agent[]): Agent[] => {
       const newAgentObj = {
         id: newAgentId,
         name: app.userName,
-        role: app.role || 'AMB Co-op Agent',
+        role: app.role || 'BNB Co-op Agent',
         country: app.country || 'Bangladesh',
         flag: '🇧🇩',
         city: app.area || 'ঢাকা',
@@ -1299,7 +1259,7 @@ const assignUniqueAgentCoordinates = (list: Agent[]): Agent[] => {
         if (!userLocation) {
           setUserLocation({ lat: latitude, lng: longitude });
         }
-        return { district: cleanDistrict, area: cleanArea };
+        return { district: cleanDistrict, area: cleanArea, lat: latitude, lng: longitude };
       }
     } catch (error: any) {
       console.error('Reverse geocoding error:', error);
@@ -1418,10 +1378,11 @@ const assignUniqueAgentCoordinates = (list: Agent[]): Agent[] => {
         whatsapp: whatsNumber || phoneNumber,
         motivation: motivation || 'কোনো বিবরণ দেওয়া হয়নি',
         shopMapLink: shopMapLink || '',
+        writtenLocation: writtenLocation || '',
         locationNumber: locationNumber || '',
         status: 'pending', // pending, reviewed, approved, rejected
         createdAt: serverTimestamp(),
-        appliedAtStr: new Date().toLocaleString('bn-BD'),
+        appliedAtStr: new Date().toLocaleString('en-US'),
         lat: finalLat,
         lng: finalLng,
         realLat: finalLat,
@@ -1467,6 +1428,7 @@ const assignUniqueAgentCoordinates = (list: Agent[]): Agent[] => {
       setWhatsNumber('');
       setMotivation('');
       setShopMapLink('');
+      setWrittenLocation('');
       setLocationNumber('');
       setApplyLat(null);
       setApplyLng(null);
@@ -1574,7 +1536,7 @@ const assignUniqueAgentCoordinates = (list: Agent[]): Agent[] => {
         experience: myAgentProfile ? 'প্রোফাইল সংশোধন আবেদন' : 'নতুন এজেন্ট তালিকাভুক্তি',
         status: 'pending',
         createdAt: serverTimestamp(),
-        appliedAtStr: new Date().toLocaleString('bn-BD')
+        appliedAtStr: new Date().toLocaleString('en-US')
       };
 
       await addDoc(collection(db, 'agent_requests'), newRequest);
@@ -1633,13 +1595,18 @@ const assignUniqueAgentCoordinates = (list: Agent[]): Agent[] => {
     }
   };
 
-  const handleUpdateAgentCoordinates = () => {
-    if (!myAgentProfile) return;
+
+  // Update static position using current GPS
+  const handleUpdateAgentCoordinates = async () => {
+    if (!myAgentProfile || isUpdatingLoc) return;
+    setIsUpdatingLoc(true);
+    
     if (!navigator.geolocation) {
-      console.warn('GPS is not supported on this browser.');
+      console.warn('Geolocation is not supported by this browser.');
+      setIsUpdatingLoc(false);
       return;
     }
-    setIsUpdatingLoc(true);
+
     navigator.geolocation.getCurrentPosition(
       async (pos) => {
         try {
@@ -1653,21 +1620,30 @@ const assignUniqueAgentCoordinates = (list: Agent[]): Agent[] => {
             latitude: latVal,
             longitude: lngVal,
             hasRealGPS: true,
-            liveLocationEnabled: true,
-            lastSeen: 'Active Now'
+            liveLocationEnabled: false, // Explicitly false as we only want static fixed points
+            lastSeen: 'Active Now',
+            lastUpdatedTs: Date.now()
           };
-          await updateDoc(doc(db, 'agents', myAgentProfile.id), updateData).catch(() => {});
-          await updateDoc(doc(db, 'bap_agents', myAgentProfile.id), updateData).catch(() => {});
-          await updateDoc(doc(db, 'users', user.uid), updateData).catch(() => {});
+          
+          const batchPromises = [
+            updateDoc(doc(db, 'agents', myAgentProfile.id), updateData).catch(() => {}),
+            updateDoc(doc(db, 'bap_agents', myAgentProfile.id), updateData).catch(() => {}),
+            updateDoc(doc(db, 'users', user.uid), updateData).catch(() => {})
+          ];
+          
           if (myAgentProfile.id !== user.uid) {
-            await updateDoc(doc(db, 'users', myAgentProfile.id), updateData).catch(() => {});
+            batchPromises.push(updateDoc(doc(db, 'users', myAgentProfile.id), updateData).catch(() => {}));
           }
           
+          await Promise.all(batchPromises);
+          
           setMyAgentProfile(prev => prev ? { ...prev, ...updateData, hasRealGPS: true } : null);
-          setAgentsList(prev => prev.map((a, _idx) => a.id === myAgentProfile.id ? { ...a, ...updateData, hasRealGPS: true } : a));
-          console.log('আপনার লাইভ জিপিএস অবস্থান সফলভাবে ডাটাবেসে আপডেট করা হয়েছে!');
+          setAgentsList(prev => prev.map((a) => a.id === myAgentProfile.id ? { ...a, ...updateData, hasRealGPS: true } : a));
+          setManualLat(latVal.toString());
+          setManualLng(lngVal.toString());
+          console.log('আপনার স্থায়ী জিপিএস অবস্থান সফলভাবে ডাটাবেসে সেভ করা হয়েছে!');
         } catch (err: any) {
-          console.error('Failed to update coordinates in database: ' + err.message);
+          console.error('Failed to update coordinates: ' + err.message);
         } finally {
           setIsUpdatingLoc(false);
         }
@@ -1680,19 +1656,118 @@ const assignUniqueAgentCoordinates = (list: Agent[]): Agent[] => {
     );
   };
 
+  // Manual Coordinate Entry Handler (The "GPS Number" feature)
+  const handleSaveManualLocation = async () => {
+    if (!myAgentProfile || isSavingManualLoc) return;
+    
+    const latNum = parseFloat(manualLat);
+    const lngNum = parseFloat(manualLng);
+    
+    if (isNaN(latNum) || isNaN(lngNum)) {
+      alert('অনুগ্রহ করে সঠিক ল্যাটিটিউড এবং লঙ্গিটিউড (GPS Number) প্রদান করুন।');
+      return;
+    }
+
+    if (!window.confirm('আপনার লোকেশন পরিবর্তনের জন্য এডমিন প্যানেলে আবেদন পাঠানো হবে। এডমিন অনুমোদন করলে ম্যাপে আপনার নতুন অবস্থান দেখা যাবে। আপনি কি নিশ্চিত?')) {
+      return;
+    }
+
+    setIsSavingManualLoc(true);
+    try {
+      const updateRequest = {
+        userId: user.uid,
+        userName: user.name || 'Agent',
+        phone: user.phone || '',
+        lat: latNum,
+        lng: lngNum,
+        realLat: latNum,
+        realLng: lngNum,
+        shopMapLink: writtenLocation || myAgentProfile.shopMapLink || '',
+        type: 'location_update',
+        status: 'pending',
+        createdAt: serverTimestamp(),
+        appliedAtStr: new Date().toLocaleString('en-US'),
+        experience: 'এজেন্ট লোকেশন পরিবর্তন আবেদন'
+      };
+
+      await addDoc(collection(db, 'agent_requests'), updateRequest);
+      
+      addDoc(collection(db, 'admin_notifications'), {
+        title: '📍 এজেন্ট লোকেশন পরিবর্তনের আবেদন',
+        message: `${user.name || 'এজেন্ট'} তার ম্যাপ লোকেশন পরিবর্তনের আবেদন করেছেন।`,
+        userId: user.uid,
+        userName: user.name || '',
+        type: 'agent_location_update',
+        read: false,
+        createdAt: new Date().toISOString()
+      }).catch(() => {});
+
+      alert('আপনার লোকেশন পরিবর্তনের আবেদনটি সফলভাবে পাঠানো হয়েছে। এডমিন অনুমোদনের পর ম্যাপ আপডেট হবে।');
+      setWrittenLocation('');
+    } catch (err: any) {
+      console.error('Manual location request failed:', err);
+      alert('আবেদন পাঠাতে সমস্যা হয়েছে। আবার চেষ্টা করুন।');
+    } finally {
+      setIsSavingManualLoc(false);
+    }
+  };
+
   const handleSaveAgentProfile = async (profileData: any) => {
     if (!myAgentProfile) return;
     setIsSavingAgentProfile(true);
+    setSuccessMessage('');
+    setErrorMessage('');
+
     try {
-      await setDoc(doc(db, 'agents', myAgentProfile.id), { ...myAgentProfile, ...profileData }, { merge: true });
-      await setDoc(doc(db, 'bap_agents', myAgentProfile.id), { ...myAgentProfile, ...profileData }, { merge: true }).catch(() => {});
+      // Create a pending request instead of direct update as per user rule
+      const updateRequest = {
+        userId: user.uid,
+        userName: profileData.name || myAgentProfile.name,
+        phone: profileData.phone || myAgentProfile.phone,
+        whatsNumber: profileData.whatsapp || myAgentProfile.whatsapp || profileData.phone,
+        country: profileData.country || myAgentProfile.country,
+        area: profileData.city || profileData.thana || myAgentProfile.city,
+        city: profileData.city || myAgentProfile.city,
+        district: profileData.district || myAgentProfile.district,
+        thana: profileData.thana || myAgentProfile.thana,
+        postOffice: profileData.postOffice || myAgentProfile.postOffice || '',
+        shopMapLink: profileData.shopMapLink || myAgentProfile.shopMapLink || '',
+        experience: 'প্রোফাইল তথ্য সংশোধন আবেদন',
+        status: 'pending',
+        createdAt: serverTimestamp(),
+        appliedAtStr: new Date().toLocaleString('en-US'),
+        // Try to geocode if location text changed
+        lat: myAgentProfile.lat,
+        lng: myAgentProfile.lng
+      };
+
+      // If manual location changed, try to geocode it for the admin to see/preview
+      if (profileData.shopMapLink && profileData.shopMapLink !== myAgentProfile.shopMapLink) {
+        const geo = await geocodeTextOrLink(profileData.shopMapLink);
+        if (geo) {
+          updateRequest.lat = geo.lat;
+          updateRequest.lng = geo.lng;
+        }
+      }
+
+      await addDoc(collection(db, 'agent_requests'), updateRequest);
       
-      const updatedProfile = { ...myAgentProfile, ...profileData };
-      setMyAgentProfile(updatedProfile);
-      setAgentsList(prev => prev.map((a, _idx) => a.id === myAgentProfile.id ? updatedProfile : a));
-      console.log('প্রোফাইল তথ্য সফলভাবে সেভ করা হয়েছে!');
+      // Admin notification
+      await addDoc(collection(db, 'admin_notifications'), {
+        title: '📝 এজেন্ট প্রোফাইল সংশোধন আবেদন',
+        message: `${user.name || 'এজেন্ট'} তার প্রোফাইল বা লোকেশন পরিবর্তনের আবেদন করেছেন।`,
+        userId: user.uid,
+        userName: user.name || '',
+        type: 'agent_profile_update',
+        read: false,
+        createdAt: new Date().toISOString()
+      });
+
+      alert('আপনার পরিবর্তনের আবেদনটি সফলভাবে দাখিল করা হয়েছে! অ্যাডমিন অনুমোদন করার পর এটি ম্যাপে আপডেট হবে।');
+      setActiveTab('my-applications');
     } catch (err: any) {
-      console.error('Failed to save profile: ' + err.message);
+      console.error('Failed to submit profile update: ' + err.message);
+      alert('আবেদন দাখিল করতে সমস্যা হয়েছে। আবার চেষ্টা করুন।');
     } finally {
       setIsSavingAgentProfile(false);
     }
@@ -1745,7 +1820,7 @@ const assignUniqueAgentCoordinates = (list: Agent[]): Agent[] => {
   const filteredAgents = useMemo(() => {
     return agentsList.filter(agent => {
       const queryLower = searchQuery.toLowerCase();
-      const agentIdStr = `AMB-AGT-${agent.id.substring(0,6).toUpperCase()}`;
+      const agentIdStr = `BNB-AGT-${agent.id.substring(0,6).toUpperCase()}`;
       const matchesSearch = 
         agent.name.toLowerCase().includes(queryLower) ||
         agent.country.toLowerCase().includes(queryLower) ||
@@ -1898,9 +1973,9 @@ const assignUniqueAgentCoordinates = (list: Agent[]): Agent[] => {
                   </div>
                   <div className="min-w-0">
                     <h4 className="text-[11px] font-black text-slate-900 leading-tight flex items-center gap-1.5">
-                      <span>উচ্চ-নির্ভুল জিপিএস নেটওয়ার্ক</span>
-                      <span className="text-[8px] bg-emerald-100 text-emerald-800 font-extrabold px-1.5 py-0.2 rounded-full border border-emerald-200">
-                        GPS Live
+                      <span>স্থায়ী এজেন্ট পয়েন্ট নেটওয়ার্ক</span>
+                      <span className="text-[8px] bg-sky-100 text-sky-800 font-extrabold px-1.5 py-0.2 rounded-full border border-sky-200">
+                        Static Point
                       </span>
                     </h4>
                     {isLocating ? (
@@ -1946,8 +2021,8 @@ const assignUniqueAgentCoordinates = (list: Agent[]): Agent[] => {
               {/* Privacy: Share My Location Toggle Switch */}
               <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-xs font-sans">
                 <div className="flex items-center gap-1.5">
-                  <Radio className={`w-3.5 h-3.5 ${isSharingLocation ? 'text-emerald-600 animate-pulse' : 'text-slate-400'}`} />
-                  <span className="text-[10px] font-black text-slate-700">আমার জিপিএস লোকেশন ম্যাপে শেয়ার করুন</span>
+                  <Radio className="w-3.5 h-3.5 text-slate-400" />
+                  <span className="text-[10px] font-black text-slate-700">আমার প্রোফাইল ম্যাপে সক্রিয় রাখুন</span>
                 </div>
                 <button
                   type="button"
@@ -2080,7 +2155,7 @@ const assignUniqueAgentCoordinates = (list: Agent[]): Agent[] => {
                     <span>কল করুন</span>
                   </a>
                   <a 
-                    href={`https://wa.me/${processedAgents[0].whatsapp ? processedAgents[0].whatsapp.replace(/[^0-9]/g, '') : processedAgents[0].phone.replace(/[^0-9]/g, '')}?text=${encodeURIComponent('আসসালামু আলাইকুম, আমি AMB কো-অপারেটিভ অ্যাপ থেকে আপনার কাছে সার্ভিস নিতে যোগাযোগ করছি।')}`}
+                    href={`https://wa.me/${processedAgents[0].whatsapp ? processedAgents[0].whatsapp.replace(/[^0-9]/g, '') : processedAgents[0].phone.replace(/[^0-9]/g, '')}?text=${encodeURIComponent('আসসালামু আলাইকুম, আমি BNB কো-অপারেটিভ অ্যাপ থেকে আপনার কাছে সার্ভিস নিতে যোগাযোগ করছি।')}`}
                     target="_blank"
                     rel="noreferrer"
                     className="py-2 bg-[#25D366] hover:bg-[#20ba56] text-white rounded-xl text-[9.5px] font-black flex items-center justify-center gap-1 transition shadow-xs text-center cursor-pointer"
@@ -2126,10 +2201,10 @@ const assignUniqueAgentCoordinates = (list: Agent[]): Agent[] => {
                   <div className="bg-gradient-to-r from-[#0D9488] to-teal-800 rounded-2xl p-4 text-white space-y-1">
                     <h3 className="text-xs font-black text-white flex items-center gap-1.5">
                       <Briefcase className="w-4.5 h-4.5 text-emerald-250 shrink-0" />
-                      AMB কো-অপারেটিভ এজেন্ট আবেদনপত্র
+                      BNB কো-অপারেটিভ এজেন্ট আবেদনপত্র
                     </h3>
                     <p className="text-[10px] text-emerald-100 font-semibold leading-relaxed">
-                      আপনার এলাকার ক্ষুদ্র ক্ষুদ্র সঞ্চয়কে গতিশীল করতে এবং রেমিট্যান্স কালেকশনে AMB এজেন্ট হিসেবে ক্যারিয়ার শুরু করুন। নিচের ফর্মটি সতর্কতার সাথে পূরণ করুন।
+                      আপনার এলাকার ক্ষুদ্র ক্ষুদ্র সঞ্চয়কে গতিশীল করতে এবং রেমিট্যান্স কালেকশনে BNB এজেন্ট হিসেবে ক্যারিয়ার শুরু করুন। নিচের ফর্মটি সতর্কতার সাথে পূরণ করুন।
                     </p>
                   </div>
 
@@ -2225,18 +2300,19 @@ const assignUniqueAgentCoordinates = (list: Agent[]): Agent[] => {
                         <div className="flex items-center justify-between">
                           <label className="text-[10px] font-black text-teal-900 flex items-center gap-1">
                             <MapPin className="w-3.5 h-3.5 text-[#0D9488]" />
-                            <span>📍 দোকানের গুগল ম্যাপস লিংক বা জিপিএস কোঅর্ডিনেট (Google Maps Link)</span>
+                            <span>📍 আপনার দোকান বা বাসার লোকেশন লিখে সেট করুন (Manual Address)</span>
                           </label>
                           <span className="text-[8.5px] font-extrabold text-teal-700 bg-teal-100/80 px-2 py-0.5 rounded-full border border-teal-200">
-                            অটো থিকানা ফিল
+                            অটো ম্যাপ পিন
                           </span>
                         </div>
                         <p className="text-[9.5px] text-teal-800 font-medium leading-normal">
-                          দোকানের গুগল ম্যাপ লিংক (Google Maps Share Link) বা কোঅর্ডিনেট (যেমন: 23.8103, 90.4125) পেস্ট করে 'যাচাই করুন' বাটনে চাপ দিন। আপনার জেলা ও থানা ওই লিংকের এরিয়া অনুযায়ী অটোমেটিক যুক্ত হয়ে যাবে!
+                          আপনি এখানে আপনার ব্যবসার সঠিক লোকেশনটি লিখে দিন। সিস্টেম স্বয়ংক্রিয়ভাবে ম্যাপে এই লোকেশনটি আপনার ব্যানারে লাইভ দেখাবে। (উদাঃ মিরপুর ১০, ঢাকা বা গুগল ম্যাপ লিংক)
                         </p>
                         <div className="flex gap-2">
                           <input
                             type="text"
+                            required
                             value={shopMapLink}
                             onChange={async (e) => {
                               const val = e.target.value;
@@ -2245,8 +2321,8 @@ const assignUniqueAgentCoordinates = (list: Agent[]): Agent[] => {
                                 await geocodeTextOrLink(val);
                               }
                             }}
-                            placeholder="গুগল ম্যাপ লিংক বা কোঅর্ডিনেট টাইপ করুন (উদাঃ https://maps.app.goo.gl/... বা 23.8103, 90.4125)"
-                            className="block w-full px-3 py-2 bg-white border border-teal-200 rounded-xl text-xs focus:ring-2 focus:ring-[#0D9488] focus:bg-white focus:outline-none font-medium text-slate-800"
+                            placeholder="দোকান বা বাসার লোকেশন লিখে সেট করুন (উদাঃ মিরপুর ১০, ঢাকা)"
+                            className="block w-full px-3 py-2 bg-white border border-teal-200 rounded-xl text-xs focus:ring-2 focus:ring-[#0D9488] focus:bg-white focus:outline-none font-black text-slate-800 placeholder:font-normal"
                           />
                           <button
                             type="button"
@@ -2267,6 +2343,40 @@ const assignUniqueAgentCoordinates = (list: Agent[]): Agent[] => {
                             যাচাই করুন
                           </button>
                         </div>
+                      </div>
+
+                      <div className="space-y-1.5">
+                        <label className="block text-[9.5px] font-black text-slate-750 uppercase tracking-wider">3. লিখিত লোকেশন (ম্যানুয়ালি লিখুন) *</label>
+                        <div className="flex gap-2">
+                          <input
+                            type="text"
+                            value={writtenLocation}
+                            onChange={(e) => setWrittenLocation(e.target.value)}
+                            placeholder="যেমনঃ খড়কী, যশোর সদর, যশোর"
+                            className="block w-full px-3.5 py-2.5 bg-white border border-slate-200 text-slate-900 font-bold rounded-xl text-xs focus:border-[#0D9488] outline-none transition-all"
+                          />
+                          <button
+                            type="button"
+                            onClick={async () => {
+                              if (!writtenLocation.trim()) {
+                                alert('প্রথমে লোকেশনটি লিখুন।');
+                                return;
+                              }
+                              const result = await geocodeTextOrLink(writtenLocation);
+                              if (result) {
+                                alert('লোকেশন থেকে ঠিকানা সফলভাবে সনাক্ত হয়েছে!');
+                              } else {
+                                alert('দুঃখিত, এই লোকেশনটি ম্যাপে খুঁজে পাওয়া যায়নি। অনুগ্রহ করে আরও বিস্তারিত লিখুন।');
+                              }
+                            }}
+                            className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-black whitespace-nowrap cursor-pointer transition shadow-3xs"
+                          >
+                            ম্যাপে খুঁজুন
+                          </button>
+                        </div>
+                        <p className="text-[8.5px] text-slate-500 font-semibold mt-1">
+                          *এখানে আপনার এজেন্টের অবস্থান লিখিত আকারে দিন। সিস্টেম ম্যাপে এটি প্রদর্শন করবে।
+                        </p>
                       </div>
 
                       <div className="grid grid-cols-2 gap-3">
@@ -2589,7 +2699,7 @@ const assignUniqueAgentCoordinates = (list: Agent[]): Agent[] => {
                     <div className="grid grid-cols-2 gap-1">
                       {/* WhatsApp Button */}
                       <a 
-                        href={`https://wa.me/${agent.whatsapp ? agent.whatsapp.replace(/[^0-9]/g, '') : agent.phone.replace(/[^0-9]/g, '')}?text=${encodeURIComponent('আসসালামু আলাইকুম, আমি AMB কো-অপারেটিভ অ্যাপ থেকে যোগাযোগ করছি।')}`}
+                        href={`https://wa.me/${agent.whatsapp ? agent.whatsapp.replace(/[^0-9]/g, '') : agent.phone.replace(/[^0-9]/g, '')}?text=${encodeURIComponent('আসসালামু আলাইকুম, আমি BNB কো-অপারেটিভ অ্যাপ থেকে যোগাযোগ করছি।')}`}
                         target="_blank"
                         rel="noreferrer"
                         className="py-1.5 bg-[#25D366] hover:bg-[#20ba56] text-white text-[8.5px] font-black rounded-xl flex items-center justify-center gap-1 transition text-center shadow-3xs cursor-pointer"
@@ -2796,7 +2906,7 @@ const assignUniqueAgentCoordinates = (list: Agent[]): Agent[] => {
             <div className="bg-white border border-slate-150 rounded-2.5xl p-5 shadow-3xs space-y-4">
               <h2 className="text-xs font-black text-slate-800 uppercase tracking-widest border-b pb-2 flex items-center gap-1.5">
                 <Globe className="w-4.5 h-4.5 text-[#0D9488]" />
-                AMB কো-অপারেটিভ আন্তর্জাতিক এজেন্ট কার্ড
+                BNB কো-অপারেটিভ আন্তর্জাতিক এজেন্ট কার্ড
               </h2>
 
               {/* Digital Agent Identity Card */}
@@ -2806,7 +2916,7 @@ const assignUniqueAgentCoordinates = (list: Agent[]): Agent[] => {
                 
                 <div className="flex justify-between items-start">
                   <div>
-                    <h3 className="text-sm font-black text-slate-100 font-sans tracking-tight mb-0.5">AMB Business Co-operative Ltd.</h3>
+                    <h3 className="text-sm font-black text-slate-100 font-sans tracking-tight mb-0.5">BNB Business Co-operative Ltd.</h3>
                     <p className="text-[7.5px] text-[#22C55E] uppercase font-black tracking-widest font-mono">OFFICIAL GLOBAL AGENT</p>
                   </div>
                   {/* Flag / status symbol */}
@@ -2824,7 +2934,7 @@ const assignUniqueAgentCoordinates = (list: Agent[]): Agent[] => {
                   <div>
                     <h4 className="text-[11.5px] font-black text-white leading-tight font-sans">{user.name || 'সম্মানিত সদস্য'}</h4>
                     <p className="text-[8px] text-slate-350 leading-tight block truncate mt-0.5">District Agent (Candidate)</p>
-                    <p className="text-[8px] text-yellow-350 font-mono mt-0.5">ID: AMB-AGT-TEMP-{user.uid?.substring(0, 5).toUpperCase()}</p>
+                    <p className="text-[8px] text-yellow-350 font-mono mt-0.5">ID: BNB-AGT-TEMP-{user.uid?.substring(0, 5).toUpperCase()}</p>
                   </div>
                 </div>
 
@@ -2839,8 +2949,98 @@ const assignUniqueAgentCoordinates = (list: Agent[]): Agent[] => {
 
               <div className="bg-slate-50 border border-slate-150 p-3.5 rounded-2xl text-[10px] text-slate-600 leading-relaxed font-semibold">
                 <p className="font-black text-slate-800 text-[11px] mb-1">ℹ️ অনুমোদন প্রক্রিয়াঃ</p>
-                আপনার আবেদনপত্রটি দাখিল হওয়ার পর, AMB কেন্দ্রীয় গভর্নিং বোর্ড প্রতিটি এলাকার কোটা অনুযায়ী তথ্য রিভিও করে থাকে। অনুমোদন সম্পন্ন হলেই আপনার আইডি কার্ডটি সচল হবে এবং আপনি আপনার এলাকায় কালেকশন পয়েন্ট ও কিস্তি গ্রহণ সেবা শুরু করতে পারবেন।
+                আপনার আবেদনপত্রটি দাখিল হওয়ার পর, BNB কেন্দ্রীয় গভর্নিং বোর্ড প্রতিটি এলাকার কোটা অনুযায়ী তথ্য রিভিও করে থাকে। অনুমোদন সম্পন্ন হলেই আপনার আইডি কার্ডটি সচল হবে এবং আপনি আপনার এলাকায় কালেকশন পয়েন্ট ও কিস্তি গ্রহণ সেবা শুরু করতে পারবেন।
               </div>
+
+              {/* MANUAL STATIC LOCATION SETTING (Request #7 & #10 fix) */}
+              {(user.role === 'agent' || myAgentProfile) && (
+                <div className="bg-emerald-50/50 border border-emerald-200 p-4 rounded-3xl space-y-3.5 shadow-3xs">
+                  <div className="flex items-center gap-2 border-b border-emerald-100 pb-2">
+                    <MapPinned className="w-5 h-5 text-emerald-600" />
+                    <h3 className="text-[11px] font-black text-emerald-900 uppercase tracking-tight">ম্যাপে স্থায়ী অবস্থান সেট করুন</h3>
+                  </div>
+
+                  <p className="text-[9px] text-slate-600 font-bold leading-snug">
+                    আপনার স্থায়ী ব্যবসায়িক লোকেশন ম্যাপে সেট করুন। এটি পরিবর্তন করলে এডমিন অনুমোদনের প্রয়োজন হবে।
+                  </p>
+
+                  <div className="space-y-1.5">
+                    <label className="text-[8px] font-black text-slate-400 uppercase ml-1">লিখিত লোকেশন (Written Address)</label>
+                    <input 
+                      type="text" 
+                      value={writtenLocation}
+                      onChange={(e) => setWrittenLocation(e.target.value)}
+                      placeholder="যেমনঃ খড়কী, যশোর সদর, যশোর"
+                      className="w-full bg-white border border-emerald-200 rounded-xl px-3 py-2 text-[10px] font-bold focus:ring-1 focus:ring-emerald-400 focus:border-emerald-400 outline-none"
+                    />
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        if (!writtenLocation.trim()) return;
+                        const result = await geocodeTextOrLink(writtenLocation);
+                        if (result) {
+                          setManualLat(String(result.lat));
+                          setManualLng(String(result.lng));
+                          alert('লোকেশন থেকে স্থানাঙ্ক চিহ্নিত করা হয়েছে!');
+                        }
+                      }}
+                      className="w-full py-1.5 bg-sky-50 text-sky-700 rounded-lg text-[8px] font-black uppercase tracking-wider border border-sky-100"
+                    >
+                      ম্যাপ থেকে স্থানাঙ্ক বের করুন
+                    </button>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1">
+                      <label className="text-[8px] font-black text-slate-400 uppercase ml-1">ল্যাটিটিউড (Latitude)</label>
+                      <input 
+                        type="text" 
+                        value={manualLat}
+                        onChange={(e) => setManualLat(e.target.value)}
+                        placeholder="e.g. 23.8103"
+                        className="w-full bg-white border border-emerald-200 rounded-xl px-3 py-2 text-[10px] font-mono font-bold focus:ring-1 focus:ring-emerald-400 focus:border-emerald-400 outline-none"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[8px] font-black text-slate-400 uppercase ml-1">লঙ্গিটিউড (Longitude)</label>
+                      <input 
+                        type="text" 
+                        value={manualLng}
+                        onChange={(e) => setManualLng(e.target.value)}
+                        placeholder="e.g. 90.4125"
+                        className="w-full bg-white border border-emerald-200 rounded-xl px-3 py-2 text-[10px] font-mono font-bold focus:ring-1 focus:ring-emerald-400 focus:border-emerald-400 outline-none"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="flex flex-col gap-2 pt-1">
+                    <button
+                      type="button"
+                      onClick={handleUpdateAgentCoordinates}
+                      disabled={isUpdatingLoc}
+                      className="w-full py-2 bg-emerald-100 hover:bg-emerald-200 text-emerald-800 rounded-xl text-[9px] font-black flex items-center justify-center gap-1.5 transition shadow-4xs cursor-pointer"
+                    >
+                      <span>📍 বর্তমান জিপিএস থেকে লোকেশন নিন</span>
+                    </button>
+                    
+                    <button
+                      type="button"
+                      onClick={handleSaveManualLocation}
+                      disabled={isSavingManualLoc || (!manualLat || !manualLng)}
+                      className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-300 text-white rounded-xl text-[10px] font-black flex items-center justify-center gap-2 transition shadow-3xs cursor-pointer shadow-emerald-200"
+                    >
+                      {isSavingManualLoc ? (
+                        <span className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                      ) : <CheckCircle className="w-4 h-4" />}
+                      <span>স্থায়ী অবস্থান হিসেবে সেভ করুন</span>
+                    </button>
+                  </div>
+
+                  <p className="text-[8px] text-slate-400 font-bold text-center italic">
+                    * গুগল ম্যাপ থেকে ল্যাটিটিউড/লঙ্গিটিউড কপি করে এখানে বসাতে পারেন।
+                  </p>
+                </div>
+              )}
             </div>
           </div>
         )}
@@ -2895,3 +3095,4 @@ const assignUniqueAgentCoordinates = (list: Agent[]): Agent[] => {
     </div>
   );
 }
+

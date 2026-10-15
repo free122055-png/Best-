@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Settings, Power, MapPinned, User } from 'lucide-react';
+import { Settings, Power, MapPinned, User, MapPin } from 'lucide-react';
 
 interface AgentProfile {
   id: string;
@@ -199,14 +199,18 @@ export default function AgentDashboardPanel({
 
           <div>
             <label className="block text-[9.5px] font-black text-teal-800 uppercase mb-1 flex items-center gap-1">
-              <span>📍 দোকানের গুগল ম্যাপস লিংক বা জিপিএস কোঅর্ডিনেট (Google Maps URL)</span>
+              <MapPin className="w-3.5 h-3.5 text-[#0D9488]" />
+              <span>📍 দোকান বা বাসার লোকেশন লিখে সেট করুন (Manual Address)</span>
             </label>
+            <p className="text-[9px] text-slate-400 font-medium mb-1.5 leading-relaxed">
+              আপনি এখানে আপনার ব্যবসার লোকেশন লিখে পরিবর্তন করতে পারবেন। তবে পরিবর্তনের জন্য এডমিন অনুমোদন লাগবে।
+            </p>
             <input 
               type="text" 
               value={dashShopMapLink} 
               onChange={e => setDashShopMapLink(e.target.value)} 
-              placeholder="https://maps.app.goo.gl/... বা 23.8103, 90.4125" 
-              className="w-full px-3.5 py-2 bg-teal-50/50 border border-teal-200 rounded-xl font-mono text-xs font-bold text-slate-800 focus:ring-2 focus:ring-[#0D9488]" 
+              placeholder="উদাঃ মিরপুর ১০, ঢাকা (বা গুগল ম্যাপ লিংক)" 
+              className="w-full px-3.5 py-2.5 bg-teal-50/50 border border-teal-200 rounded-xl font-black text-xs text-slate-800 focus:ring-2 focus:ring-[#0D9488] placeholder:font-normal" 
             />
           </div>
 

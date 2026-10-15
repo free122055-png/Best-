@@ -103,13 +103,13 @@ export default function SafiProductDetailsModal({
     : null;
 
   return (
-    <div className="fixed inset-0 z-65 flex items-center justify-center bg-black/80 backdrop-blur-xs font-sans overflow-hidden">
+    <div className="fixed inset-0 z-65 flex flex-col bg-white font-sans overflow-hidden w-screen h-screen">
       <motion.div 
         initial={{ y: '100%', opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
         exit={{ y: '100%', opacity: 0 }}
         transition={{ type: 'spring', damping: 28, stiffness: 300 }}
-        className="bg-white w-full h-full sm:h-[94vh] sm:max-w-lg sm:rounded-3xl flex flex-col overflow-hidden text-slate-900 shadow-2xl relative"
+        className="bg-white w-full h-full flex flex-col overflow-hidden text-slate-900 relative"
       >
         {/* 1. AliExpress Top Navigation Bar */}
         <div className="bg-white/95 backdrop-blur-md border-b border-slate-150 px-3.5 py-2.5 flex items-center justify-between z-30 shrink-0 sticky top-0 shadow-2xs">

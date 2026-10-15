@@ -8,6 +8,8 @@ export interface User {
   password?: string; // Account security password (entered on initial / fresh login)
   pin: string; // Stored PIN (e.g., 4-digit number)
   pinSet?: boolean;
+  activeSessionToken?: string; // Single active device session token
+  activeSessionDeviceId?: string; // Unique ID of active device
   isPendingPin?: boolean;
   role: 'user' | 'admin' | 'sub_admin';
   subAdminPermissions?: string[]; // Array of permitted section IDs in Admin Panel
@@ -15,8 +17,8 @@ export interface User {
   mainBalance?: number; // Primary main balance
   lockedBalance?: number; // Escrow locked balance
   pendingBalance?: number; // Escrow pending balance
-  telecomBalance?: number; // AMB Telecom balance
-  superShopBalance?: number; // AMB Super Shop balance
+  telecomBalance?: number; // BNB Telecom balance
+  superShopBalance?: number; // BNB Super Shop balance
   savings: number; // Accumulated savings
   dueLoan: number; // User's outstanding loan
   nid?: string;
@@ -30,7 +32,9 @@ export interface User {
   profession?: string;
   alternatePhone?: string;
   emergencyPhone?: string;
-  memberCategory?: 'regular' | 'investor' | 'shareholder';
+  memberCategory?: 'owner' | 'shareholder' | 'investor' | 'regular';
+  nominees?: MemberNominee[];
+  samityQuarterlyPaidMonths?: string[]; // e.g. ['2026-jan', '2026-apr', '2026-jul', '2026-oct']
   nomineeName?: string;
   nomineeRelation?: string;
   nomineePhone?: string;
@@ -92,8 +96,9 @@ export interface User {
   requestedDeviceId?: string; // New Device ID requested by the user
   deviceLockBypassed?: boolean; // Whether device lock is bypassed for this user
   deviceChangeRequested?: boolean; // Whether the user requested a device change approval
-  deviceChangeRequestedAt?: string; // Timestamp when device change was requested
   isLoggedIn?: boolean; // Active logged in state for real-time zero device force logout
+  qardLateCount?: number; // Count of late repayments for Qard Hasana
+  isLifetimeBannedFromQard?: boolean; // Lifetime ban status if late repayments >= 2
   forceLogoutAt?: string; // Force logout timestamp set by admin to force instant logout
   sessionLoggedInAt?: string; // Session login timestamp on the client side
   ambCardNumber?: string;
@@ -105,6 +110,7 @@ export interface User {
   ambCardIssuedAt?: string;
   ambCardOtpLocked?: boolean;
   savedAmbCards?: SavedAmbCard[];
+  savedBNBCards?: SavedAmbCard[];
   latitude?: number;
   longitude?: number;
   fullAddress?: string;
@@ -499,7 +505,8 @@ export interface QardVerificationNotice {
 
 export interface QardEligibilityConfig {
   requiredActiveDays: number;
-  requiredAmbTxVolume: number;
+  requiredAmbTxVolume?: number;
+  requiredBNBTxVolume?: number;
   trackerTitle?: string;
   trackerSubtitle?: string;
 }
@@ -629,7 +636,7 @@ export interface SamityInvestment {
   dislikedUsers?: { uid: string; name: string; memberId?: string; photoURL?: string; reactedAt?: string }[];
   viewsCount?: number;
   comments?: SamityInvestmentComment[];
-  authorName?: string; // ডিফল্ট: "AMB ইনভেস্টমেন্ট বোর্ড / ম্যানেজমেন্ট"
+  authorName?: string; // ডিফল্ট: "BNB ইনভেস্টমেন্ট বোর্ড / ম্যানেজমেন্ট"
   authorRole?: string; // ডিফল্ট: "সেন্ট্রাল ম্যানেজমেন্ট"
   authorAvatar?: string;
   isPinned?: boolean;
@@ -701,6 +708,7 @@ export interface AppConfig {
   appLogoUrl?: string;
   serviceStatus?: Record<string, boolean>;
   dashboardBanners?: { id: number; tag: string; title: string; description: string; bgGradient: string; image: string; }[];
+  bottomBanners?: { id: number; tag: string; title: string; description: string; bgGradient: string; image: string; }[];
   qardBanners?: { id: number; tag: string; title: string; description: string; bgGradient: string; image: string; }[];
   samityBanners?: { id: number; tag: string; title: string; description: string; bgGradient: string; image: string; }[];
   telecomBanners?: { id: number; tag: string; title: string; description: string; bgGradient: string; image: string; }[];
@@ -755,6 +763,9 @@ export interface AppConfig {
   ambToAmbFreeActive?: boolean;
   ambToAmbMinLimit?: number;
   ambToAmbMaxLimit?: number;
+  ambToBNBFreeActive?: boolean;
+  ambToBNBMinLimit?: number;
+  ambToBNBMaxLimit?: number;
   billPayActive?: boolean;
   billPayFeePercent?: number;
   salaryPayActive?: boolean;
@@ -817,6 +828,7 @@ export interface AppConfig {
   oneSignalRestApiKey?: string;
   sectionIcons?: Record<string, string>;
   ambToAmbIconUrl?: string;
+  ambToBNBIconUrl?: string;
   softwareIntegrations?: Record<string, {
     sectionKey: string;
     softwareName: string;
@@ -853,6 +865,16 @@ export interface AppConfig {
     agreed: boolean;
     feedbackText?: string;
     respondedAt: string;
+  }>;
+  rationCardConfigs?: Record<string, { 
+    label: string; 
+    price: number; 
+    colorHex: string;
+    bgClass?: string;
+    textPrimaryClass?: string;
+    textSecondaryClass?: string;
+    badgeText?: string;
+    description?: string;
   }>;
 }
 
@@ -892,6 +914,7 @@ export interface UserNotification {
   notifyType?: 'info' | 'credit' | 'debit';
   amount?: number;
   type?: 'bonus' | 'fine' | 'notice' | 'general';
+  message?: string;
 }
 
 export interface PaymentMethod {
@@ -903,6 +926,15 @@ export interface PaymentMethod {
   active: boolean;
 }
 
+export interface MemberNominee {
+  id?: string;
+  name: string;
+  relation?: string;
+  phone?: string;
+  nid?: string;
+  percent?: number;
+}
+
 export interface SavedAmbCard {
   id: string;
   name: string; // e.g. "ভাইয়ের কার্ড"
@@ -910,6 +942,14 @@ export interface SavedAmbCard {
   expiry: string; // MM/YY
   cvv: string;
 }
+export type SavedBNBCard = SavedAmbCard;
+
+export const SAMITY_QUARTERLY_MONTHS = [
+  { id: 'jan', quarter: 'Q1', name: 'জানুয়ারি', monthNum: 1, short: 'Jan', bengaliQuarter: '১ম ত্রৈমাসিক (জানুয়ারি)' },
+  { id: 'apr', quarter: 'Q2', name: 'এপ্রিল', monthNum: 4, short: 'Apr', bengaliQuarter: '২য় ত্রৈমাসিক (এপ্রিল)' },
+  { id: 'jul', quarter: 'Q3', name: 'জুলাই', monthNum: 7, short: 'Jul', bengaliQuarter: '৩য় ত্রৈমাসিক (জুলাই)' },
+  { id: 'oct', quarter: 'Q4', name: 'অক্টোবর', monthNum: 10, short: 'Oct', bengaliQuarter: '৪র্থ ত্রৈমাসিক (অক্টোবর)' },
+];
 
 export const SAMITY_MONTHS = [
   { id: 'jan', monthNum: 1, name: 'জানুয়ারি', short: 'Jan' },
@@ -1071,12 +1111,12 @@ export interface PhoneChangeRequest {
 }
 
 /**
- * Generates a short, easy-to-read AMB Transaction ID (maximum 5 or 6 characters total).
+ * Generates a short, easy-to-read BNB Transaction ID (maximum 5 or 6 characters total).
  * Rules: Exactly 1 or 2 letters at the beginning, followed by numbers.
  * Total characters: Strictly 5 or 6 characters (e.g., 'BN4829', 'B74921', 'BN8301', 'B5829').
  * Allows members to easily speak or read the number aloud over phone/support.
  */
-export const generateAmbTrxId = (preferredPrefix?: string): string => {
+export const generateBNBTrxId = (preferredPrefix?: string): string => {
   let prefix = (preferredPrefix || (Math.random() > 0.4 ? 'BN' : 'B')).toUpperCase().replace(/[^A-Z]/g, '');
   if (!prefix) prefix = 'BN';
   if (prefix.length > 2) prefix = prefix.slice(0, 2);
@@ -1092,12 +1132,12 @@ export const generateAmbTrxId = (preferredPrefix?: string): string => {
 };
 
 /**
- * Formats or cleans an internal AMB transaction number so that long internal IDs 
+ * Formats or cleans an internal BNB transaction number so that long internal IDs 
  * (such as timestamps or internal hashes) are neatly displayed as 5-6 characters (1-2 letters + numbers).
  * Note: External MFS TrxIDs provided by payment gateways (e.g. bKash 8K48AL7D9) are preserved as entered.
  */
 export const formatShortTrxId = (rawId?: string): string => {
-  if (!rawId) return generateAmbTrxId('BN');
+  if (!rawId) return generateBNBTrxId('BN');
   const str = String(rawId).trim().toUpperCase();
 
   // If already 5-6 chars with 1-2 letters and numbers, keep as-is (e.g., BN4821, B74921, B5829)
@@ -1106,7 +1146,7 @@ export const formatShortTrxId = (rawId?: string): string => {
   }
 
   // If it has a known internal prefix with long timestamp like LID..., CARD..., TXN..., REC..., TX-..., ADD..., QRD...
-  const internalMatch = str.match(/^(LID|CARD|TXN|REC|AMB|TX|ADD|QRD|SAM|TEL|SHOP|CORR)[\-_]?(\d+)/);
+  const internalMatch = str.match(/^(LID|CARD|TXN|REC|BNB|BNB|TX|ADD|QRD|SAM|TEL|SHOP|CORR)[\-_]?(\d+)/);
   if (internalMatch) {
     const letters = internalMatch[1].startsWith('B') ? 'BN' : internalMatch[1].slice(0, 2);
     const digits = internalMatch[2];
@@ -1122,6 +1162,33 @@ export const formatShortTrxId = (rawId?: string): string => {
   // If it is a typical MFS TrxID entered by user (like bKash 8K48AL7D9)
   return str;
 };
+
+export interface DetectedPayment {
+  id: string; // e.g. PAY_8K9L7M6N5P4
+  trxId: string;
+  amount: number;
+  sender: string; // e.g. 'bKash'
+  senderPhone?: string;
+  message?: string;
+  rawMessage?: string;
+  detectedAt: string;
+  status: 'pending_verification' | 'verified' | 'failed' | 'duplicate';
+  verificationStatus?: 'pending_review' | 'unidentified_member' | 'verified' | 'rejected' | 'duplicate';
+  matchedUserId?: string | null;
+  matchedMemberId?: string | null;
+  matchedUserName?: string | null;
+  matchedTransactionId?: string | null;
+  isProcessed: boolean;
+  processedAt?: string | null;
+  verifiedAt?: string | null;
+  verifiedBy?: string | null;
+  rejectionReason?: string | null;
+  rejectedAt?: string | null;
+  isDuplicate?: boolean;
+  duplicateAttempts?: number;
+  source?: 'android_native_receiver' | 'android_webhook' | 'simulator';
+  personalNotice?: string;
+}
 
 
 

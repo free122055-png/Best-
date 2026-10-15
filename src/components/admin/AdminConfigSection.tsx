@@ -25,15 +25,29 @@ import { User, Transaction, Notice, Offer, BapReport, BapGroup, BapAdminRequest,
 import { normalizeMemberId, formatBanglaAmount, normalizePhoneNumber, findUserInFirestoreByPhone, getNextSequentialMemberId, deleteUserCompletelyFromDatabase, convertBengaliToEnglishDigits } from '../../lib/memberUtils';
 import { sortTransactionsNewestFirst, getTxTime } from '../../lib/transactionUtils';
 import { saveAppConfig, DEFAULT_QARD_CONFIG } from '../../lib/config';
-import { AMBLogo } from '../AMBLogo';
+import { BNBLogo } from '../BNBLogo';
 import { HeaderPendingModal } from '../HeaderPendingModal';
 import SamityScreen from '../SamityScreen';
 import UnifiedBackButton from '../UnifiedBackButton';
 import SamityAdmin from '../SamityAdmin';
 import SafiPremiumShop from '../SafiPremiumShop';
 import TelecomAdmin from '../TelecomAdmin';
-import AmbSalaryAdmin from '../AmbSalaryAdmin';
+import BNBSalaryAdmin from '../BNBSalaryAdmin';
 import { HistoryRetentionSettings } from '../HistoryRetentionSettings';
+import { 
+  SamityIcon,
+  SafeDealsIcon,
+  QardIcon,
+  BankIcon,
+  TelecomIcon,
+  RationIcon,
+  SalaryIcon,
+  SafiIcon,
+  AutoRechargeIcon,
+  BillPayIcon,
+  AgentIcon,
+  AboutIcon
+} from '../SectionIcons';
 import { runWalletEndToEndTests, TestResultItem } from '../../lib/walletTests';
 import { 
   ExternalLink,
@@ -351,7 +365,9 @@ export function AdminConfigSection(props: any) {
     cfgBottomNavTabs,
     setCfgBottomNavTabs,
     setAdminTab,
-    cfgSaving
+    cfgSaving,
+    cfgSectionIcons,
+    setCfgSectionIcons
   } = props;
 
   return (
@@ -733,14 +749,14 @@ export function AdminConfigSection(props: any) {
                       className="w-full bg-slate-900/50 border border-slate-800 focus:border-red-500 rounded-xl p-3 text-sm text-white outline-none transition cursor-pointer disabled:opacity-40"
                     >
                       <option value="">কোনোটিই নয় (হোম স্ক্রিন খুলবে)</option>
-                      <option value="telecom">AMB টেলিকম / রিচার্জ স্ক্রিন</option>
-                      <option value="samity">AMB সমবায় / সঞ্চয় স্ক্রিন</option>
-                      <option value="qard">AMB কর্জে হাসানা ঋণ স্ক্রিন</option>
-                      <option value="shop">AMB সুপার শপ ও অর্ডার</option>
-                      <option value="agent">AMB এজেন্ট ক্যাশআউট পয়েন্ট</option>
-                      <option value="escrow">AMB নিরাপদ লেনদেন এসক্রো</option>
-                      <option value="ration">AMB রেশন কার্ড সিস্টেম</option>
-                      <option value="courier">AMB ইনস্ট্যান্ট কুরিয়ার</option>
+                      <option value="telecom">BNB টেলিকম / রিচার্জ স্ক্রিন</option>
+                      <option value="samity">BNB সমবায় / সঞ্চয় স্ক্রিন</option>
+                      <option value="qard">BNB কর্জে হাসানা ঋণ স্ক্রিন</option>
+                      <option value="shop">BNB সুপার শপ ও অর্ডার</option>
+                      <option value="agent">BNB এজেন্ট ক্যাশআউট পয়েন্ট</option>
+                      <option value="escrow">BNB নিরাপদ লেনদেন এসক্রো</option>
+                      <option value="ration">BNB রেশন কার্ড সিস্টেম</option>
+                      <option value="courier">BNB ইনস্ট্যান্ট কুরিয়ার</option>
                       <option value="history">গ্রাহকের লেনদেনের ইতিহাস</option>
                       <option value="profile">গ্রাহক প্রোফাইল ও কেওয়াইসি</option>
                     </select>
@@ -872,7 +888,7 @@ export function AdminConfigSection(props: any) {
                     {cfgLogoUrl ? (
                       <img src={cfgLogoUrl} alt="App Logo" className="w-full h-full object-cover rounded-2xl" referrerPolicy="no-referrer" />
                     ) : (
-                      <AMBLogo size={70} variant="white" />
+                      <BNBLogo size={70} variant="white" />
                     )}
                     {cfgLogoUrl && (
                       <button
@@ -937,7 +953,7 @@ export function AdminConfigSection(props: any) {
                     onChange={(e) => setCfgAppName(e.target.value)}
                     required
                     className="w-full bg-slate-50 border border-slate-200/80 focus:border-emerald-500 rounded-xl p-3 text-sm text-slate-900 font-bold outline-none transition"
-                    placeholder="যেমন: AMB Business Network"
+                    placeholder="যেমন: BNB Business Network"
                   />
                   <p className="text-[10px] text-slate-500">ড্যাশবোর্ড এবং হোম স্ক্রিনে প্রদর্শিত মূল ব্র্যান্ডের নাম।</p>
                 </div>
@@ -1377,16 +1393,16 @@ export function AdminConfigSection(props: any) {
                   
                   <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 pt-2">
                     {[
-                      { key: 'samity', label: 'AMB ম্যানেজমেন্ট কোম্পানি ইনভেস্টর' },
-                      { key: 'bank', label: 'MY AMB লেনদেন (রেমিট্যান্স)' },
-                      { key: 'telecom', label: 'AMB টেলিকম (ফ্লেক্সিলোড)' },
-                      { key: 'shop', label: 'AMB সুপার শপ (পণ্য অর্ডার)' },
+                      { key: 'samity', label: 'BNB ম্যানেজমেন্ট কোম্পানি ইনভেস্টর' },
+                      { key: 'bank', label: 'MY BNB লেনদেন (রেমিট্যান্স)' },
+                      { key: 'telecom', label: 'BNB টেলিকম (ফ্লেক্সিলোড)' },
+                      { key: 'shop', label: 'BNB সুপার শপ (পণ্য অর্ডার)' },
                       { key: 'qard', label: 'করযে হাসানা (সুদমুক্ত ঋণ)' },
                       { key: 'safedeals', label: 'নিরাপদ লেনদেন (ভেরিফাইড পাইকারি)' },
                       { key: 'safi', label: 'প্রিমিয়াম Safi (খাঁটি পণ্য)' },
-                      { key: 'ration', label: 'AMB রেশন কার্ড (পাইকারি ছাড়)' },
+                      { key: 'ration', label: 'BNB রেশন কার্ড (পাইকারি ছাড়)' },
                       { key: 'chat', label: 'লাইভ চ্যাট (সাপোর্ট রুম)' },
-                      { key: 'agent', label: 'AMB এজেন্ট (ক্যারিয়ার পোর্টাল)' },
+                      { key: 'agent', label: 'BNB এজেন্ট (ক্যারিয়ার পোর্টাল)' },
                       { key: 'about', label: 'আমাদের সম্পর্কে (পরিচিতি)' },
                       { key: 'bap', label: 'বাংলাদেশ এডমিন প্যানেল' },
                     ].map((svc) => {
@@ -1551,7 +1567,7 @@ export function AdminConfigSection(props: any) {
                           {[
                             { key: 'home', label: '🏠 হোম (Home)' },
                             { key: 'deposit', label: '💸 সেন্ড মানি (Send)' },
-                            { key: 'add_money', label: '➕ AMB এড মানি (Add Money)' },
+                            { key: 'add_money', label: '➕ BNB এড মানি (Add Money)' },
                             { key: 'history', label: '📋 লেনদেন (Transactions)' },
                             { key: 'profile', label: '👤 প্রোফাইল (Card)' }
                           ].map((tab) => {
@@ -1586,6 +1602,137 @@ export function AdminConfigSection(props: any) {
                       </div>
                     </div>
 
+                  </div>
+                </div>
+
+                {/* 🎨 ড্যাশবোর্ড সেকশন আইকন কাস্টমাইজেশন ও গ্যালারি চয়েজার */}
+                <div className="space-y-4 md:col-span-2 pt-6 border-t border-slate-200/80">
+                  <div className="flex flex-col text-left">
+                    <h4 className="text-sm font-bold text-emerald-400 flex items-center gap-1.5">
+                      <Upload className="w-4 h-4 text-emerald-400" />
+                      🖼️ ড্যাশবোর্ড ১২টি সেকশন আইকন গ্যালারি কন্ট্রোল (Dashboard Section Icons Gallery)
+                    </h4>
+                    <p className="text-[11px] text-slate-400 mt-1">
+                      গ্যালারি থেকে ছবি সিলেক্ট করে যেকোনো সেকশনের আইকন পরিবর্তন করতে পারবেন। গ্যালারি ছবি ডিলিট করে দিলে সেটি সাথে সাথে পূর্বের এইচডি ভেক্টর আইকনে ফিরে আসবে।
+                    </p>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 pt-2">
+                    {[
+                      { key: 'samity', label: 'BNB কোম্পানি ইনভেস্টর', IconComp: SamityIcon },
+                      { key: 'safedeals', label: 'BNB নিরাপদ লেনদেন', IconComp: SafeDealsIcon },
+                      { key: 'qard', label: 'BNB কার্জ হাসানা', IconComp: QardIcon },
+                      { key: 'bank', label: 'MY BNB লেনদেন', IconComp: BankIcon },
+                      { key: 'telecom', label: 'BNB টেলিকম', IconComp: TelecomIcon },
+                      { key: 'ration', label: 'BNB রেশন কার্ড', IconComp: RationIcon },
+                      { key: 'salary', label: 'BNB আটা সেলারি পে', IconComp: SalaryIcon },
+                      { key: 'safi', label: 'al safi', IconComp: SafiIcon },
+                      { key: 'auto_recharge', label: 'BNB ডাটা রিচার্জ', IconComp: AutoRechargeIcon },
+                      { key: 'bill_pay', label: 'BNB বিল পে', IconComp: BillPayIcon },
+                      { key: 'agent', label: 'BNB এজেন্ট', IconComp: AgentIcon },
+                      { key: 'about', label: 'BNB আমাদের লক্ষ্য', IconComp: AboutIcon },
+                    ].map(({ key, label, IconComp }) => {
+                      const customUrl = cfgSectionIcons?.[key];
+
+                      return (
+                        <div key={key} className="bg-slate-900/60 border border-slate-800 rounded-2xl p-3.5 flex flex-col justify-between space-y-3">
+                          <div className="flex items-center justify-between gap-2 border-b border-slate-800 pb-2">
+                            <span className="text-xs font-bold text-white truncate">{label}</span>
+                            <span className={`text-[9px] font-black px-2 py-0.5 rounded-full border ${
+                              customUrl ? 'bg-amber-950/60 text-amber-400 border-amber-800/80' : 'bg-emerald-950/60 text-emerald-400 border-emerald-800/80'
+                            }`}>
+                              {customUrl ? 'কাস্টম গ্যালারি আইকন' : 'ডিফল্ট ভেক্টর আইকন'}
+                            </span>
+                          </div>
+
+                          {/* Preview Box */}
+                          <div className="flex items-center justify-center h-20 bg-slate-950 rounded-xl border border-slate-800/80 p-2">
+                            {customUrl ? (
+                              <img src={customUrl} alt={label} className="h-16 w-16 object-contain" />
+                            ) : (
+                              <IconComp className="h-14 w-14" />
+                            )}
+                          </div>
+
+                          {/* Action Buttons */}
+                          <div className="flex items-center gap-2 pt-1">
+                            <label className="flex-1 py-2 px-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-[11px] font-bold flex items-center justify-center gap-1.5 transition active:scale-95 cursor-pointer">
+                              <Upload className="w-3.5 h-3.5" /> গ্যালারি ছবি সিলেক্ট
+                              <input
+                                type="file"
+                                accept="image/*"
+                                className="hidden"
+                                onChange={(e) => {
+                                  const file = e.target.files?.[0];
+                                  if (!file) return;
+
+                                  if (file.size > 5 * 1024 * 1024) {
+                                    alert("ছবির সাইজ সর্বোচ্চ 5MB হতে পারবে।");
+                                    return;
+                                  }
+
+                                  const reader = new FileReader();
+                                  reader.onload = (event) => {
+                                    const img = new Image();
+                                    img.onload = () => {
+                                      const canvas = document.createElement('canvas');
+                                      const maxDim = 256;
+                                      let width = img.width;
+                                      let height = img.height;
+
+                                      if (width > maxDim || height > maxDim) {
+                                        if (width > height) {
+                                          height = Math.round((height * maxDim) / width);
+                                          width = maxDim;
+                                        } else {
+                                          width = Math.round((width * maxDim) / height);
+                                          height = maxDim;
+                                        }
+                                      }
+
+                                      canvas.width = width;
+                                      canvas.height = height;
+                                      const ctx = canvas.getContext('2d');
+                                      ctx?.drawImage(img, 0, 0, width, height);
+                                      const dataUrl = canvas.toDataURL('image/png', 0.9);
+
+                                      if (typeof setCfgSectionIcons === 'function') {
+                                        setCfgSectionIcons((prev: any) => ({
+                                          ...(prev || {}),
+                                          [key]: dataUrl
+                                        }));
+                                      }
+                                    };
+                                    img.src = event.target?.result as string;
+                                  };
+                                  reader.readAsDataURL(file);
+                                  e.target.value = '';
+                                }}
+                              />
+                            </label>
+
+                            {customUrl && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  if (typeof setCfgSectionIcons === 'function') {
+                                    setCfgSectionIcons((prev: any) => {
+                                      const copy = { ...(prev || {}) };
+                                      delete copy[key];
+                                      return copy;
+                                    });
+                                  }
+                                }}
+                                title="আইকন ডিলিট করে ডিফল্ট ভেক্টরে ফিরিয়ে আনুন"
+                                className="py-2 px-2.5 bg-rose-600/80 hover:bg-rose-600 text-white rounded-xl text-[11px] font-bold flex items-center justify-center gap-1 transition active:scale-95 cursor-pointer shrink-0"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" /> ডিলিট
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
 

@@ -25,14 +25,14 @@ import { User, Transaction, Notice, Offer, BapReport, BapGroup, BapAdminRequest,
 import { normalizeMemberId, formatBanglaAmount, normalizePhoneNumber, findUserInFirestoreByPhone, getNextSequentialMemberId, deleteUserCompletelyFromDatabase, convertBengaliToEnglishDigits } from '../../lib/memberUtils';
 import { sortTransactionsNewestFirst, getTxTime } from '../../lib/transactionUtils';
 import { saveAppConfig, DEFAULT_QARD_CONFIG } from '../../lib/config';
-import { AMBLogo } from '../AMBLogo';
+import { BNBLogo } from '../BNBLogo';
 import { HeaderPendingModal } from '../HeaderPendingModal';
 import SamityScreen from '../SamityScreen';
 import UnifiedBackButton from '../UnifiedBackButton';
 import SamityAdmin from '../SamityAdmin';
 import SafiPremiumShop from '../SafiPremiumShop';
 import TelecomAdmin from '../TelecomAdmin';
-import AmbSalaryAdmin from '../AmbSalaryAdmin';
+import BNBSalaryAdmin from '../BNBSalaryAdmin';
 import { HistoryRetentionSettings } from '../HistoryRetentionSettings';
 import { runWalletEndToEndTests, TestResultItem } from '../../lib/walletTests';
 import { 
@@ -397,7 +397,7 @@ export function AdminReceiptSection(props: any) {
                         value={receiptCompanyName}
                         onChange={(e) => setReceiptCompanyName(e.target.value)}
                         className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2 text-xs font-bold text-slate-800 focus:outline-none focus:border-purple-500 focus:bg-white"
-                        placeholder="বিজনেস নেটওয়ার্ক বাংলাদেশ (AMB)"
+                        placeholder="বিজনেস নেটওয়ার্ক বাংলাদেশ (BNB)"
                       />
                     </div>
                   </div>
@@ -992,7 +992,7 @@ export function AdminReceiptSection(props: any) {
                         {/* Header Box */}
                         <div className={`${style.headerBg} p-4 text-center relative space-y-1`}>
                           <div className="w-10 h-10 mx-auto bg-white/20 rounded-full flex items-center justify-center font-black text-sm">
-                            AMB
+                            BNB
                           </div>
                           <h4 className="text-sm font-black tracking-tight">{activeTitle}</h4>
                           <p className="text-[10px] font-medium opacity-90">{receiptCompanyName}</p>
@@ -1003,7 +1003,7 @@ export function AdminReceiptSection(props: any) {
                         <div className="p-4 space-y-3 bg-slate-50/50">
                           {/* Watermark Tag */}
                           <div className="flex items-center justify-between border-b border-slate-200 pb-2">
-                            <span className="text-[10px] font-bold text-slate-500">ট্রানজেকশন আইডি: AMB-9821873</span>
+                            <span className="text-[10px] font-bold text-slate-500">ট্রানজেকশন আইডি: BNB-9821873</span>
                             <span className={`text-[9px] font-black px-2 py-0.5 rounded-full border ${style.badgeBg}`}>
                               {receiptOfficialTagText}
                             </span>
@@ -1020,7 +1020,7 @@ export function AdminReceiptSection(props: any) {
                           <div className="space-y-1.5 text-[10px] font-bold text-slate-600 bg-white p-2.5 rounded-xl border border-slate-200/80">
                             <div className="flex justify-between">
                               <span className="text-slate-400">প্রাপক/সদস্য:</span>
-                              <span className="text-slate-800 font-extrabold">সুজন মিয়া (AMB-1082)</span>
+                              <span className="text-slate-800 font-extrabold">সুজন মিয়া (BNB-1082)</span>
                             </div>
                             <div className="flex justify-between">
                               <span className="text-slate-400">তারিখ ও সময়:</span>

@@ -1,0 +1,400 @@
+              {rcData?.issueDate || '01/01/2026'}
+            </span>
+          </div>
+
+          <div className="border-r border-slate-200/60 px-3">
+            <span className="text-[9px] text-zinc-400 block font-extrabold uppercase tracking-widest leading-none">Expiry Date</span>
+            <span className="text-[12px] font-mono font-black block mt-1" style={{ color: mainColorHex }}>
+              {rcData?.expiryDate || '01/01/2027'}
+            </span>
+            <div className="flex items-center gap-1 mt-1">
+              <span className="text-[8px] font-black px-1.5 py-0.5 rounded-md bg-white border border-slate-200 shadow-xs" style={{ color: mainColorHex }}>
+                {(() => {
+                  const exp = rcData?.expiryTimestamp ? new Date(rcData.expiryTimestamp) : null;
+                  if (!exp) return '১ বছর মেয়াদ';
+                  const diff = exp.getTime() - new Date().getTime();
+                  const days = Math.ceil(diff / (1000 * 60 * 60 * 24));
+                  return days > 0 ? `${englishToBengali(days)} দিন বাকি` : 'মেয়াদ উত্তীর্ণ';
+                })()}
+              </span>
+            </div>
+          </div>
+
+          <div className="pl-3 flex flex-col items-center justify-center">
+            <span 
+              className="text-[18px] font-bold tracking-widest italic select-none block h-6 truncate" 
+              style={{ fontFamily: "'Dancing Script', cursive, sans-serif", color: mainColorHex }}
+            >
+              {rcData?.signature || 'S. Hasan'}
+            </span>
+            <div className="w-full border-t border-slate-200 pt-1 mt-0.5 text-center">
+              <span className="text-[8px] font-black text-zinc-400 block uppercase tracking-widest">Authority</span>
+            </div>
+          </div>
+
+        </div>
+
+        {/* Solid Branding Base Bar */}
+        <div className="text-white px-7 py-3 flex items-center justify-between gap-4" style={{ backgroundColor: mainColorHex }}>
+          <div className="flex items-center gap-3 flex-1 min-w-0">
+            <QrCode className="w-5 h-5 opacity-80" />
+            <p className="text-[10px] text-white/90 leading-snug font-bold truncate">
+              {cardTypeLabelBn} - এই কার্ডটি কেবল নির্ধারিত ভর্তুকি সেন্টারে নিত্যপ্রয়োজনীয় পণ্য গ্রহণের জন্য বৈধ।
+            </p>
+          </div>
+          <div className="flex items-center gap-1.5 shrink-0 bg-white/10 px-3 py-1 rounded-full">
+            <ShieldCheck className="w-3.5 h-3.5 text-emerald-300" />
+            <span className="text-[9px] font-black uppercase tracking-widest">Secured ID</span>
+          </div>
+        </div>
+
+      </div>
+      </RationCardContainer>
+    );
+  };
+
+  // Capture current container view to down-convert as PNG download trigger
+  const handleDownloadCard = async () => {
+    if (!cardRef.current) return;
+    try {
+      let canvas;
+      try {
+        canvas = await html2canvas(cardRef.current, {
+          scale: 3, // High level DPI configuration
+          useCORS: true,
+          allowTaint: false,
+          backgroundColor: '#ffffff'
+        });
+      } catch (corsErr) {
+        console.warn("CORS check failed, attempting with allowTaint: true", corsErr);
+        canvas = await html2canvas(cardRef.current, {
+          scale: 3,
+          useCORS: true,
+          allowTaint: true,
+          backgroundColor: '#ffffff'
+        });
+      }
+      
+      const dataUrl = canvas.toDataURL('image/png');
+      setGeneratedCardUrl(dataUrl);
+      setShowCardImageModal(true);
+
+      // Convert to Blob for 100% reliable mobile downloading
+      try {
+        const arr = dataUrl.split(',');
+        const mime = arr[0].match(/:(.*?);/)![1];
+        const bstr = atob(arr[1]);
+        let n = bstr.length;
+        const u8arr = new Uint8Array(n);
+        while (n--) {
+          u8arr[n] = bstr.charCodeAt(n);
+        }
+        const blob = new Blob([u8arr], { type: mime });
+        const blobUrl = URL.createObjectURL(blob);
+
+        const link = document.createElement('a');
+        link.download = `BNB-Ration-Card-${rationCard?.cardNo || liveUser?.memberId}.png`;
+        link.href = blobUrl;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        setTimeout(() => URL.revokeObjectURL(blobUrl), 1000);
+      } catch (clickError) {
+        console.warn('Programmatic download blocked by sandbox, showing save-image modal fallback', clickError);
+      }
+    } catch (err) {
+      console.error(err);
+      alert('কার্ডটির ইমেজ সরাসরি তৈরি করা যায়নি। তবে নিচে আপনার কার্ডের ইমেজ তৈরি হয়েছে, আপনি ছবিটি দীর্ঘক্ষণ চেপে ধরে রেখে সংরক্ষণ করতে পারেন।');
+    }
+  };
+
+  // Check if current user is admin/sub-admin
+  const isAdmin = liveUser?.role === 'admin' || liveUser?.role === 'sub_admin';
+
+  // Handle Base64 VIP card template image upload from gallery by Admin
+  const handleUploadVipCardImage = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 800 * 1024) {
+      alert("ফাইলের সাইজ অনেক বড় (সর্বোচ্চ 800 KB অনুমোদিত)");
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onloadend = async () => {
+      const base64String = reader.result as string;
+      try {
+        const configRef = doc(db, 'system_settings', 'app_config');
+        await updateDoc(configRef, {
+          vipCardDesignUrl: base64String
+        });
+        alert("ভিআইপি গোল্ডেন কার্ডের ডিজাইন ইমেজ সফলভাবে আপলোড হয়েছে!");
+      } catch (error) {
+        console.error("Error updating config:", error);
+        alert("ডিজাইন আপলোড করতে সমস্যা হয়েছে। আবার চেষ্টা করুন।");
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+
+  // Share verification link
+  const handleShareCard = () => {
+    const shareUrl = `${window.location.origin}?verify=${rationCard?.cardNo || liveUser?.memberId}`;
+    if (navigator.share) {
+      navigator.share({
+        title: 'BNB Ration Card Verification',
+        text: `বিএনবি কো-অপারেটিভ রেশন আইডিঃ ${rationCard?.cardNo || liveUser?.memberId} এর ডিজিটাল রেশন ভেরিফিকেশন ভিউ।`,
+        url: shareUrl
+      }).catch(err => console.error(err));
+    } else {
+      navigator.clipboard.writeText(shareUrl);
+      alert('ডিজিটাল রেশন ভেরিফিকেশন কো-অপারেটিভ লিংক সফলভাবে মেমোরিতে কপি করা হয়েছে!');
+    }
+  };
+
+  // Handle high speed 1-click automatic auto-generation utilizing standard live user profiles data
+  const handleAutoGenerateCard = async () => {
+    const activationFee = 150;
+    if ((liveUser.balance || 0) < activationFee) {
+      alert(`রেশন কার্ডের ওয়ান-টাইম সক্রিয়করণ ফি ৳${activationFee} BDT। আপনার ওয়ালেটে পর্যাপ্ত ব্যালেন্স নেই!`);
+      return;
+    }
+
+    setSubmittingReg(true);
+    try {
+      const timestamp = new Date().toISOString();
+      const cardNo = liveUser.memberId || `BNB${String(Math.floor(10000000 + Math.random() * 90000000))}`;
+      
+      await addDoc(collection(db, 'ration_cards'), {
+        userId: liveUser.uid,
+        userName: liveUser.name,
+        phone: liveUser.phone || '01812115535',
+        address: (liveUser as any).address || 'Village: Jashore, Upazila: Jashore Sadar, District: Jashore',
+        village: 'Jashore',
+        upazila: 'Jashore Sadar',
+        district: 'Jashore',
+        nominee: 'প্রযোজ্য নয়',
+        cardType: 'Silver Regular',
+        cardNo: cardNo,
+        issueDate: '07/06/2026',
+        expiryDate: '06/06/2027',
+        signature: 'S.Hasan',
+        securityCode: liveUser.pin || '1234',
+        createdAt: timestamp,
+        status: 'active'
+      });
+
+      const userRef = doc(db, 'users', liveUser.uid);
+      await updateDoc(userRef, {
+        balance: liveUser.balance - activationFee,
+        mainBalance: liveUser.balance - activationFee
+      });
+
+      await addDoc(collection(db, 'transactions'), {
+        id: `tx-rc-activation-${Date.now()}`,
+        userId: liveUser.uid,
+        userName: liveUser.name,
+        memberId: liveUser.memberId,
+        type: 'fee_payment',
+        typeLabel: 'রেশন কার্ড ফি',
+        amount: activationFee,
+        status: 'success',
+        description: `ডিজিটাল রেশন কার্ড (${cardNo}) স্বয়ংক্রিয় সক্রিয়করণ ফি চার্জ করা হয়েছে।`,
+        createdAt: timestamp,
+        paymentMethod: 'Main Balance'
+      });
+      addDoc(collection(db, 'admin_notifications'), {
+        title: '🌾 নতুন ভর্তুকি রেশন কার্ড আবেদন ও সক্রিয়করণ',
+        message: `${liveUser.name || 'সদস্য'} (${liveUser.memberId || 'N/A'}) ভর্তুকি রেশন কার্ডের আবেদন করেছেন (কার্ড টাইপ: ${cardNo || 'রেশন কার্ড'})।`,
+        userId: liveUser.uid,
+        userName: liveUser.name || '',
+        memberId: liveUser.memberId || '',
+        userPhone: liveUser.phone || '',
+        amount: activationFee,
+        type: 'ration_activation',
+        read: false,
+        createdAt: new Date().toISOString()
+      }).catch(e => console.warn('Admin notif error:', e));
+
+      alert("অভিনন্দন! আপনার ডিজিটাল রেশন কার্ডটি প্রোফাইল ডাটা হতে সফলভাবে স্বয়ংক্রিয়ভাবে জেনারেট ও সক্রিয় করা হয়েছে।");
+      await syncLiveProfile();
+    } catch (err: any) {
+      alert("ত্রুটি দেখা দিয়েছে: " + err.message);
+    } finally {
+      setSubmittingReg(false);
+    }
+  };
+
+  const defaultRationSlides = [
+    {
+      id: 1,
+      tag: "কো-অপারেটিভ রেশন",
+      title: "বিএনবি ডিজিটাল রেশন সেবা",
+      description: "ডিজিটাল কো-অপারেটিভ রেশন কার্ডধারীদের জন্য বিশেষভাবে ভর্তুকি মূল্যে সর্বোচ্চ মানের ফ্রেশ ক্যাটাগরির চাল, ডাল, তেলসহ নানা নিত্যপ্রয়োজনীয় খাদ্যের নির্ভরযোগ্য পোর্টাল।",
+      bgGradient: "from-emerald-950 via-emerald-900 to-teal-950",
+      image: "https://images.unsplash.com/photo-1596040033229-a9821ebd058d?auto=format&fit=crop&q=80&w=1200"
+    },
+    {
+      id: 2,
+      tag: "সহজ বুকিং",
+      title: `${englishToBengali(appConfig?.rationMaxSelectLimit || 5)}টি পণ্য নির্বাচন`,
+      description: `${appConfig?.rationTotalItemsText || "10"}টি নিত্যপ্রয়োজনীয় পণ্যের তালিকা থেকে প্রতি মাসে সর্বোচ্চ ${englishToBengali(appConfig?.rationMaxSelectLimit || 5)}টি পণ্য ভর্তুকি মূল্যে বুকিং করার দারুণ সুবিধা পান।`,
+      bgGradient: "from-slate-950 via-emerald-950 to-emerald-900",
+      image: "https://images.unsplash.com/photo-1542838132-92c53300491e?auto=format&fit=crop&q=80&w=1200"
+    }
+  ];
+
+  const adSlides = appConfig?.rationBanners && appConfig.rationBanners.length > 0
+    ? appConfig.rationBanners
+    : defaultRationSlides;
+  
+  // Ration Card Firestore state
+  const [rationCard, setRationCard] = useState<any | null>(null);
+  const [loadingCard, setLoadingCard] = useState(true);
+  const [dbRationItems, setDbRationItems] = useState<RationItem[]>([]);
+  const [orders, setOrders] = useState<any[]>([]);
+  const [loadingOrders, setLoadingOrders] = useState(true);
+  const [generatedCardUrl, setGeneratedCardUrl] = useState<string | null>(null);
+  const [showCardImageModal, setShowCardImageModal] = useState(false);
+
+  // Registration Form States
+  const [regName, setRegName] = useState(liveUser?.name || '');
+  const [regAddress, setRegAddress] = useState('');
+  const [regNominee, setRegNominee] = useState('');
+  const [regType, setRegType] = useState('Silver Regular');
+  const [submittingReg, setSubmittingReg] = useState(false);
+
+  // Real-time Preview States for interactive customization
+  const [previewCardType, setPreviewCardType] = useState<'red' | 'white' | 'green'>('white');
+  const [previewNominee, setPreviewNominee] = useState('');
+  const [previewAddress, setPreviewAddress] = useState('');
+  const [isEditingInfo, setIsEditingInfo] = useState(false);
+
+  useEffect(() => {
+    if (rationCard) {
+      setPreviewNominee(rationCard.nominee || '');
+      setPreviewAddress(rationCard.address || (liveUser as any)?.address || '');
+      
+      const type = rationCard.cardType?.toLowerCase() || '';
+      if (type.includes('red') || type.includes('premium')) setPreviewCardType('red');
+      else if (type.includes('green') || type.includes('special')) setPreviewCardType('green');
+      else setPreviewCardType('white');
+    }
+  }, [rationCard, liveUser]);
+
+  // Order Placement Modal / Drawer states
+  const [selectedItemIds, setSelectedItemIds] = useState<string[]>([]);
+  const [showCheckoutModal, setShowCheckoutModal] = useState(false);
+  const [securityPin, setSecurityPin] = useState('');
+  const [checkoutError, setCheckoutError] = useState('');
+  const [placingOrder, setPlacingOrder] = useState(false);
+
+  // Live Chat States inside Support view
+  const [chatMessages, setChatMessages] = useState<any[]>([
+    { id: '1', sender: 'support', text: 'আসসালামু আলাইকুম! আমাদের ডিজিটাল রেশন কার্ড হেল্প ডেস্কে আপনাকে স্বাগতম। আপনার কার্ড সংশোধন, অর্ডার ট্র্যাকিং বা যেকোনো সাহায্য পেতে মেসেজ করুন।', timestamp: '10:30 AM' }
+  ]);
+  const [chatInputText, setChatInputText] = useState('');
+  const [isChatTyping, setIsChatTyping] = useState(false);
+
+  const handleSendChatMessage = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!chatInputText.trim()) return;
+
+    const userText = chatInputText;
+    setChatInputText('');
+
+    const now = new Date();
+    const timeStr = now.toLocaleTimeString('bn-BD', { hour: '2-digit', minute: '2-digit' });
+
+    // Append user message
+    const userMsg = { id: Math.random().toString(), sender: 'user', text: userText, timestamp: timeStr };
+    setChatMessages(prev => [...prev, userMsg]);
+
+    // Save to firestore for admins to reply
+    try {
+      await addDoc(collection(db, 'support_chats'), {
+        userId: liveUser.uid,
+        userName: liveUser.name || 'সদস্য',
+        message: userText,
+        sender: 'user',
+        createdAt: new Date().toISOString()
+      });
+    } catch (err) {
+      console.error(err);
+    }
+
+    setIsChatTyping(true);
+
+    setTimeout(() => {
+      setIsChatTyping(false);
+      let replyText = '';
+      const textLower = userText.toLowerCase();
+
+      if (textLower.includes('সংশোধন') || textLower.includes('নাম ভুল') || textLower.includes('ঠিকানা')) {
+        replyText = 'আপনার রেশন কার্ডের ভুল তথ্য সংশোধন করার জন্য অনুগ্রহ করে হেল্পলাইন নম্বর অথবা নিকটস্থ কার্যালয়ে মূল প্রমানপত্রসহ যোগাযোগ করুন। সিস্টেম থেকে কেবল নির্দিষ্ট কর্মকর্তা আপনার আবেদন অনুমোদন করতে পারেন।';
+      } else if (textLower.includes('ডেলিভারি') || textLower.includes('অর্ডার') || textLower.includes('সংগ্রহ')) {
+        replyText = 'আপনার রেশন বুকিংটি সফল হওয়ার পর লেনদেন ইতিহাসে যান এবং নির্ধারিত বিতরণ কেন্দ্রে গিয়ে আপনার স্লিপ এবং রেশন কার্ডটি প্রদর্শন করে পণ্য সংগ্রহ করুন।';
+      } else if (textLower.includes('টাকা') || textLower.includes('পেমেন্ট') || textLower.includes('বুকিং')) {
+        replyText = 'আপনার ওয়ালেটে পর্যাপ্ত বেলেন্স থাকা সাপেক্ষে সাশ্রয়ী পণ্যের অফার সেকশন থেকে যেকোনো পণ্যের জন্য সহজে অর্ডার নিশ্চিত করতে পারেন।';
+      } else {
+        replyText = 'আসসালামু আলাইকুম! আপনার বার্তাটি আমরা পেয়েছি। আমাদের লাইভ ট্র্যাকিং অফিসার আপনার মেসেজটি রিভিউ করছেন। যেকোনো জরুরি প্রয়োজনে আমাদের অফিশিয়াল কাস্টমার কন্টাক্টে সরাসরি কল করতে পারেন।';
+      }
+
+      const replyMsg = { 
+        id: Math.random().toString(), 
+        sender: 'support', 
+        text: replyText, 
+        timestamp: new Date().toLocaleTimeString('bn-BD', { hour: '2-digit', minute: '2-digit' }) 
+      };
+      setChatMessages(prev => [...prev, replyMsg]);
+    }, 1500);
+  };
+
+  // 10 Items from mockup precisely
+  const rationItems: RationItem[] = [
+    { id: 'item_rice', name: 'চাল (মিনিক্যাট)', qty: '5 KG', price: 240, marketPrice: 300, emoji: '🍚', color: 'from-amber-50 to-orange-50' },
+    { id: 'item_flour', name: 'আটা (ময়দা)', qty: '2 KG', price: 60, marketPrice: 80, emoji: '🌾', color: 'from-yellow-50 to-amber-50' },
+    { id: 'item_lentil', name: 'মসুর ডাল', qty: '1 KG', price: 100, marketPrice: 130, emoji: '🍛', color: 'from-red-50 to-orange-50' },
+    { id: 'item_oil', name: 'সয়াবিন তেল', qty: '1 লিটার', price: 140, marketPrice: 170, emoji: '🍾', color: 'from-yellow-50 to-teal-50' },
+    { id: 'item_sugar', name: 'চিনি', qty: '1 KG', price: 60, marketPrice: 80, emoji: '🍬', color: 'from-cyan-50 to-blue-50' },
+    { id: 'item_salt', name: 'লবণ', qty: '1 KG', price: 15, marketPrice: 20, emoji: '🧂', color: 'from-slate-50 to-zinc-50' },
+    { id: 'item_milk', name: 'দুধ গুঁড়া', qty: '500 GM', price: 180, marketPrice: 220, emoji: '🥛', color: 'from-indigo-50 to-purple-50' },
+    { id: 'item_chickpea', name: 'ছোলা', qty: '1 KG', price: 80, marketPrice: 100, emoji: '🥜', color: 'from-amber-100/40 to-yellow-50' },
+    { id: 'item_semai', name: 'সেমাই', qty: '1 KG', price: 70, marketPrice: 90, emoji: '🍜', color: 'from-amber-50 to-yellow-100/30' },
+    { id: 'item_tea', name: 'চা পাতা', qty: '250 GM', price: 90, marketPrice: 120, emoji: '🍃', color: 'from-emerald-50 to-green-50' }
+  ];
+
+  // Fetch / Sync Ration card & past orders
+  useEffect(() => {
+    // 1. Sync card
+    const unsubCard = onSnapshot(
+      query(collection(db, 'ration_cards'), where('userId', '==', liveUser.uid)),
+      (snap) => {
+        if (!snap.empty) {
+          setRationCard({ id: snap.docs[0].id, ...snap.docs[0].data() });
+        } else {
+          setRationCard(null);
+        }
+        setLoadingCard(false);
+      },
+      (err) => {
+        console.error("Ration card sync failed", err);
+        setLoadingCard(false);
+      }
+    );
+
+    // 2. Sync orders
+    const unsubOrders = onSnapshot(
+      query(collection(db, 'ration_orders'), where('userId', '==', liveUser.uid)),
+      (snap) => {
+        const list: any[] = [];
+        snap.forEach((d) => {
+          list.push({ id: d.id, ...d.data() });
+        });
+        // Sort newest first
+        list.sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
+        setOrders(list);
+        setLoadingOrders(false);
+      },
+      (err) => {

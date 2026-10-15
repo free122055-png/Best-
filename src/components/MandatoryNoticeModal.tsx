@@ -212,9 +212,9 @@ export const MandatoryNoticeModal: React.FC<MandatoryNoticeModalProps> = ({
   return (
     <div 
       id="mandatory-notice-overlay"
-      className="fixed inset-0 z-[99999] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-fade-in font-sans"
+      className="fixed inset-0 z-[99999] flex flex-col justify-between bg-[#0b6623] w-screen h-screen overflow-y-auto animate-fade-in font-sans p-3 sm:p-6"
     >
-      <div className="relative w-full max-w-sm sm:max-w-md bg-white rounded-3xl shadow-2xl border border-slate-100 overflow-hidden text-center flex flex-col max-h-[92vh]">
+      <div className="relative w-full max-w-lg mx-auto my-auto bg-white rounded-3xl shadow-2xl border border-slate-100 overflow-hidden text-center flex flex-col min-h-[85vh] justify-between">
         
         {/* Top Header Badge Bar */}
         <div className="pt-5 px-6 flex items-center justify-between">

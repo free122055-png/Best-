@@ -85,40 +85,158 @@ export function getUnpaidSamityMonths(
 }
 
 /**
- * Returns STRICTLY OVERDUE months that are eligible for AUTO-DEDUCTION.
+ * Fine calculation based on user rules:
+ * - 1st to 10th: 0 fine (grace period / নিয়মিত কিস্তির সময়)
+ * - 11th onwards for 30 days (11 তারিখ থেকে 30 দিন, অর্থাৎ 39তম দিন পর্যন্ত): প্রতিদিন ৳1 জরিমানা
+ * - 40th day onwards (11 তারিখ থেকে 30 দিন অতিক্রান্ত হলে, অর্থাৎ 40তম দিন থেকে): প্রতিদিন ৳10 জরিমানা
+ */
+export function calculateSamityFine(dayOfMonth: number, totalDaysElapsed?: number): { fineAmount: number; statusText: string; isPenalty: boolean; daysLate: number } {
+  const elapsed = typeof totalDaysElapsed === 'number' ? totalDaysElapsed : dayOfMonth;
+
+  if (elapsed <= 10) {
+    return { fineAmount: 0, statusText: '১-১০ তারিখ: নিয়মিত কিস্তির সময় (কোনো জরিমানা নেই)', isPenalty: false, daysLate: 0 };
+  }
+
+  // 11 তারিখ থেকে বকেয়া দিন গণনা (11 তারিখ = বকেয়ার ১ম দিন)
+  const daysLate = elapsed - 10;
+
+  // 11 তারিখ থেকে 30 দিন (অর্থাৎ 11 থেকে 39তম দিন পর্যন্ত): প্রতিদিন ৳1 জরিমানা
+  if (elapsed < 40) {
+    const fine = daysLate * 1;
+    return { 
+      fineAmount: fine, 
+      statusText: `১১ তারিখ থেকে ৩০ দিন: প্রতিদিন ৳১ জরিমানা (বকেয়া: ${daysLate} দিন = ৳${fine})`, 
+      isPenalty: true, 
+      daysLate 
+    };
+  }
+
+  // ৪০তম দিন থেকে (11 তারিখ থেকে 30 দিন পূর্ণ হওয়ার পর): প্রতিদিন ৳10 জরিমানা
+  const daysAt10Rate = elapsed - 40 + 1; // 40তম দিনে 1 দিন, 41তম দিনে 2 দিন
+  const fine = 29 * 1 + (daysAt10Rate * 10);
+  return { 
+    fineAmount: fine, 
+    statusText: `৪০তম দিন থেকে: প্রতিদিন ৳১০ জরিমানা (বকেয়া: ${daysLate} দিন = ৳${fine})`, 
+    isPenalty: true, 
+    daysLate 
+  };
+}
+
+/**
+ * Calculates accurate overdue days and fine for any given unpaid month.
+ * Handles both the current month and past overdue months.
+ */
+export function calculateOverdueDaysAndFine(targetYear: number, targetMonthIdx: number): { daysLate: number; fineAmount: number; statusText: string } {
+  const now = new Date();
+  const currentYear = now.getFullYear();
+  const currentMonthIdx = now.getMonth();
+  const currentDay = now.getDate();
+
+  // If target month is current month:
+  if (targetYear === currentYear && targetMonthIdx === currentMonthIdx) {
+    const res = calculateSamityFine(currentDay);
+    return { daysLate: res.daysLate, fineAmount: res.fineAmount, statusText: res.statusText };
+  }
+
+  // If target month is in future:
+  if (targetYear > currentYear || (targetYear === currentYear && targetMonthIdx > currentMonthIdx)) {
+    return { daysLate: 0, fineAmount: 0, statusText: 'ভবিষ্যৎ মাস (কোনো জরিমানা নেই)' };
+  }
+
+  // If target month is in past: calculate total elapsed days from the 10th of that target month
+  const dueDate = new Date(targetYear, targetMonthIdx, 10);
+  const diffMs = now.getTime() - dueDate.getTime();
+  const daysLate = Math.max(0, Math.floor(diffMs / (1000 * 60 * 60 * 24)));
+
+  if (daysLate <= 0) {
+    return { daysLate: 0, fineAmount: 0, statusText: '১-১০ তারিখ: নিয়মিত কিস্তির সময় (কোনো জরিমানা নেই)' };
+  }
+
+  // 11 তারিখ থেকে 30 দিন (অর্থাৎ 29 দিন পর্যন্ত): প্রতিদিন ৳1 জরিমানা
+  if (daysLate < 30) {
+    const fine = daysLate * 1;
+    return { 
+      daysLate, 
+      fineAmount: fine, 
+      statusText: `১১ তারিখ থেকে ৩০ দিন: প্রতিদিন ৳১ জরিমানা (বকেয়া: ${daysLate} দিন = ৳${fine})` 
+    };
+  }
+
+  // 40তম দিন থেকে (11 তারিখ থেকে 30 দিন অতিক্রান্ত হলে): প্রতিদিন ৳10 জরিমানা
+  const daysAt10Rate = daysLate - 30 + 1;
+  const fine = 29 * 1 + (daysAt10Rate * 10);
+  return { 
+    daysLate, 
+    fineAmount: fine, 
+    statusText: `৪০তম দিন থেকে: প্রতিদিন ৳১০ জরিমানা (বকেয়া: ${daysLate} দিন = ৳${fine})` 
+  };
+}
+
+/**
+ * Returns member category monthly rate:
+ * 🔴 ওনার: ৳৪,০০০
+ * 🟡 শেয়ার হোল্ডার: ৳২,০০০
+ * ⚪ ইনভেস্টার: ৳১,০০০
+ */
+export function getUserMonthlyInstallmentRate(user: User): number {
+  if (!user) return 1000;
+  if (user.memberCategory === 'owner') return 4000;
+  if (user.memberCategory === 'shareholder') return 2000;
+  if (user.memberCategory === 'investor') return 1000;
+  if (user.monthlySavingsTarget && Number(user.monthlySavingsTarget) > 0) {
+    return Number(user.monthlySavingsTarget);
+  }
+  return 1000;
+}
+
+/**
+ * Returns member category quarterly rate (জানুয়ারি, এপ্রিল, জুলাই, অক্টোবর):
+ * 🔴 ওনার: ৳১০,০০০
+ * 🟡 শেয়ার হোল্ডার: ৳৫,০০০
+ * ⚪ ইনভেস্টার: ৳০ (নেই)
+ */
+export function getUserQuarterlyInstallmentRate(user: User): number {
+  if (!user) return 0;
+  if (user.memberCategory === 'owner') return 10000;
+  if (user.memberCategory === 'shareholder') return 5000;
+  return 0; // Invester has NO quarterly installment!
+}
+
+/**
+ * Check if a quarterly installment is paid for a year (jan, apr, jul, oct)
+ */
+export function isUserQuarterlyPaid(user: User, year: number, qId: string): boolean {
+  if (!user) return false;
+  const qKey = `${year}-${qId.toLowerCase().trim()}`;
+  const qList = Array.isArray(user.samityQuarterlyPaidMonths) ? user.samityQuarterlyPaidMonths : [];
+  return qList.includes(qKey);
+}
+
+/**
+ * Returns STRICTLY OVERDUE or eligible current months for AUTO-DEDUCTION.
  * Absolute Rules:
- * 1. Future months (e.g. October, November, December when in September) can NEVER be auto-deducted under any circumstances!
- * 2. The Current Month (e.g. September) has a grace period from the 1st to the 9th:
- *    - If currentDay <= 9 (1st through 9th): Current month is NOT overdue. It will NEVER be auto-deducted!
- *    - If currentDay > 9 (from 10th onwards): Current month is now overdue if unpaid, and eligible for auto-deduction.
- * 3. Past unpaid months (e.g. January through August when in September) are overdue and eligible.
- * 4. Months are returned in strict chronological order (oldest overdue month first).
+ * 1. Future months (e.g. November, December when in October) can NEVER be auto-deducted!
+ * 2. Current Month (e.g. October): If today is 1st to 10th (or anytime if unpaid), it IS eligible for auto-deduction
+ *    IF AND ONLY IF member's balance has at least the full installment amount!
+ * 3. Broken deductions are strictly prohibited (সম্পূর্ণ কিস্তির টাকা একাউন্টে থাকতে হবে)।
  */
 export function getOverdueSamityMonthsForAutoDeduction(user: User): Array<{ id: string; monthNum: number; name: string; short: string; year: number; index: number }> {
   if (!user) return [];
   const now = new Date();
   const currentYear = now.getFullYear();
-  const currentMonthIdx = now.getMonth(); // 0-indexed (8 = September)
+  const currentMonthIdx = now.getMonth(); // 0-indexed (8 = September, 9 = October)
   const currentDay = now.getDate(); // 1 to 31
 
   const overdueList: Array<{ id: string; monthNum: number; name: string; short: string; year: number; index: number }> = [];
 
-  // Check 2026 / currentYear months up to currentMonthIdx
+  // Check months up to currentMonthIdx
   SAMITY_MONTHS.forEach((m, idx) => {
     // RULE 1: STRICT BAN ON FUTURE MONTHS (idx > currentMonthIdx)
-    // October, November, December etc. are NEVER overdue and MUST NEVER be auto-deducted!
     if (idx > currentMonthIdx) {
       return;
     }
 
-    // RULE 2: GRACE PERIOD FOR CURRENT MONTH (idx === currentMonthIdx)
-    // Members have until the 9th of each month to pay manually.
-    // If today is <= 9 (e.g. 1st through 9th of September), it is NOT overdue!
-    if (idx === currentMonthIdx && currentDay <= 9) {
-      return;
-    }
-
-    // If unpaid, add to overdue list
+    // If unpaid, add to candidate list for auto-deduction
     const isPaid = isUserMonthPaid(user, currentYear, m.id, idx);
     if (!isPaid) {
       overdueList.push({
@@ -132,7 +250,7 @@ export function getOverdueSamityMonthsForAutoDeduction(user: User): Array<{ id: 
     }
   });
 
-  // Sort chronologically (earliest overdue month first)
+  // Sort chronologically (earliest unpaid month first)
   overdueList.sort((a, b) => {
     if (a.year !== b.year) return a.year - b.year;
     return a.index - b.index;
@@ -221,7 +339,7 @@ export async function processUserSamitySavingsAutoDeduction(
     };
   }
 
-  const targetRate = Math.max(1, Number(user.monthlySavingsTarget) || 1000);
+  const targetRate = getUserMonthlyInstallmentRate(user);
   const now = new Date();
   const currentDay = now.getDate();
 
@@ -245,9 +363,9 @@ export async function processUserSamitySavingsAutoDeduction(
   }
 
   if (targetUnpaidMonths.length === 0) {
-    const isWithinGrace = currentDay <= 9;
+    const isWithinGrace = currentDay <= 10;
     const msg = isWithinGrace
-      ? 'চলতি মাসের ৯ তারিখ পর্যন্ত কিস্তি পরিশোধের স্বাভাবিক সময় নির্ধারিত রয়েছে। ৯ তারিখের পূর্বে অটোমেটিক কোনো কিস্তি কাটা হবে না এবং ভবিষ্যৎ মাসের (অক্টোবর, নভেম্বর ইত্যাদি) টাকা কখনো কাটা হয় না।'
+      ? 'চলতি মাসের ১০ তারিখ পর্যন্ত কিস্তি পরিশোধের নিয়মিত সময় চলছে (কোনো জরিমানা নেই)। বর্তমানে কোনো বকেয়া কিস্তি নেই।'
       : 'বর্তমানে কোনো বকেয়া কিস্তি নেই। অগ্রিম বা ভবিষ্যৎ মাসের টাকা অটোমেটিক কাটা সম্পূর্ণ নিষিদ্ধ।';
     return {
       success: false,
@@ -273,7 +391,7 @@ export async function processUserSamitySavingsAutoDeduction(
 
       const freshData = uSnap.data() as User;
       const liveBal = getEffectiveBalance(freshData);
-      const userMonthlyTarget = Math.max(1, Number(freshData.monthlySavingsTarget) || Number(user.monthlySavingsTarget) || targetRate);
+      const userMonthlyTarget = getUserMonthlyInstallmentRate(freshData);
 
       // Must have at least 1 full installment in main balance
       if (liveBal < userMonthlyTarget) {
@@ -827,6 +945,453 @@ export async function adminProcessSamityMonthSettlement({
     return {
       success: false,
       message: error?.message || 'সঞ্চয় হিসাব হালনাগাদে ত্রুটি ঘটেছে।'
+    };
+  }
+}
+
+/**
+ * Process a quarterly installment payment (Jan, Apr, Jul, Oct) for Owner (৳10,000) or Shareholder (৳5,000).
+ * Supports paying for own account or on behalf of another user.
+ */
+export async function processQuarterlyInstallmentPayment(
+  targetUser: User,
+  year: number,
+  quarterId: string,
+  deductFromMainBalance: boolean = true,
+  payerUser?: User,
+  paymentSource: 'payer' | 'target' = 'payer'
+): Promise<{ success: boolean; message: string; newBalance?: number; newSavings?: number }> {
+  if (!targetUser || !targetUser.uid) {
+    return { success: false, message: 'অবৈধ ব্যবহারকারী প্রোফাইল।' };
+  }
+
+  const qKey = `${year}-${quarterId.toLowerCase().trim()}`;
+  const targetUserRef = doc(db, 'users', targetUser.uid);
+  const isPayerDifferent = Boolean(payerUser && payerUser.uid && payerUser.uid !== targetUser.uid && paymentSource === 'payer');
+  const payerRef = isPayerDifferent ? doc(db, 'users', payerUser!.uid) : null;
+
+  try {
+    const result = await runTransaction(db, async (transaction) => {
+      const uSnap = await transaction.get(targetUserRef);
+      if (!uSnap.exists()) {
+        throw new Error('ব্যবহারকারীর প্রোফাইল ডেটাবেজে পাওয়া যায়নি।');
+      }
+
+      const freshTarget = uSnap.data() as User;
+      const isOwner = freshTarget.memberCategory === 'owner';
+      const isShareholder = freshTarget.memberCategory === 'shareholder';
+
+      if (!isOwner && !isShareholder) {
+        throw new Error('ত্রৈমাসিক অতিরিক্ত কিস্তি শুধুমাত্র ওনার (৳১০,০০০) এবং শেয়ার হোল্ডার (৳৫,০০০) সদস্যদের জন্য প্রযোজ্য।');
+      }
+
+      const qRate = isOwner ? 10000 : 5000;
+      const qExisting: string[] = Array.isArray(freshTarget.samityQuarterlyPaidMonths) ? freshTarget.samityQuarterlyPaidMonths : [];
+
+      if (qExisting.includes(qKey)) {
+        throw new Error(`এই ত্রৈমাসিক কিস্তি (${qKey}) ইতিমধ্যে পরিশোধ করা হয়েছে।`);
+      }
+
+      let payerLiveBal = 0;
+      let freshPayer: User | null = null;
+
+      if (isPayerDifferent && payerRef) {
+        const pSnap = await transaction.get(payerRef);
+        if (!pSnap.exists()) {
+          throw new Error('পরিশোধকারীর প্রোফাইল ডেটাবেজে পাওয়া যায়নি।');
+        }
+        freshPayer = pSnap.data() as User;
+        payerLiveBal = getEffectiveBalance(freshPayer);
+
+        if (deductFromMainBalance && payerLiveBal < qRate) {
+          throw new Error(`আপনার মেইন ব্যালেন্সে পর্যাপ্ত টাকা নেই। আপনার ব্যালেন্স ৳${payerLiveBal.toLocaleString('bn-BD')}, কিন্তু কিস্তির পরিমাণ ৳${qRate.toLocaleString('bn-BD')} টাকা।`);
+        }
+
+        const newPayerBal = deductFromMainBalance ? Math.max(0, payerLiveBal - qRate) : payerLiveBal;
+        transaction.update(payerRef, {
+          balance: newPayerBal,
+          mainBalance: newPayerBal,
+          updatedAt: new Date().toISOString()
+        });
+      } else {
+        const targetLiveBal = getEffectiveBalance(freshTarget);
+        if (deductFromMainBalance && targetLiveBal < qRate) {
+          throw new Error(`সদস্যের মেইন ব্যালেন্সে পর্যাপ্ত টাকা নেই। বর্তমান ব্যালেন্স ৳${targetLiveBal.toLocaleString('bn-BD')}, কিন্তু কিস্তির পরিমাণ ৳${qRate.toLocaleString('bn-BD')} টাকা।`);
+        }
+        const newTargetBal = deductFromMainBalance ? Math.max(0, targetLiveBal - qRate) : targetLiveBal;
+        transaction.update(targetUserRef, {
+          balance: newTargetBal,
+          mainBalance: newTargetBal,
+          updatedAt: new Date().toISOString()
+        });
+      }
+
+      const currentSavings = Number(freshTarget.savings) || 0;
+      const newSavings = currentSavings + qRate;
+      const newShares = Math.floor(newSavings / 1000);
+      const updatedQMonths = [...new Set([...qExisting, qKey])];
+
+      transaction.update(targetUserRef, {
+        savings: newSavings,
+        dpsBalance: newSavings,
+        shares: newShares,
+        samityQuarterlyPaidMonths: updatedQMonths,
+        updatedAt: new Date().toISOString()
+      });
+
+      const qMonthName = quarterId === 'jan' ? 'জানুয়ারি' : quarterId === 'apr' ? 'এপ্রিল' : quarterId === 'jul' ? 'জুলাই' : 'অক্টোবর';
+      const nowIso = new Date().toISOString();
+      const receiptCode = `Q-SAV-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+
+      if (isPayerDifferent && freshPayer) {
+        // Payer Tx & Notif
+        const payerTxRef = doc(collection(db, 'transactions'));
+        transaction.set(payerTxRef, {
+          id: payerTxRef.id,
+          userId: freshPayer.uid,
+          userName: freshPayer.name || '',
+          userPhone: freshPayer.phone || '',
+          memberId: freshPayer.memberId || '',
+          type: 'samity_deposit',
+          typeLabel: `অন্যের ত্রৈমাসিক কিস্তি (${qMonthName} ${year})`,
+          amount: qRate,
+          status: 'approved',
+          isApproved: true,
+          paymentMethod: 'Al Mayadin Wallet',
+          description: `সদস্য ${freshTarget.name || ''} (${freshTarget.memberId || ''})-এর ${qMonthName} ${year} ত্রৈমাসিক কিস্তি ৳${qRate.toLocaleString('bn-BD')} টাকা আপনার ওয়ালেট থেকে পরিশোধ করা হয়েছে।`,
+          createdAt: nowIso,
+          receiptNo: receiptCode
+        });
+
+        const payerNotifRef = doc(collection(db, 'user_notifications'));
+        transaction.set(payerNotifRef, {
+          id: payerNotifRef.id,
+          userId: freshPayer.uid,
+          memberId: freshPayer.memberId || '',
+          title: `✅ সদস্যের ত্রৈমাসিক কিস্তি পরিশোধ সফল (${qMonthName} ${year})`,
+          body: `আপনার ব্যালেন্স থেকে সদস্য ${freshTarget.name} (${freshTarget.memberId})-এর ${qMonthName} ${year} কিস্তি ৳${qRate.toLocaleString('bn-BD')} টাকা সফলভাবে জমা হয়েছে।`,
+          read: false,
+          isPersonal: true,
+          isTransactionHistory: true,
+          category: 'transaction',
+          createdAt: nowIso
+        });
+
+        // Target Tx & Notif
+        const targetTxRef = doc(collection(db, 'transactions'));
+        transaction.set(targetTxRef, {
+          id: targetTxRef.id,
+          userId: freshTarget.uid,
+          userName: freshTarget.name || '',
+          userPhone: freshTarget.phone || '',
+          memberId: freshTarget.memberId || '',
+          type: 'samity_deposit',
+          typeLabel: `ত্রৈমাসিক কিস্তি জমা (${freshPayer.name} কর্তৃক)`,
+          amount: qRate,
+          status: 'approved',
+          isApproved: true,
+          paymentMethod: 'Member Sponsor Deposit',
+          description: `সদস্য ${freshPayer.name || ''} (${freshPayer.memberId || ''})-এর ওয়ালেট থেকে আপনার ${qMonthName} ${year} ত্রৈমাসিক কিস্তি ৳${qRate.toLocaleString('bn-BD')} জমা সম্পন্ন।`,
+          createdAt: nowIso,
+          receiptNo: receiptCode
+        });
+
+        const targetNotifRef = doc(collection(db, 'user_notifications'));
+        transaction.set(targetNotifRef, {
+          id: targetNotifRef.id,
+          userId: freshTarget.uid,
+          memberId: freshTarget.memberId || '',
+          title: `🎉 ত্রৈমাসিক কিস্তি জমা সম্পন্ন (${qMonthName} ${year})`,
+          body: `সদস্য ${freshPayer.name} (${freshPayer.memberId}) কর্তৃক আপনার ${qMonthName} ${year} সালের ত্রৈমাসিক কিস্তি ৳${qRate.toLocaleString('bn-BD')} টাকা সঞ্চয় ফান্ডে জমা করা হয়েছে। নতুন সঞ্চয়: ৳${newSavings.toLocaleString('bn-BD')}।`,
+          read: false,
+          isPersonal: true,
+          isTransactionHistory: true,
+          category: 'transaction',
+          createdAt: nowIso
+        });
+      } else {
+        // Normal own payment
+        const txRef = doc(collection(db, 'transactions'));
+        const notifRef = doc(collection(db, 'user_notifications'));
+
+        transaction.set(txRef, {
+          id: txRef.id,
+          userId: targetUser.uid,
+          userName: freshTarget.name || targetUser.name || '',
+          userPhone: freshTarget.phone || targetUser.phone || '',
+          memberId: freshTarget.memberId || targetUser.memberId || '',
+          type: 'samity_deposit',
+          typeLabel: `ত্রৈমাসিক কিস্তি (${qMonthName} ${year})`,
+          amount: qRate,
+          status: 'approved',
+          isApproved: true,
+          paymentMethod: deductFromMainBalance ? 'Al Mayadin Wallet' : 'Direct Deposit',
+          description: `মেইন ব্যালেন্স থেকে ${qMonthName} ${year} ত্রৈমাসিক অতিরিক্ত কিস্তি ৳${qRate.toLocaleString('bn-BD')} টাকা জমা দেওয়া হয়েছে।`,
+          createdAt: nowIso,
+          receiptNo: receiptCode
+        });
+
+        transaction.set(notifRef, {
+          id: notifRef.id,
+          userId: targetUser.uid,
+          memberId: freshTarget.memberId || targetUser.memberId || '',
+          title: `🎉 ত্রৈমাসিক অতিরিক্ত কিস্তি জমা সম্পন্ন (${qMonthName} ${year})`,
+          body: `আপনার মেইন ব্যালেন্স থেকে ${qMonthName} ${year} সালের ত্রৈমাসিক কিস্তি ৳${qRate.toLocaleString('bn-BD')} টাকা সফলভাবে কেটে সঞ্চয় তহবিলে জমা করা হয়েছে। নতুন সঞ্চয় ব্যালেন্স: ৳${newSavings.toLocaleString('bn-BD')}।`,
+          read: false,
+          isPersonal: true,
+          isTransactionHistory: true,
+          category: 'transaction',
+          createdAt: nowIso
+        });
+      }
+
+      return {
+        success: true,
+        message: isPayerDifferent
+          ? `অভিনন্দন! সদস্য ${freshTarget.name}-এর ${qMonthName} ${year} সালের ত্রৈমাসিক কিস্তি ৳${qRate.toLocaleString('bn-BD')} টাকা সফলভাবে জমা হয়েছে।`
+          : `অভিনন্দন! ${qMonthName} ${year} সালের ত্রৈমাসিক কিস্তি ৳${qRate.toLocaleString('bn-BD')} টাকা সফলভাবে জমা হয়েছে।`,
+        newBalance: isPayerDifferent ? (freshPayer ? Math.max(0, payerLiveBal - qRate) : 0) : Math.max(0, getEffectiveBalance(freshTarget) - qRate),
+        newSavings: newSavings
+      };
+    });
+
+    return result;
+  } catch (error: any) {
+    console.error('Error in processQuarterlyInstallmentPayment:', error);
+    return {
+      success: false,
+      message: error?.message || 'ত্রৈমাসিক কিস্তি পরিশোধে সমস্যা হয়েছে।'
+    };
+  }
+}
+
+/**
+ * Process multiple quarterly installment payments at once (e.g. 2, 3, or all 4 quarters together).
+ * Can be paid in advance or anytime by Owner (৳10,000/q) or Shareholder (৳5,000/q).
+ * Supports paying for own account or for another user.
+ */
+export async function processMultipleQuarterlyInstallmentsPayment(
+  targetUser: User,
+  year: number,
+  quarterIds: string[],
+  deductFromMainBalance: boolean = true,
+  payerUser?: User,
+  paymentSource: 'payer' | 'target' = 'payer'
+): Promise<{ success: boolean; message: string; paidCount?: number; newBalance?: number; newSavings?: number }> {
+  if (!targetUser || !targetUser.uid) {
+    return { success: false, message: 'অবৈধ ব্যবহারকারী প্রোফাইল।' };
+  }
+  if (!quarterIds || quarterIds.length === 0) {
+    return { success: false, message: 'কোনো ত্রৈমাসিক কিস্তি নির্বাচন করা হয়নি।' };
+  }
+
+  const targetUserRef = doc(db, 'users', targetUser.uid);
+  const isPayerDifferent = Boolean(payerUser && payerUser.uid && payerUser.uid !== targetUser.uid && paymentSource === 'payer');
+  const payerRef = isPayerDifferent ? doc(db, 'users', payerUser!.uid) : null;
+
+  try {
+    const result = await runTransaction(db, async (transaction) => {
+      const uSnap = await transaction.get(targetUserRef);
+      if (!uSnap.exists()) {
+        throw new Error('ব্যবহারকারীর প্রোফাইল ডেটাবেজে পাওয়া যায়নি।');
+      }
+
+      const freshTarget = uSnap.data() as User;
+      const isOwner = freshTarget.memberCategory === 'owner';
+      const isShareholder = freshTarget.memberCategory === 'shareholder';
+
+      if (!isOwner && !isShareholder) {
+        throw new Error('ত্রৈমাসিক অতিরিক্ত কিস্তি শুধুমাত্র ওনার (৳১০,০০০) এবং শেয়ার হোল্ডার (৳৫,০০০) সদস্যদের জন্য প্রযোজ্য।');
+      }
+
+      const qRatePerMonth = isOwner ? 10000 : 5000;
+      const qExisting: string[] = Array.isArray(freshTarget.samityQuarterlyPaidMonths) ? freshTarget.samityQuarterlyPaidMonths : [];
+
+      // Filter only unpaid quarters among requested
+      const targetKeysToPay: Array<{ id: string; key: string; name: string }> = [];
+      quarterIds.forEach(qId => {
+        const key = `${year}-${qId.toLowerCase().trim()}`;
+        if (!qExisting.includes(key)) {
+          const name = qId === 'jan' ? 'জানুয়ারি' : qId === 'apr' ? 'এপ্রিল' : qId === 'jul' ? 'জুলাই' : 'অক্টোবর';
+          targetKeysToPay.push({ id: qId, key, name });
+        }
+      });
+
+      if (targetKeysToPay.length === 0) {
+        throw new Error('নির্বাচিত কিস্তিগুলো ইতিমধ্যে পরিশোধিত রয়েছে।');
+      }
+
+      const totalRequired = targetKeysToPay.length * qRatePerMonth;
+      let payerLiveBal = 0;
+      let freshPayer: User | null = null;
+
+      if (isPayerDifferent && payerRef) {
+        const pSnap = await transaction.get(payerRef);
+        if (!pSnap.exists()) {
+          throw new Error('পরিশোধকারীর প্রোফাইল ডেটাবেজে পাওয়া যায়নি।');
+        }
+        freshPayer = pSnap.data() as User;
+        payerLiveBal = getEffectiveBalance(freshPayer);
+
+        if (deductFromMainBalance && payerLiveBal < totalRequired) {
+          throw new Error(`আপনার মেইন ব্যালেন্সে পর্যাপ্ত টাকা নেই। আপনার ব্যালেন্স ৳${payerLiveBal.toLocaleString('bn-BD')}, কিন্তু ${targetKeysToPay.length}টি কিস্তির মোট পরিমাণ ৳${totalRequired.toLocaleString('bn-BD')} টাকা।`);
+        }
+
+        const newPayerBal = deductFromMainBalance ? Math.max(0, payerLiveBal - totalRequired) : payerLiveBal;
+        transaction.update(payerRef, {
+          balance: newPayerBal,
+          mainBalance: newPayerBal,
+          updatedAt: new Date().toISOString()
+        });
+      } else {
+        const targetLiveBal = getEffectiveBalance(freshTarget);
+        if (deductFromMainBalance && targetLiveBal < totalRequired) {
+          throw new Error(`সদস্যের মেইন ব্যালেন্সে পর্যাপ্ত টাকা নেই। বর্তমান ব্যালেন্স ৳${targetLiveBal.toLocaleString('bn-BD')}, কিন্তু ${targetKeysToPay.length}টি কিস্তির মোট পরিমাণ ৳${totalRequired.toLocaleString('bn-BD')} টাকা।`);
+        }
+        const newTargetBal = deductFromMainBalance ? Math.max(0, targetLiveBal - totalRequired) : targetLiveBal;
+        transaction.update(targetUserRef, {
+          balance: newTargetBal,
+          mainBalance: newTargetBal,
+          updatedAt: new Date().toISOString()
+        });
+      }
+
+      const currentSavings = Number(freshTarget.savings) || 0;
+      const newSavings = currentSavings + totalRequired;
+      const newShares = Math.floor(newSavings / 1000);
+      const updatedQMonths = [...new Set([...qExisting, ...targetKeysToPay.map(t => t.key)])];
+
+      transaction.update(targetUserRef, {
+        savings: newSavings,
+        dpsBalance: newSavings,
+        shares: newShares,
+        samityQuarterlyPaidMonths: updatedQMonths,
+        updatedAt: new Date().toISOString()
+      });
+
+      const qNamesStr = targetKeysToPay.map(t => t.name).join(', ');
+      const nowIso = new Date().toISOString();
+      const receiptCode = `Q-BULK-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+
+      if (isPayerDifferent && freshPayer) {
+        // Payer Tx & Notif
+        const payerTxRef = doc(collection(db, 'transactions'));
+        transaction.set(payerTxRef, {
+          id: payerTxRef.id,
+          userId: freshPayer.uid,
+          userName: freshPayer.name || '',
+          userPhone: freshPayer.phone || '',
+          memberId: freshPayer.memberId || '',
+          type: 'samity_deposit',
+          typeLabel: `অন্যের ত্রৈমাসিক কিস্তি (${targetKeysToPay.length}টি)`,
+          amount: totalRequired,
+          status: 'approved',
+          isApproved: true,
+          paymentMethod: 'Al Mayadin Wallet',
+          description: `সদস্য ${freshTarget.name || ''} (${freshTarget.memberId || ''})-এর ${targetKeysToPay.length}টি ত্রৈমাসিক কিস্তি (${qNamesStr} ${year}) মোট ৳${totalRequired.toLocaleString('bn-BD')} আপনার ওয়ালেট থেকে পরিশোধ করা হয়েছে।`,
+          createdAt: nowIso,
+          receiptNo: receiptCode
+        });
+
+        const payerNotifRef = doc(collection(db, 'user_notifications'));
+        transaction.set(payerNotifRef, {
+          id: payerNotifRef.id,
+          userId: freshPayer.uid,
+          memberId: freshPayer.memberId || '',
+          title: `🎉 ${targetKeysToPay.length}টি ত্রৈমাসিক কিস্তি পরিশোধ সম্পন্ন (${year})`,
+          body: `আপনার ব্যালেন্স থেকে সদস্য ${freshTarget.name} (${freshTarget.memberId})-এর ${qNamesStr} ${year} কিস্তি বাবদ মোট ৳${totalRequired.toLocaleString('bn-BD')} টাকা সফলভাবে কেটে নেওয়া হয়েছে।`,
+          read: false,
+          isPersonal: true,
+          isTransactionHistory: true,
+          category: 'transaction',
+          createdAt: nowIso
+        });
+
+        // Target Tx & Notif
+        const targetTxRef = doc(collection(db, 'transactions'));
+        transaction.set(targetTxRef, {
+          id: targetTxRef.id,
+          userId: freshTarget.uid,
+          userName: freshTarget.name || '',
+          userPhone: freshTarget.phone || '',
+          memberId: freshTarget.memberId || '',
+          type: 'samity_deposit',
+          typeLabel: `ত্রৈমাসিক কিস্তি জমা (${freshPayer.name} কর্তৃক)`,
+          amount: totalRequired,
+          status: 'approved',
+          isApproved: true,
+          paymentMethod: 'Member Sponsor Deposit',
+          description: `সদস্য ${freshPayer.name || ''} (${freshPayer.memberId || ''})-এর ওয়ালেট থেকে আপনার ${targetKeysToPay.length}টি ত্রৈমাসিক কিস্তি (${qNamesStr} ${year}) মোট ৳${totalRequired.toLocaleString('bn-BD')} জমা সম্পন্ন হয়েছে।`,
+          createdAt: nowIso,
+          receiptNo: receiptCode
+        });
+
+        const targetNotifRef = doc(collection(db, 'user_notifications'));
+        transaction.set(targetNotifRef, {
+          id: targetNotifRef.id,
+          userId: freshTarget.uid,
+          memberId: freshTarget.memberId || '',
+          title: `🎉 ${targetKeysToPay.length}টি ত্রৈমাসিক কিস্তি জমা সম্পন্ন (${year})`,
+          body: `সদস্য ${freshPayer.name} (${freshPayer.memberId}) কর্তৃক আপনার ${qNamesStr} ${year} সালের ${targetKeysToPay.length}টি কিস্তি বাবদ মোট ৳${totalRequired.toLocaleString('bn-BD')} টাকা জমা হয়েছে। নতুন সঞ্চয়: ৳${newSavings.toLocaleString('bn-BD')}।`,
+          read: false,
+          isPersonal: true,
+          isTransactionHistory: true,
+          category: 'transaction',
+          createdAt: nowIso
+        });
+      } else {
+        // Normal own payment
+        const txRef = doc(collection(db, 'transactions'));
+        const notifRef = doc(collection(db, 'user_notifications'));
+
+        transaction.set(txRef, {
+          id: txRef.id,
+          userId: targetUser.uid,
+          userName: freshTarget.name || targetUser.name || '',
+          userPhone: freshTarget.phone || targetUser.phone || '',
+          memberId: freshTarget.memberId || targetUser.memberId || '',
+          type: 'samity_deposit',
+          typeLabel: `ত্রৈমাসিক কিস্তি (${targetKeysToPay.length}টি: ${qNamesStr})`,
+          amount: totalRequired,
+          status: 'approved',
+          isApproved: true,
+          paymentMethod: deductFromMainBalance ? 'Al Mayadin Wallet' : 'Direct Deposit',
+          description: `মেইন ব্যালেন্স থেকে ${targetKeysToPay.length}টি ত্রৈমাসিক অতিরিক্ত কিস্তি (${qNamesStr} ${year}) বাবদ মোট ৳${totalRequired.toLocaleString('bn-BD')} টাকা জমা নেওয়া হয়েছে।`,
+          createdAt: nowIso,
+          receiptNo: receiptCode
+        });
+
+        transaction.set(notifRef, {
+          id: notifRef.id,
+          userId: targetUser.uid,
+          memberId: freshTarget.memberId || targetUser.memberId || '',
+          title: `🎉 ${targetKeysToPay.length}টি ত্রৈমাসিক কিস্তি জমা সম্পন্ন (${year})`,
+          body: `আপনার মেইন ব্যালেন্স থেকে ${qNamesStr} ${year} সালের ত্রৈমাসিক কিস্তি বাবদ মোট ৳${totalRequired.toLocaleString('bn-BD')} টাকা সফলভাবে কেটে সঞ্চয় তহবিলে জমা করা হয়েছে। নতুন সঞ্চয় ব্যালেন্স: ৳${newSavings.toLocaleString('bn-BD')}।`,
+          read: false,
+          isPersonal: true,
+          isTransactionHistory: true,
+          category: 'transaction',
+          createdAt: nowIso
+        });
+      }
+
+      return {
+        success: true,
+        paidCount: targetKeysToPay.length,
+        message: isPayerDifferent
+          ? `অভিনন্দন! সদস্য ${freshTarget.name}-এর ${targetKeysToPay.length}টি ত্রৈমাসিক কিস্তি (${qNamesStr}) বাবদ মোট ৳${totalRequired.toLocaleString('bn-BD')} টাকা সফলভাবে জমা হয়েছে।`
+          : `অভিনন্দন! ${targetKeysToPay.length}টি ত্রৈমাসিক কিস্তি (${qNamesStr}) বাবদ মোট ৳${totalRequired.toLocaleString('bn-BD')} টাকা সফলভাবে জমা হয়েছে।`,
+        newBalance: isPayerDifferent ? (freshPayer ? Math.max(0, payerLiveBal - totalRequired) : 0) : Math.max(0, getEffectiveBalance(freshTarget) - totalRequired),
+        newSavings: newSavings
+      };
+    });
+
+    return result;
+  } catch (error: any) {
+    console.error('Error in processMultipleQuarterlyInstallmentsPayment:', error);
+    return {
+      success: false,
+      message: error?.message || 'ত্রৈমাসিক কিস্তি পরিশোধে সমস্যা হয়েছে।'
     };
   }
 }

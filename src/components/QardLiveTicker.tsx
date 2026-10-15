@@ -144,7 +144,7 @@ export const QardLiveTicker: React.FC<QardLiveTickerProps> = ({
       {/* Auto Scrolling Vertical Ticker Container */}
       <div className="relative z-10 flex-1 my-4 flex flex-col justify-center min-h-[220px]">
         
-        {/* Ambient guidelines / backdrop */}
+        {/* BNBient guidelines / backdrop */}
         <div className="absolute inset-0 bg-slate-950/20 rounded-2xl border border-slate-850/60 pointer-events-none" />
 
         {/* Outer scrolling stage */}

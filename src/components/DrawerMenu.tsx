@@ -34,7 +34,7 @@ import {
   ShieldAlert
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { AMBLogo } from './AMBLogo';
+import { BNBLogo } from './BNBLogo';
 import { doc, updateDoc, collection, addDoc, deleteDoc } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 
@@ -102,7 +102,7 @@ interface DrawerMenuProps {
       color: 'text-teal-600',
       bgColor: 'bg-teal-50',
       subItems: [
-        { id: 'terms', label: 'শর্তাবলী (Terms & Conditions)', desc: 'AMB কো-অপারেটিভ এর আইনি শর্তাবলী' },
+        { id: 'terms', label: 'শর্তাবলী (Terms & Conditions)', desc: 'BNB কো-অপারেটিভ এর আইনি শর্তাবলী' },
         { id: 'privacy', label: 'গোপনীয়তা নীতি (Privacy Policy)', desc: 'আপনার ব্যক্তিগত ও লেনদেন তথ্যের সুরক্ষা' },
         { id: 'permissions_info', label: 'অ্যাপ পারমিশন ও ডেটা সেফটি', desc: 'কোন পারমিশন কেন ব্যবহার করা হয়' },
       ]
@@ -124,12 +124,12 @@ interface DrawerMenuProps {
   // FAQ Database
   const faqData = [
     {
-      q: 'Al Mayadin Bazar (AMB) সমবায় সমিতি কী?',
-      a: 'AMB হচ্ছে গণপ্রজাতন্ত্রী বাংলাদেশ সরকারের বিধিমালা মেনে পরিচালিত একটি প্রগতিশীল অনলাইন ও অফলাইন ভিত্তিক সমবায় সঞ্চয় ও ঋণদান প্ল্যাটফর্ম। এর মূল উদ্দেশ্য সদস্যদের মাঝে অর্থনৈতিক বন্ধন সুদৃঢ় করা এবং গ্রামীণ ও ক্ষুদ্র ব্যবসায়ীদের সহজ শর্তে পুঁজির ব্যবস্থা করা।'
+      q: 'Al Mayadin Bazar (BNB) সমবায় সমিতি কী?',
+      a: 'BNB হচ্ছে গণপ্রজাতন্ত্রী বাংলাদেশ সরকারের বিধিমালা মেনে পরিচালিত একটি প্রগতিশীল অনলাইন ও অফলাইন ভিত্তিক সমবায় সঞ্চয় ও ঋণদান প্ল্যাটফর্ম। এর মূল উদ্দেশ্য সদস্যদের মাঝে অর্থনৈতিক বন্ধন সুদৃঢ় করা এবং গ্রামীণ ও ক্ষুদ্র ব্যবসায়ীদের সহজ শর্তে পুঁজির ব্যবস্থা করা।'
     },
     {
       q: 'আমানত ও দৈনিক সঞ্চয় জমার নিয়মাবলি কী?',
-      a: 'AMB মেম্বারগণ দৈনিক, সাপ্তাহিক বা মাসিক ভিত্তিতে সঞ্চয় জমা করতে পারেন। বিকাশ, নগদ, রকেট মোবাইল ব্যাংকিং অথবা সরাসরি এজেন্টের মাধ্যমে সঞ্চয় গ্রহণ করা হয়। জমাকৃত সঞ্চয় প্রতি মাসের শেষে সুদমুক্ত লভ্যাংশ বা ক্যাশব্যাক অর্জনে ভূমিকা রাখে।'
+      a: 'BNB মেম্বারগণ দৈনিক, সাপ্তাহিক বা মাসিক ভিত্তিতে সঞ্চয় জমা করতে পারেন। বিকাশ, নগদ, রকেট মোবাইল ব্যাংকিং অথবা সরাসরি এজেন্টের মাধ্যমে সঞ্চয় গ্রহণ করা হয়। জমাকৃত সঞ্চয় প্রতি মাসের শেষে সুদমুক্ত লভ্যাংশ বা ক্যাশব্যাক অর্জনে ভূমিকা রাখে।'
     },
     {
       q: 'আমি কীভাবে লোন বা করজে হাসানা গ্রহণ করতে পারি?',
@@ -169,8 +169,6 @@ export const DrawerMenu = React.memo(function DrawerMenu({
 
   // Active sub-item modal
   const [activeSubModal, setActiveSubModal] = useState<string | null>(null);
-
-  if (!isOpen && !activeSubModal) return null;
 
 
   // Success/Error feedback alerts
@@ -276,13 +274,13 @@ export const DrawerMenu = React.memo(function DrawerMenu({
 
         'ℹ️ INFORMATION (তথ্য)': 'ℹ️ SYSTEM INFORMATION',
         'শর্তাবলী (Terms & Conditions)': 'Terms & Conditions',
-        'AMB কো-অপারেティブ এর আইনি শর্তাবলী': 'Legal terms of AMB Cooperative',
+        'BNB কো-অপারেティブ এর আইনি শর্তাবলী': 'Legal terms of BNB Cooperative',
         'গোপনীয়তা নীতি (Privacy Policy)': 'Privacy Policy',
         'আপনার ব্যক্তিগত ও লেনদেন তথ্যের সুরক্ষা': 'Protection of personal and transaction data',
 
         '👨💼 ABOUT (আমাদের সম্পর্কে)': '👨💼 ABOUT THE INITIATIVE',
         'আমাদের সম্পর্কে': 'About Us',
-        'BNB সমবায় উদ্যোগের মূল লক্ষ্য ও টিম': 'Core mission and team of AMB initiative',
+        'BNB সমবায় উদ্যোগের মূল লক্ষ্য ও টিম': 'Core mission and team of BNB initiative',
         'অ্যাপের ভার্সন': 'App Version',
         'রিলিজ ও কারিগরি সংস্করণ বিস্তারিত': 'Release and technical version details',
         'যোগাযোগের তথ্য': 'Contact Information',
@@ -411,7 +409,7 @@ export const DrawerMenu = React.memo(function DrawerMenu({
     try {
       // Write durable problem ticket to Firestore
       const reportsRef = collection(db, 'user_reports');
-      const ticketId = 'AMB-' + Math.floor(100000 + Math.random() * 900000);
+      const ticketId = 'BNB-' + Math.floor(100000 + Math.random() * 900000);
       
       await addDoc(reportsRef, {
         ticketId,
@@ -533,6 +531,9 @@ export const DrawerMenu = React.memo(function DrawerMenu({
     }, 1500);
   };
 
+  // If neither drawer nor any sub-modal is open, do not render JSX
+  if (!isOpen && !activeSubModal) return null;
+
   return (
     <>
       <AnimatePresence>
@@ -575,12 +576,12 @@ export const DrawerMenu = React.memo(function DrawerMenu({
                         referrerPolicy="no-referrer"
                       />
                     ) : (
-                      <AMBLogo size={34} variant="white" />
+                      <BNBLogo size={34} variant="white" />
                     )}
                   </div>
                   <div>
                     <div className="flex items-center gap-1.5">
-                      <span className="text-xs font-black tracking-wider uppercase text-emerald-300">AMB Al Mayadin Bazar</span>
+                      <span className="text-xs font-black tracking-wider uppercase text-emerald-300">BNB Al Mayadin Bazar</span>
                       <span className="bg-emerald-500/80 text-[8px] text-white px-1 py-0.5 rounded font-mono">v2.0</span>
                     </div>
                     <span className="bg-emerald-700/60 text-white font-mono text-[9px] px-2 py-0.5 rounded-md font-bold">Bangladesh</span>
@@ -829,7 +830,7 @@ export const DrawerMenu = React.memo(function DrawerMenu({
                 {/* 1. PASSWORD MODIFICATION VIEW */}
                 {activeSubModal === 'change_password' && (
                   <form onSubmit={handlePasswordChange} className="space-y-4 text-left">
-                    <p className="text-[10px] text-slate-450 leading-relaxed font-semibold">আপনার AMB মেম্বার অ্যাকাউন্ট সুরক্ষায় নতুন গোপন পাসওয়ার্ড সেট করুন।</p>
+                    <p className="text-[10px] text-slate-450 leading-relaxed font-semibold">আপনার BNB মেম্বার অ্যাকাউন্ট সুরক্ষায় নতুন গোপন পাসওয়ার্ড সেট করুন।</p>
                     <div>
                       <label className="block text-[10px] font-black uppercase tracking-wider text-slate-400 mb-1">বর্তমান পাসওয়ার্ড</label>
                       <input 
@@ -1239,7 +1240,7 @@ export const DrawerMenu = React.memo(function DrawerMenu({
                 {/* 9. FAQ ACCORDION LIST */}
                 {activeSubModal === 'faq' && (
                   <div className="space-y-3 text-left">
-                    <p className="text-[10.5px] text-slate-500 leading-relaxed font-semibold mb-1">AMB মেম্বারদের সচরাচর জিজ্ঞাসিত কিছু সাধারণ উত্তর ও নিয়মাবলি নিচে প্রদান করা হলো:</p>
+                    <p className="text-[10.5px] text-slate-500 leading-relaxed font-semibold mb-1">BNB মেম্বারদের সচরাচর জিজ্ঞাসিত কিছু সাধারণ উত্তর ও নিয়মাবলি নিচে প্রদান করা হলো:</p>
                     
                     <div className="space-y-2 max-h-[50vh] pr-1">
                       {faqData.map((item, idx) => {
@@ -1269,7 +1270,7 @@ export const DrawerMenu = React.memo(function DrawerMenu({
                 {activeSubModal === 'terms' && (
                   <div className="text-left space-y-4 text-slate-650 leading-relaxed text-[11px] font-sans max-h-[50vh] pr-1">
                     <div className="bg-blue-50 border border-blue-100 p-3 rounded-2xl text-[10px] text-blue-700 font-semibold mb-2">
-                      ⚠️ AMB মেম্বারশিপ একাউন্ট খোলার পূর্বে দয়া করে আইনি শর্তাবলী মনোযোগ সহকারে পঠন করুন।
+                      ⚠️ BNB মেম্বারশিপ একাউন্ট খোলার পূর্বে দয়া করে আইনি শর্তাবলী মনোযোগ সহকারে পঠন করুন।
                     </div>
                     
                     <div className="space-y-3 font-medium">
@@ -1305,9 +1306,9 @@ export const DrawerMenu = React.memo(function DrawerMenu({
                     </div>
 
                     <div className="space-y-1">
-                      <h4 className="text-sm font-bold text-slate-800">AMB App Production Version</h4>
+                      <h4 className="text-sm font-bold text-slate-800">BNB App Production Version</h4>
                       <p className="font-mono text-xs font-black text-purple-700">v2.0 (Stable Release)</p>
-                      <span className="text-[9.5px] text-slate-400 font-mono block">Build Signature: AMB-PROD-20260627</span>
+                      <span className="text-[9.5px] text-slate-400 font-mono block">Build Signature: BNB-PROD-20260627</span>
                     </div>
 
                     <div className="border-t border-slate-100 pt-3 text-left space-y-2.5 max-h-[30vh]">
@@ -1357,7 +1358,7 @@ export const DrawerMenu = React.memo(function DrawerMenu({
                         </div>
                         <div className="min-w-0 flex-1">
                           <span className="text-[9px] text-slate-400 font-bold block uppercase tracking-wider leading-none">অফিসিয়াল ইমেইল (Email)</span>
-                          <a href="mailto:support@amb-business.net" className="text-xs font-mono font-extrabold text-slate-800 hover:text-blue-600 block mt-1 hover:underline truncate">support@amb-business.net</a>
+                          <a href="mailto:support@bnb-business.net" className="text-xs font-mono font-extrabold text-slate-800 hover:text-blue-600 block mt-1 hover:underline truncate">support@bnb-business.net</a>
                         </div>
                       </div>
 
@@ -1394,7 +1395,7 @@ export const DrawerMenu = React.memo(function DrawerMenu({
                     <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 space-y-3">
                       <div className="flex items-center justify-between border-b border-slate-100 pb-2">
                         <span className="text-[10px] text-slate-500 font-bold uppercase">মেম্বার আইডি</span>
-                        <span className="font-mono text-xs font-black text-slate-800">{user.memberId || 'AMB Member'}</span>
+                        <span className="font-mono text-xs font-black text-slate-800">{user.memberId || 'BNB Member'}</span>
                       </div>
                       <div className="flex items-center justify-between border-b border-slate-100 pb-2">
                         <span className="text-[10px] text-slate-500 font-bold uppercase">নিবন্ধিত মোবাইল</span>

@@ -82,8 +82,6 @@ export default function AdminAutoRechargeSection({
   requestConfirm = async (title, msg) => window.confirm(`${title}\n${msg}`),
   isMasterAdmin = true
 }: AdminAutoRechargeSectionProps) {
-  if (adminTab !== 'auto_recharge_admin') return null;
-
   const [activeSubTab, setActiveSubTab] = useState<'gateways' | 'queue' | 'settings'>('gateways');
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'pending' | 'success' | 'rejected'>('all');
@@ -103,7 +101,7 @@ export default function AdminAutoRechargeSection({
     String((appConfig as any)?.autoRechargeMaxThreshold || '1000')
   );
   const [autoTicker, setAutoTicker] = useState<string>(
-    (appConfig as any)?.autoRechargeTicker || '⚡ AMB ইনস্ট্যান্ট অটো রিচার্জ গেটওয়ে ২৪/৭ সক্রিয়। সকল অপারেটরে দ্রুত ফ্লেক্সিলোড ও স্পেশাল ক্যাশব্যাক অফার উপভোগ করুন।'
+    (appConfig as any)?.autoRechargeTicker || '⚡ BNB ইনস্ট্যান্ট অটো রিচার্জ গেটওয়ে ২৪/৭ সক্রিয়। সকল অপারেটরে দ্রুত ফ্লেক্সিলোড ও স্পেশাল ক্যাশব্যাক অফার উপভোগ করুন।'
   );
   const [autoPolicyText, setAutoPolicyText] = useState<string>(
     (appConfig as any)?.autoRechargePolicy || '১. রিচার্জ ব্যালেন্স থেকে অটো রিচার্জ সম্পন্ন হয়।\n২. ভুল নম্বরে রিচার্জ গেলে কোম্পানি দায়ী নয়।\n৩. কোনো কারণে সার্ভার ব্যস্ত থাকলে অটোমেটিক রি-ট্রাই করা হবে।'
@@ -407,6 +405,8 @@ export default function AdminAutoRechargeSection({
     }
   };
 
+  if (adminTab !== 'auto_recharge_admin') return null;
+
   return (
     <div className="w-full text-left space-y-4 animate-fade-in text-slate-800" id="admin-auto-recharge-section">
       {/* 1. Header Navigation Bar */}
@@ -429,7 +429,7 @@ export default function AdminAutoRechargeSection({
                 <Zap className="w-4 h-4 fill-sky-300" />
               </span>
               <h1 className="text-base sm:text-lg font-black tracking-tight text-white">
-                AMB অটো রিচার্জ গেটওয়ে এডমিন কন্ট্রোল
+                BNB অটো রিচার্জ গেটওয়ে এডমিন কন্ট্রোল
               </h1>
             </div>
             <p className="text-xs text-sky-200 font-medium mt-0.5">

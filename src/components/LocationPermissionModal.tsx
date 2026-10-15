@@ -76,8 +76,8 @@ export const LocationPermissionModal: React.FC<LocationPermissionModalProps> = (
   };
 
   return (
-    <div className="fixed inset-0 bg-slate-950/85 backdrop-blur-md flex items-center justify-center z-[9999] p-4 font-sans text-white animate-fade-in">
-      <div className="bg-[#0f172a] rounded-3xl border border-slate-800 shadow-2xl w-full max-w-md overflow-hidden relative p-5 sm:p-6 space-y-5">
+    <div className="fixed inset-0 bg-[#0b6623] flex flex-col justify-between z-[9999] p-4 sm:p-6 font-sans text-white animate-fade-in w-screen h-screen overflow-y-auto">
+      <div className="bg-white text-slate-800 rounded-3xl shadow-2xl w-full max-w-md mx-auto my-auto overflow-hidden relative p-6 space-y-5 border border-emerald-100">
         
         {/* Header Icon & Title */}
         <div className="space-y-3">

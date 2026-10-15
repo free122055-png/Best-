@@ -1,18 +1,16 @@
-import {StrictMode} from 'react';
-import {createRoot} from 'react-dom/client';
+import { StrictMode } from 'react';
+import { createRoot } from 'react-dom/client';
 import App from './App.tsx';
+import AdminApp from './AdminApp.tsx';
 import './index.css';
 
-// Global monkeypatch to ensure all numbers, monetary values, dates, and times are displayed
-// in English numerals (e.g. 1, 2, 3) rather than Bengali digits, even when 'bn-BD' is requested.
-// This also ensures 2 decimal places (poisha/paisa) are always shown for money formatting.
+// Global monkeypatch for English numerals & currency formatting
 const originalNumberToLocaleString = Number.prototype.toLocaleString;
 Number.prototype.toLocaleString = function(locales?: any, options?: any): string {
   let targetLocale = locales;
   if (locales === 'bn-BD' || (Array.isArray(locales) && locales.includes('bn-BD'))) {
     targetLocale = 'en-US';
   }
-
   const isTargetLocale = !targetLocale || 
     targetLocale === 'en-US' || 
     targetLocale === 'en-IN' || 
@@ -32,7 +30,6 @@ Number.prototype.toLocaleString = function(locales?: any, options?: any): string
   return originalNumberToLocaleString.call(this, targetLocale, options);
 };
 
-// Also patch Date localization to render in English numbers
 const originalDateToLocaleString = Date.prototype.toLocaleString;
 Date.prototype.toLocaleString = function(locales?: any, options?: any): string {
   let targetLocale = locales;
@@ -60,8 +57,17 @@ Date.prototype.toLocaleTimeString = function(locales?: any, options?: any): stri
   return originalDateToLocaleTimeString.call(this, targetLocale, options);
 };
 
+// Check if current URL indicates Admin App mode (e.g. /admin, ?admin=true, or admin. subdomain)
+const isExplicitAdminApp = (() => {
+  if (typeof window === 'undefined') return false;
+  const path = window.location.pathname.toLowerCase();
+  const search = window.location.search.toLowerCase();
+  const host = window.location.hostname.toLowerCase();
+  return path.includes('admin') || search.includes('admin=true') || host.startsWith('admin.');
+})();
+
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <App />
-  </StrictMode>,
+    {isExplicitAdminApp ? <AdminApp /> : <App />}
+  </StrictMode>
 );

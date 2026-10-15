@@ -12,6 +12,7 @@ import {
   XCircle, 
   ChevronRight, 
   User, 
+  Users,
   Phone, 
   ShieldCheck, 
   AlertCircle, 
@@ -75,8 +76,8 @@ const RationCardContainer = ({ children }: { children: React.ReactNode }) => {
     const updateScale = () => {
       if (containerRef.current) {
         const width = containerRef.current.clientWidth;
-        // The card is designed to be 680px wide
-        const newScale = Math.min(1, width / 680);
+        // The card is designed to be 720px wide (16:9 ratio with 405px height)
+        const newScale = Math.min(1, width / 720);
         setScale(newScale);
       }
     };
@@ -106,11 +107,11 @@ const RationCardContainer = ({ children }: { children: React.ReactNode }) => {
   }, []);
 
   return (
-    <div ref={containerRef} className="w-full flex justify-center items-center overflow-hidden py-2 select-none">
+    <div ref={containerRef} className="w-full flex justify-center items-center overflow-hidden py-1 select-none">
       <div 
         style={{ 
-          width: `${680 * scale}px`, 
-          height: `${382 * scale}px`, 
+          width: `${720 * scale}px`, 
+          height: `${405 * scale}px`, 
           position: 'relative',
           overflow: 'hidden',
           flexShrink: 0,
@@ -119,8 +120,8 @@ const RationCardContainer = ({ children }: { children: React.ReactNode }) => {
       >
         <div 
           style={{ 
-            width: '680px', 
-            height: '382px',
+            width: '720px', 
+            height: '405px',
             transform: `scale(${scale})`,
             transformOrigin: 'top left',
             position: 'absolute',
@@ -152,7 +153,7 @@ export const RationCardView = React.memo(function RationCardView({ liveUser, syn
   };
 
   // Navigation active tab
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'card' | 'items' | 'order' | 'my_orders' | 'history' | 'profile' | 'support'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'card' | 'items' | 'order' | 'my_orders' | 'history' | 'profile' | 'support' | 'apply'>('dashboard');
 
   // Ration Card internal back handler
   useBackHandler(() => {
@@ -179,274 +180,310 @@ export const RationCardView = React.memo(function RationCardView({ liveUser, syn
 
   // Reusable 100% accurate visual representation of the Digital Ration Card
   const renderBeautifulRationCard = (rcData: any, scaleClass = "") => {
-    const cNo = rcData?.cardNo || liveUser?.memberId || 'AMB00000000';
+    const cNo = rcData?.cardNo || liveUser?.memberId || 'BNB00000001';
     
-    // Setup color scheme dynamically based on Card Type
-    const cardType = rcData?.cardType || 'Standard';
-    const isVip = cardType === 'Platinum' || cardType === 'VIP Premium' || cardType === 'VIP' || cardType === 'Platinum Card';
-    const isPremium = cardType === 'Premium' || cardType === 'Golden' || cardType === 'Premium Card';
+    const cardType = rcData?.cardType || previewCardType || 'green_white';
+    
+    // Mapping for 4 stages of cards
+    const isRed = cardType === 'red_white' || cardType === 'red';
+    const isBlue = cardType === 'blue_white' || cardType === 'blue';
+    const isGreen = cardType === 'green_white' || cardType === 'green' || (!isRed && !isBlue && !cardType);
+    const isBlack = cardType === 'black_white' || cardType === 'black';
 
-    let mainColorHex = "#015335"; // Regular/Silver or original default
-    let borderHex = "#015335";
-    let bgGradientClass = "bg-white"; 
-    let labelBgHex = "#E9F2ED";
-    let textPrimaryClass = "text-slate-800";
-    let textSecondaryClass = "text-zinc-500";
-    let cardTypeLabelBn = "ডিজিটাল রেশন কার্ড";
-    let accentEmoji = "🥈";
+    let mainColorHex = "#006A4E"; // Official Green (#006A4E) from mockup
+    let borderHex = mainColorHex;
+    let cardTypeLabelBn = "প্রিমিয়াম সবুজ কার্ড";
 
-    if (isPremium) {
-      mainColorHex = "#AA7C11"; // Golden primary
-      borderHex = "#D4AF37";     // Gold border
-      bgGradientClass = "bg-gradient-to-br from-amber-50 via-yellow-100/40 to-amber-50";
-      labelBgHex = "#FEF3C7";
-      textPrimaryClass = "text-amber-950 font-black";
-      textSecondaryClass = "text-amber-700 font-bold";
-      cardTypeLabelBn = "প্রিমিয়াম গোল্ডেন কার্ড";
-      accentEmoji = "👑";
-    } else if (isVip) {
-      mainColorHex = rcData?.vipPrimaryColor || "#6D28D9"; // Purple custom
-      borderHex = rcData?.vipBorderColor || "#EC4899";     // Pink/Gold custom
-      bgGradientClass = `bg-gradient-to-br ${rcData?.vipCardBg || "from-slate-950 via-purple-950/70 to-slate-900"}`;
-      labelBgHex = "#3B0764";
-      textPrimaryClass = rcData?.vipTextColor || "text-purple-100 font-black";
-      textSecondaryClass = "text-purple-300 font-bold";
-      cardTypeLabelBn = "ভিআইপি প্রিমিয়াম কার্ড";
-      accentEmoji = "💎";
-    } else {
-      // Standard / Silver Regular
-      mainColorHex = "#4A5568"; // Slate Gray/Silver
-      borderHex = "#CBD5E0";     // Light Silver
-      bgGradientClass = "bg-gradient-to-br from-slate-50 via-slate-200/50 to-slate-100";
-      labelBgHex = "#EDF2F7";
-      textPrimaryClass = "text-slate-850 font-black";
-      textSecondaryClass = "text-slate-500 font-bold";
-      cardTypeLabelBn = "রেগুলার সিলভার কার্ড";
-      accentEmoji = "🥈";
+    if (isRed) {
+      mainColorHex = "#DC2626";
+      borderHex = mainColorHex;
+      cardTypeLabelBn = "গোল্ডেন প্রিমিয়াম লাল কার্ড";
+    } else if (isBlue) {
+      mainColorHex = "#2563EB";
+      borderHex = mainColorHex;
+      cardTypeLabelBn = "গোল্ডেন নীল কার্ড";
+    } else if (isGreen) {
+      mainColorHex = "#006A4E";
+      borderHex = mainColorHex;
+      cardTypeLabelBn = "প্রিমিয়াম সবুজ কার্ড";
+    } else if (isBlack) {
+      mainColorHex = "#1E293B";
+      borderHex = mainColorHex;
+      cardTypeLabelBn = "রেগুলার সাদা-কালো কার্ড";
     }
 
     const mainColorClean = mainColorHex.replace('#', '');
     const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&color=${mainColorClean}&data=${encodeURIComponent(`https://businessnetworkbangladesh.com/verify-ration?id=${cNo}`)}`;
     
     return (
-      <RationCardContainer>
-        <div 
-          ref={cardRef}
-          id="amb-ration-card-canvas"
-          className={`w-[680px] h-[382px] text-zinc-900 rounded-[1.75rem] shadow-2xl overflow-hidden font-sans flex flex-col justify-between border-[6px] p-0 relative select-none ${bgGradientClass} ${scaleClass}`}
-          style={{ borderColor: borderHex }}
-        >
-        {/* Card Top Banner Header */}
-        <div className="flex flex-row justify-between items-center gap-3 px-6 py-4 border-b border-slate-200 bg-white/90 backdrop-blur-xs">
-          
-          {/* Left Logo Side */}
-          <div className="flex items-center gap-3">
-            <div className="w-14 h-14 rounded-2xl flex items-center justify-center shadow-lg shrink-0" style={{ backgroundColor: mainColorHex }}>
-              <svg className="w-10 h-10 text-white fill-white" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
-                <path d="M 100 22 C 80 45 84 82 100 102 C 116 82 120 45 100 22 Z" fillRule="evenodd" />
-                <path d="M 100 101 L 100 48" stroke="#015335" strokeWidth="3.5" strokeLinecap="round" style={{ stroke: mainColorHex }} />
-                <path d="M 91 100 C 62 92 42 70 45 42 C 62 36 82 58 91 100 Z" fillRule="evenodd" />
-                <path d="M 90 98 C 80 81 69 68 59 62" stroke="#015335" strokeWidth="3.2" strokeLinecap="round" style={{ stroke: mainColorHex }} />
-                <path d="M 109 100 C 138 92 158 70 155 42 C 138 36 118 58 109 100 Z" fillRule="evenodd" />
-                <path d="M 110 98 C 120 81 131 68 141 62" stroke="#015335" strokeWidth="3.2" strokeLinecap="round" style={{ stroke: mainColorHex }} />
-                <text x="100" y="126" textAnchor="middle" className="font-sans font-black text-[25px]" style={{ fontWeight: 955, fill: mainColorHex }}>AMB</text>
-                <path d="M 89 178 L 63 178 C 63 150 48 125 34 100 C 23 80 18 64 25 54 C 29 46 38 48 43 58 C 47 68 55 90 62 112 C 63 118 65 122 67 122 C 70 122 74 108 78 96 C 81 86 85 78 90 78 C 94 78 98 84 98 92 C 98 108 89 135 89 178 Z" strokeWidth="1.2" fillRule="evenodd" strokeLinecap="round" strokeLinejoin="round" />
-                <path d="M 111 178 L 137 178 C 137 150 152 125 166 100 C 177 80 182 64 175 54 C 171 46 162 48 157 58 C 153 68 145 90 138 112 C 137 118 135 122 133 122 C 130 122 126 108 122 96 C 119 86 115 78 110 78 C 106 78 102 84 102 92 C 102 108 111 135 111 178 Z" strokeWidth="1.2" fillRule="evenodd" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
-            </div>
-            <div className="text-left font-sans">
-              <h2 className="text-[30px] font-black leading-none tracking-tight" style={{ color: mainColorHex }}>AMB</h2>
-              <p className="text-[10px] text-zinc-650 font-extrabold tracking-widest leading-none mt-1 uppercase font-sans">Al Mayadin Bazar</p>
-            </div>
-          </div>
-          
-          {/* Right Ration Card Title */}
-          <div className="text-right font-sans">
-            <div className="flex items-center justify-end gap-1 text-xl font-black tracking-tight leading-none" style={{ color: mainColorHex }}>
-              <span>AMB RATION CARD</span>
-              <span className="text-lg">{accentEmoji}</span>
-            </div>
-            <p className="text-[10px] text-zinc-500 font-extrabold mt-1">সবার জন্য পুষ্টিকর খাদ্য, সুস্থ ও সমৃদ্ধ আগামী</p>
-            <div className="h-[2px] mt-1.5 w-32 ml-auto rounded-full" style={{ backgroundColor: mainColorHex }} />
-          </div>
-
+      <div className="w-full flex flex-col items-center">
+        {/* Color Switcher Buttons - OUTSIDE RationCardContainer so it doesn't push down the 405px canvas */}
+        <div className="mb-3 flex justify-center items-center gap-2 px-2 overflow-x-auto no-scrollbar">
+          {[
+            { id: 'green_white', label: 'প্রিমিয়াম (সবুজ)', color: 'bg-[#006A4E]', ring: 'ring-[#006A4E]' },
+            { id: 'red_white', label: 'গোল্ডেন প্রিমিয়াম (লাল)', color: 'bg-red-600', ring: 'ring-red-500' },
+            { id: 'blue_white', label: 'গোল্ডেন (নীল)', color: 'bg-blue-600', ring: 'ring-blue-500' },
+            { id: 'black_white', label: 'রেগুলার (সাদা-কালো)', color: 'bg-slate-800', ring: 'ring-slate-700' }
+          ].map((ct) => {
+            const isActive = (previewCardType === ct.id) || (isGreen && ct.id === 'green_white') || (isRed && ct.id === 'red_white') || (isBlue && ct.id === 'blue_white') || (isBlack && ct.id === 'black_white');
+            return (
+              <button
+                key={ct.id}
+                type="button"
+                onClick={() => setPreviewCardType(ct.id as any)}
+                className={`px-3 py-1.5 rounded-full text-[11px] font-black transition-all flex items-center gap-1.5 shrink-0 shadow-xs cursor-pointer ${
+                  isActive
+                    ? 'bg-slate-900 text-white scale-105 ring-2 ' + ct.ring
+                    : 'bg-white text-slate-700 border border-slate-200 hover:bg-slate-50'
+                }`}
+              >
+                <div className={`w-2.5 h-2.5 rounded-full ${ct.color}`} />
+                <span>{ct.label}</span>
+              </button>
+            );
+          })}
         </div>
 
-        {/* Central Block of Content layout */}
-        <div className="grid grid-cols-12 gap-4 p-5 items-center flex-1 bg-transparent">
-          
-          {/* Cardholder Portrait Frame */}
-          <div className="col-span-3 flex items-center justify-center">
-            <div className="w-[110px] h-[138px] border-2 rounded-[1.25rem] overflow-hidden flex flex-col items-center justify-center relative shadow-inner p-1 shrink-0 bg-white/50" style={{ borderColor: `${mainColorHex}35` }}>
-              {rcData?.photoUrl || rcData?.photo || (liveUser?.profilePic && (liveUser.profilePic.startsWith('http') || liveUser.profilePic.startsWith('data:image/'))) ? (
-                <img
-                  src={rcData?.photoUrl || rcData?.photo || liveUser?.profilePic}
-                  alt="Cardholder Photo"
-                  referrerPolicy="no-referrer"
-                  className="w-full h-full object-cover rounded-[1rem]"
-                />
-              ) : (
-                <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-100 pt-3 overflow-hidden">
-                  <div className="w-12 h-12 rounded-full mb-1" style={{ backgroundColor: mainColorHex }} />
-                  <div className="w-20 h-[56px] rounded-t-full" style={{ backgroundColor: mainColorHex }} />
+        {/* Scaled Digital Ration Card Canvas Container - WRAPS ONLY THE 720x405 CANVAS */}
+        <RationCardContainer>
+          <div 
+            ref={cardRef}
+            id="bnb-ration-card-canvas"
+            className={`w-[720px] h-[405px] text-zinc-900 rounded-[1.25rem] shadow-2xl overflow-hidden font-sans flex flex-col justify-between border-[6px] p-0 relative select-none bg-white ${scaleClass}`}
+            style={{ borderColor: borderHex }}
+          >
+            {/* 1. Header Area */}
+            <div className="flex flex-row justify-between items-center px-6 py-3 border-b border-slate-100/80 bg-white">
+              {/* Left Side: Logo & App Title */}
+              <div className="flex items-center gap-3">
+                <div 
+                  className="w-13 h-13 rounded-2xl flex items-center justify-center shadow-xs shrink-0 overflow-hidden p-1.5" 
+                  style={{ backgroundColor: mainColorHex }}
+                >
+                  <img 
+                    src="/bnb_logo.png" 
+                    alt="BNB Logo" 
+                    className="w-full h-full object-contain"
+                    onError={(e) => {
+                      (e.currentTarget as HTMLElement).style.display = 'none';
+                    }}
+                  />
                 </div>
-              )}
-              <div className="absolute bottom-1 border px-2 py-0.5 rounded-full text-[8px] font-black text-white leading-none tracking-wider" style={{ backgroundColor: mainColorHex, borderColor: `${mainColorHex}50` }}>
-                সদস্য ফটো
+                <div className="text-left font-sans">
+                  <h2 className="text-[26px] font-black leading-none tracking-tight" style={{ color: mainColorHex }}>
+                    BNB
+                  </h2>
+                  <p className="text-[10px] text-slate-800 font-extrabold tracking-wider leading-none mt-1 uppercase">
+                    AL MAYADIN BAZAR
+                  </p>
+                </div>
               </div>
-            </div>
-          </div>
-
-          {/* Profile Info Columns */}
-          <div className="col-span-5 space-y-3 text-left font-sans">
-            
-            {/* Name */}
-            <div className="flex items-start gap-2.5">
-              <div className="w-7 h-7 rounded-full flex items-center justify-center text-white shrink-0 shadow-sm p-0.5" style={{ backgroundColor: mainColorHex }}>
-                <User className="w-4 h-4" />
-              </div>
-              <div className="min-w-0">
-                <p className="text-[9px] text-zinc-400 font-extrabold leading-none">নাম</p>
-                <p className={`text-[13px] tracking-tight leading-tight mt-1 uppercase truncate font-sans ${textPrimaryClass}`}>
-                  {rcData?.userName || rcData?.name || liveUser?.name}
+              
+              {/* Right Side: Title & Motto */}
+              <div className="text-right">
+                <div className="flex items-center justify-end gap-1.5 text-[22px] font-black tracking-tight leading-none" style={{ color: mainColorHex }}>
+                  <span>BNB RATION CARD</span>
+                  <span className="text-lg">💎</span>
+                </div>
+                <p className="text-[11px] text-slate-600 font-extrabold mt-1">
+                  সবার জন্য পুষ্টিকর খাদ্য, সুস্থ ও সমৃদ্ধ আগামী
                 </p>
               </div>
             </div>
 
-            {/* Phone */}
-            <div className="flex items-start gap-2.5">
-              <div className="w-7 h-7 rounded-full flex items-center justify-center text-white shrink-0 shadow-sm p-0.5" style={{ backgroundColor: mainColorHex }}>
-                <Phone className="w-3.5 h-3.5" />
+            {/* 2. Middle Body Content */}
+            <div className="grid grid-cols-12 gap-4 px-6 py-3 items-center flex-1 bg-white">
+              {/* Photo Column (Left) */}
+              <div className="col-span-3 flex items-center justify-center">
+                <div 
+                  className="w-[125px] h-[155px] border-2 rounded-[1.5rem] overflow-hidden flex flex-col items-center justify-center relative shadow-xs bg-slate-50 p-1" 
+                  style={{ borderColor: `${mainColorHex}40` }}
+                >
+                  {rcData?.photoUrl || rcData?.photo || liveUser?.profilePic ? (
+                    <img
+                      src={rcData?.photoUrl || rcData?.photo || liveUser?.profilePic}
+                      alt="Member"
+                      referrerPolicy="no-referrer"
+                      className="w-full h-full object-cover rounded-[1.25rem]"
+                      onError={(e) => {
+                        (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=300';
+                      }}
+                    />
+                  ) : (
+                    <div className="flex flex-col items-center justify-center opacity-30">
+                      <User className="w-16 h-16" style={{ color: mainColorHex }} />
+                    </div>
+                  )}
+                  <div 
+                    className="absolute bottom-1 px-3 py-0.5 rounded-full text-[9.5px] font-black text-white leading-none shadow-xs" 
+                    style={{ backgroundColor: mainColorHex }}
+                  >
+                    সদস্য ফটো
+                  </div>
+                </div>
               </div>
-              <div className="min-w-0">
-                <p className="text-[9px] text-zinc-400 font-extrabold leading-none">মোবাইল নাম্বার</p>
-                <p className="text-[13px] font-mono font-black leading-tight mt-1" style={{ color: mainColorHex }}>
-                  {rcData?.phone || liveUser?.phone || '01812115535'}
-                </p>
+
+              {/* Member Details Column (Center) */}
+              <div className="col-span-6 space-y-2.5 text-left pl-1">
+                {/* Name */}
+                <div className="flex items-center gap-2.5">
+                  <div 
+                    className="w-7 h-7 rounded-full flex items-center justify-center text-white shrink-0 shadow-xs" 
+                    style={{ backgroundColor: mainColorHex }}
+                  >
+                    <User className="w-4 h-4 text-white" />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-[10px] text-slate-400 font-bold leading-none">নাম</p>
+                    <p className="text-[15px] font-black leading-tight mt-0.5 text-slate-900 uppercase truncate">
+                      {rcData?.userName || rcData?.name || liveUser?.name || 'MD RASEL MIA'}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Mobile */}
+                <div className="flex items-center gap-2.5">
+                  <div 
+                    className="w-7 h-7 rounded-full flex items-center justify-center text-white shrink-0 shadow-xs" 
+                    style={{ backgroundColor: mainColorHex }}
+                  >
+                    <Phone className="w-4 h-4 text-white" />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-[10px] text-slate-400 font-bold leading-none">মোবাইল নাম্বার</p>
+                    <p className="text-[15px] font-mono font-black leading-tight mt-0.5 text-slate-900">
+                      {rcData?.phone || liveUser?.phone || '01600664081'}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Address */}
+                <div className="flex items-start gap-2.5">
+                  <div 
+                    className="w-7 h-7 rounded-full flex items-center justify-center text-white shrink-0 shadow-xs mt-0.5" 
+                    style={{ backgroundColor: mainColorHex }}
+                  >
+                    <MapPin className="w-4 h-4 text-white" />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-[10px] text-slate-400 font-bold leading-none">ঠিকানার বিবরণ</p>
+                    <p className="text-[11.5px] font-bold leading-snug mt-0.5 text-slate-900 line-clamp-2">
+                      {rcData?.address || (rcData?.village ? `Village: ${rcData.village}, Upazila: ${rcData.upazila}, District: ${rcData.district}` : 'Village: যশোর, Upazila: যশোর সদর, District: যশোর')}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* QR Verification Column (Right) */}
+              <div className="col-span-3 flex flex-col items-center justify-center border-l border-slate-100 pl-3">
+                <div 
+                  className="bg-white p-2 border-2 rounded-[1.5rem] shadow-xs flex flex-col items-center shrink-0 w-32" 
+                  style={{ borderColor: mainColorHex }}
+                >
+                  <div className="relative flex items-center justify-center mb-1">
+                    <img 
+                      src={qrUrl} 
+                      alt="QR" 
+                      className="w-22 h-22 object-contain"
+                    />
+                  </div>
+                  <div 
+                    className="text-white w-full text-[9px] font-black py-1 px-1 rounded-full flex items-center justify-center gap-1 shadow-2xs" 
+                    style={{ backgroundColor: mainColorHex }}
+                  >
+                    <ShieldCheck className="w-3.5 h-3.5 text-emerald-300" />
+                    <span>সদস্য যাচাইকরণ</span>
+                  </div>
+                </div>
+                <p className="text-[9px] font-bold text-slate-500 mt-1">QR স্ক্যান করে যাচাই করুন</p>
               </div>
             </div>
 
-            {/* Multi-tier address */}
-            <div className="flex items-start gap-2.5 font-sans">
-              <div className="w-7 h-7 rounded-full flex items-center justify-center text-white shrink-0 shadow-sm p-0.5" style={{ backgroundColor: mainColorHex }}>
-                <MapPin className="w-3.5 h-3.5" />
+            {/* 3. Bottom Information Strip */}
+            <div className="grid grid-cols-4 gap-0 border-t border-slate-100 px-6 py-2 items-center bg-slate-50/60">
+              {/* Card No */}
+              <div className="border-r border-slate-200/80 pr-2 flex items-center gap-2">
+                <div className="p-1.5 rounded-lg bg-emerald-50 shrink-0">
+                  <FileText className="w-4 h-4" style={{ color: mainColorHex }} />
+                </div>
+                <div>
+                  <span className="text-[9.5px] text-slate-400 block font-bold leading-none">কার্ড নম্বর</span>
+                  <span className="text-[12px] font-mono font-black uppercase block tracking-tight mt-0.5" style={{ color: mainColorHex }}>
+                    {cNo}
+                  </span>
+                </div>
               </div>
-              <div className="min-w-0">
-                <p className="text-[9px] text-zinc-400 font-extrabold leading-none uppercase">ঠিকানার বিবরণ</p>
-                <div className={`text-[10.5px] leading-snug mt-1 truncate max-w-[190px] ${textPrimaryClass}`}>
-                  {rcData?.address || `Village: ${rcData?.village || 'যশোর'}, Upazila: ${rcData?.upazila || 'যশোর সদর'}, District: ${rcData?.district || 'যশোর'}`}
+
+              {/* Issue Date */}
+              <div className="border-r border-slate-200/80 px-2 flex items-center gap-2">
+                <div className="p-1.5 rounded-lg bg-emerald-50 shrink-0">
+                  <Calendar className="w-4 h-4" style={{ color: mainColorHex }} />
+                </div>
+                <div>
+                  <span className="text-[9.5px] text-slate-400 block font-bold leading-none">ইস্যুর তারিখ</span>
+                  <span className="text-[12px] font-mono font-black text-slate-900 block mt-0.5">
+                    {rcData?.issueDate || '01/01/2026'}
+                  </span>
+                </div>
+              </div>
+
+              {/* Expiry Date */}
+              <div className="border-r border-slate-200/80 px-2 flex items-center gap-2">
+                <div className="p-1.5 rounded-lg bg-emerald-50 shrink-0">
+                  <ShieldCheck className="w-4 h-4" style={{ color: mainColorHex }} />
+                </div>
+                <div>
+                  <span className="text-[9.5px] text-slate-400 block font-bold leading-none">মেয়াদ শেষ</span>
+                  <span className="text-[12px] font-mono font-black text-slate-900 block mt-0.5">
+                    {rcData?.expiryDate || '01/01/2027'}
+                  </span>
+                  <span className="text-[8.5px] font-bold block mt-0.5" style={{ color: mainColorHex }}>
+                    ১ বছর মেয়াদ
+                  </span>
+                </div>
+              </div>
+
+              {/* Signature */}
+              <div className="pl-2 flex flex-col items-center justify-center">
+                <span 
+                  className="text-[17px] font-bold tracking-wider italic select-none block h-5 truncate" 
+                  style={{ fontFamily: "'Dancing Script', cursive, sans-serif", color: mainColorHex }}
+                >
+                  {rcData?.signature || 'S. Hasan'}
+                </span>
+                <div className="w-full border-t border-slate-200 pt-0.5 mt-0.5 text-center">
+                  <span className="text-[9.5px] font-bold text-slate-400 block">কর্তৃপক্ষের স্বাক্ষর</span>
                 </div>
               </div>
             </div>
 
-          </div>
-
-          {/* Validation QR check block */}
-          <div className="col-span-4 flex flex-col items-center justify-center border-l border-slate-150 pl-4 w-full">
-            <div className="bg-white p-1.5 border-2 rounded-[1.5rem] shadow-sm relative overflow-hidden flex flex-col items-center shrink-0 w-28" style={{ borderColor: mainColorHex }}>
-              <div className="relative flex items-center justify-center">
-                <img 
-                  src={qrUrl} 
-                  alt="Ration Verification QR" 
-                  className="w-20 h-20"
-                  referrerPolicy="no-referrer"
-                />
-                {/* Centered logo inside QR code */}
-                <div className="absolute w-[22px] h-[22px] bg-white rounded-md p-0.5 shadow-sm border border-slate-100 flex items-center justify-center z-10">
-                  <svg className="w-full h-full fill-current" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg" style={{ color: mainColorHex }}>
-                    <path d="M 100 22 C 80 45 84 82 100 102 C 116 82 120 45 100 22 Z" />
-                    <path d="M 91 100 C 62 92 42 70 45 42 C 62 36 82 58 91 100 Z" />
-                    <path d="M 109 100 C 138 92 158 70 155 42 C 138 36 118 58 109 100 Z" />
-                  </svg>
-                </div>
-              </div>
-              <div className="text-white w-full text-[8.5px] font-black py-0.5 px-1.5 rounded-md mt-1.5 flex items-center justify-center gap-0.5 font-sans" style={{ backgroundColor: mainColorHex }}>
-                <ShieldCheck className="w-3.5 h-3.5 text-emerald-350" />
-                <span>সদস্য যাচাইকরণ</span>
-              </div>
-              <p className="text-[7px] text-zinc-500 font-black tracking-tight mt-1 text-center leading-none">QR স্ক্যান করে যাচাই করুন</p>
-            </div>
-          </div>
-
-        </div>
-
-        {/* Parameters bottom segments with vertical dividers */}
-        <div className="grid grid-cols-4 gap-1 border-t border-slate-200 px-5 py-3 items-center bg-slate-50/90 text-left font-sans">
-          
-          <div className="border-r border-slate-200 pr-2 min-w-0 flex items-start gap-2">
-            <div className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0" style={{ backgroundColor: `${mainColorHex}15` }}>
-              <FileText className="w-4 h-4" style={{ color: mainColorHex }} />
-            </div>
-            <div className="min-w-0">
-              <span className="text-[8px] text-zinc-500 block font-black uppercase leading-none">কার্ড নম্বর</span>
-              <span className="text-[10.5px] font-mono font-black uppercase block tracking-tighter truncate mt-1 animate-pulse" style={{ color: mainColorHex }}>
-                {cNo}
-              </span>
-            </div>
-          </div>
-
-          <div className="border-r border-slate-200 px-2 min-w-0 flex items-start gap-2">
-            <div className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0" style={{ backgroundColor: `${mainColorHex}15` }}>
-              <Calendar className="w-4 h-4" style={{ color: mainColorHex }} />
-            </div>
-            <div className="min-w-0">
-              <span className="text-[8px] text-zinc-500 block font-black uppercase leading-none">ইস্যুর তারিখ</span>
-              <span className="text-[10.5px] font-mono font-black text-slate-800 block truncate mt-1">
-                {rcData?.issueDate || '07/06/2026'}
-              </span>
-            </div>
-          </div>
-
-          <div className="border-r border-slate-200 px-2 min-w-0 flex items-start gap-2 font-sans">
-            <div className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0" style={{ backgroundColor: `${mainColorHex}15` }}>
-              <ShieldCheck className="w-4 h-4" style={{ color: mainColorHex }} />
-            </div>
-            <div className="min-w-0">
-              <span className="text-[8px] text-zinc-500 block font-black uppercase leading-none">মেয়াদ শেষ</span>
-              <span className="text-[10.5px] font-mono font-black block truncate mt-1" style={{ color: mainColorHex }}>
-                {rcData?.expiryDate || '06/06/2027'}
-              </span>
-              <span className="text-[6px] block font-extrabold mt-0.5 leading-none" style={{ color: mainColorHex }}>1 বছর পর রিনিউ</span>
-            </div>
-          </div>
-
-          <div className="pl-2 flex flex-col items-center justify-center min-w-0">
-            <span 
-              className="text-[14px] font-bold tracking-widest italic select-none block leading-none h-4.5 truncate" 
-              style={{ fontFamily: "'Dancing Script', cursive, sans-serif", color: mainColorHex }}
+            {/* 4. Bottom Solid Footer Bar */}
+            <div 
+              className="text-white px-5 py-2.5 flex items-center justify-between gap-3 min-h-[42px] rounded-b-[1.2rem] select-none" 
+              style={{ backgroundColor: mainColorHex }}
             >
-              {rcData?.signature || 'S.Hasan'}
-            </span>
-            <div className="w-full border-t border-slate-300 text-center pt-1 mt-1">
-              <span className="text-[7.5px] font-black text-slate-400 block leading-none truncate uppercase font-sans">কর্তৃপক্ষের স্বাক্ষর</span>
+              {/* Left Icon + Disclaimer Text */}
+              <div className="flex items-center gap-2.5 flex-1 min-w-0 text-left">
+                <div className="w-7 h-7 rounded-lg border border-white/25 bg-white/10 flex items-center justify-center shrink-0 shadow-3xs">
+                  <QrCode className="w-4 h-4 text-white opacity-95" />
+                </div>
+                <p className="text-[10px] text-white font-bold leading-tight truncate tracking-tight">
+                  BNB এর এই স্পেশাল {isRed ? 'রেড' : isBlue ? 'ব্লু' : isBlack ? 'ব্ল্যাক' : 'গ্রীন'} কার্ডধারী ন্যায্যমূল্যে নিত্যপ্রয়োজনীয় পণ্য গ্রহণের যোগ্যতা রাখেন। এই কার্ড অন্যকে হস্তান্তরযোগ্য নয়।
+                </p>
+              </div>
+
+              {/* Right Pill Badge: Safe Transaction */}
+              <div className="flex items-center gap-1.5 shrink-0 bg-white/10 px-3.5 py-1 rounded-full border border-white/20 backdrop-blur-xs">
+                <ShieldCheck className="w-3.5 h-3.5 text-emerald-300 shrink-0" />
+                <span className="text-[9.5px] font-bold text-white tracking-wide whitespace-nowrap">নিরাপদ লেনদেন, বিশ্বস্ত সেবা</span>
+              </div>
             </div>
           </div>
-
-        </div>
-
-        {/* Solid footer bar */}
-        <div className="text-white px-5 py-2.5 flex items-center justify-between text-left gap-3 font-sans" style={{ backgroundColor: mainColorHex }}>
-          <div className="flex items-center gap-2.5 flex-1 min-w-0">
-            <div className="bg-white p-0.5 rounded-md shrink-0">
-              <QrCode className="w-4.5 h-4.5" style={{ color: mainColorHex }} />
-            </div>
-            <p className="text-[8.5px] text-[#E9F2ED] leading-snug font-black max-w-2xl truncate sm:whitespace-normal font-sans">
-              AMB এর এই {cardTypeLabelBn}ধারী ন্যায্যমূল্যে নিত্যপ্রয়োজনীয় পণ্য গ্রহণের যোগ্যতা রাখেন। এই কার্ড অন্যকে হস্তান্তরযোগ্য নয়।
-            </p>
-          </div>
-          
-          <div className="shrink-0 flex items-center gap-1 bg-white/10 border border-white/15 rounded-full px-2.5 py-0.5 shadow-inner">
-            <svg className="w-3 h-3 text-emerald-300 shrink-0" fill="currentColor" viewBox="0 0 20 20">
-              <path d="M10.894 2.553a1 1 0 00-1.788 0l-7 14a1 1 0 001.169 1.409l5-1.429A1 1 0 009 15.571V11a1 1 0 112 0v4.571a1 1 0 00.725.962l5 1.428a1 1 0 001.17-1.408l-7-14z" />
-            </svg>
-            <span className="text-[8.5px] text-white font-black leading-none truncate font-sans">নিরাপদ লেনদেন, বিশ্বস্ত সেবা</span>
-          </div>
-        </div>
-
+        </RationCardContainer>
       </div>
-      </RationCardContainer>
     );
   };
+
 
   // Capture current container view to down-convert as PNG download trigger
   const handleDownloadCard = async () => {
@@ -488,7 +525,7 @@ export const RationCardView = React.memo(function RationCardView({ liveUser, syn
         const blobUrl = URL.createObjectURL(blob);
 
         const link = document.createElement('a');
-        link.download = `AMB-Ration-Card-${rationCard?.cardNo || liveUser?.memberId}.png`;
+        link.download = `BNB-Ration-Card-${rationCard?.cardNo || liveUser?.memberId}.png`;
         link.href = blobUrl;
         document.body.appendChild(link);
         link.click();
@@ -538,7 +575,7 @@ export const RationCardView = React.memo(function RationCardView({ liveUser, syn
     const shareUrl = `${window.location.origin}?verify=${rationCard?.cardNo || liveUser?.memberId}`;
     if (navigator.share) {
       navigator.share({
-        title: 'AMB Ration Card Verification',
+        title: 'BNB Ration Card Verification',
         text: `বিএনবি কো-অপারেটিভ রেশন আইডিঃ ${rationCard?.cardNo || liveUser?.memberId} এর ডিজিটাল রেশন ভেরিফিকেশন ভিউ।`,
         url: shareUrl
       }).catch(err => console.error(err));
@@ -559,7 +596,7 @@ export const RationCardView = React.memo(function RationCardView({ liveUser, syn
     setSubmittingReg(true);
     try {
       const timestamp = new Date().toISOString();
-      const cardNo = liveUser.memberId || `AMB${String(Math.floor(10000000 + Math.random() * 90000000))}`;
+      const cardNo = liveUser.memberId || `BNB${String(Math.floor(10000000 + Math.random() * 90000000))}`;
       
       await addDoc(collection(db, 'ration_cards'), {
         userId: liveUser.uid,
@@ -646,7 +683,7 @@ export const RationCardView = React.memo(function RationCardView({ liveUser, syn
   
   // Ration Card Firestore state
   const [rationCard, setRationCard] = useState<any | null>(null);
-  const [loadingCard, setLoadingCard] = useState(true);
+  const [loadingCard, setLoadingCard] = useState(false);
   const [dbRationItems, setDbRationItems] = useState<RationItem[]>([]);
   const [orders, setOrders] = useState<any[]>([]);
   const [loadingOrders, setLoadingOrders] = useState(true);
@@ -659,6 +696,24 @@ export const RationCardView = React.memo(function RationCardView({ liveUser, syn
   const [regNominee, setRegNominee] = useState('');
   const [regType, setRegType] = useState('Silver Regular');
   const [submittingReg, setSubmittingReg] = useState(false);
+
+  // Real-time Preview States for interactive customization
+  const [previewCardType, setPreviewCardType] = useState<any>('green_white');
+  const [previewNominee, setPreviewNominee] = useState('');
+  const [previewAddress, setPreviewAddress] = useState('');
+  const [isEditingInfo, setIsEditingInfo] = useState(false);
+
+  useEffect(() => {
+    if (rationCard) {
+      setPreviewNominee(rationCard.nominee || '');
+      setPreviewAddress(rationCard.address || (liveUser as any)?.address || '');
+      
+      const type = rationCard.cardType?.toLowerCase() || '';
+      if (type.includes('red') || type.includes('premium')) setPreviewCardType('red');
+      else if (type.includes('green') || type.includes('special')) setPreviewCardType('green');
+      else setPreviewCardType('white');
+    }
+  }, [rationCard, liveUser]);
 
   // Order Placement Modal / Drawer states
   const [selectedItemIds, setSelectedItemIds] = useState<string[]>([]);
@@ -827,7 +882,7 @@ export const RationCardView = React.memo(function RationCardView({ liveUser, syn
     setSubmittingReg(true);
     try {
       const timestamp = new Date().toISOString();
-      const cardNo = `AMB-RC-${Math.floor(1000 + Math.random() * 9000)}-${Math.floor(100000 + Math.random() * 900000)}`;
+      const cardNo = `BNB-RC-${Math.floor(1000 + Math.random() * 9000)}-${Math.floor(100000 + Math.random() * 900000)}`;
       
       // 1. Save to Firebase
       await addDoc(collection(db, 'ration_cards'), {
@@ -903,6 +958,10 @@ export const RationCardView = React.memo(function RationCardView({ liveUser, syn
   // Action Order Execution
   const handlePlaceOrder = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!rationCard || rationCard.status !== 'active') {
+      setCheckoutError("ভর্তুকি মূল্যে রেশন পণ্য অর্ডার করতে আপনার একটি সচল ডিজিটাল রেশন কার্ড প্রয়োজন। দয়া করে প্রথমে কার্ডের আবেদন করুন।");
+      return;
+    }
     if (selectedItems.length === 0) {
       setCheckoutError("অনুগ্রহ করে কমপক্ষে 1টি আইটেম নির্বাচন করুন।");
       return;
@@ -1000,58 +1059,18 @@ export const RationCardView = React.memo(function RationCardView({ liveUser, syn
   };
 
   // Custom UI elements
-  if (loadingCard) {
-    return (
-      <div className="bg-slate-50 min-h-screen flex items-center justify-center text-slate-800">
-        <div className="animate-pulse font-black text-xl text-[#015335]">লোড হচ্ছে...</div>
-      </div>
-    );
-  }
+  // Direct entry without loading screen
 
-  // Not signed up yet form or rejected
-  if (!rationCard || rationCard.status === 'rejected') {
-    return <RationApplicationForm liveUser={liveUser} onClose={onClose} />;
-  }
 
-  // Pending verification check
-  if (rationCard.status === 'pending') {
+  // Render application form tab if user clicks apply/order card
+  if (activeTab === 'apply') {
     return (
-      <div className="bg-slate-50 min-h-screen text-slate-800 font-sans flex flex-col items-center justify-center p-6 relative select-none">
-        {onClose && (
-          <button
-            type="button"
-            onClick={onClose}
-            className="absolute top-4 left-4 p-2 bg-white rounded-full shadow-sm border border-slate-200 cursor-pointer hover:bg-slate-50"
-          >
-            <X className="w-4 h-4" />
-          </button>
-        )}
-        <div className="max-w-md w-full bg-white rounded-3xl border border-slate-200 p-8 shadow-xl text-center space-y-6">
-          <div className="w-20 h-20 bg-amber-50 rounded-full flex items-center justify-center text-amber-500 mx-auto animate-bounce border-2 border-amber-100">
-            <Clock className="w-10 h-10" />
-          </div>
-          <div className="space-y-2">
-            <span className="px-3.5 py-1 bg-amber-100 text-amber-800 text-xs font-black rounded-full border border-amber-200 uppercase tracking-wider">
-              আবেদন অপেক্ষমান (Pending Verification)
-            </span>
-            <h2 className="text-xl font-black text-slate-900 pt-2">আপনার রেশন কার্ডের আবেদনটি যাচাই করা হচ্ছে</h2>
-            <p className="text-xs text-slate-600 font-bold leading-relaxed pt-1">
-              আসসালামু আলাইকুম! আপনার রেশন কার্ডের আবেদনটি আমাদের কাছে সফলভাবে পৌঁছেছে। AMB এডমিন প্যানেল আপনার তথ্যগুলো গভীরভাবে ভেরিফাই করছে।
-            </p>
-            <p className="text-[11px] text-emerald-800 bg-emerald-50 border border-emerald-100/60 p-3.5 rounded-2xl font-bold leading-relaxed">
-              এডমিন আপনার আবেদনটি রিভিউ করার সময় আপনার জন্য একটি ডিজিটাল কার্ড নম্বর, ইস্যু/মেয়াদ উত্তীর্ণের তারিখ এবং অনুমোদনকারী স্বাক্ষর সেট করে এপ্রুভ করবেন। এপ্রুভ হওয়া মাত্রই আপনি এই পেজে আপনার ডিজিটাল কার্ড এবং ভর্তুকি মূল্যে রেশন পণ্য অর্ডার করার সুবিধা পাবেন।
-            </p>
-          </div>
-          <div className="pt-2">
-            <button
-              type="button"
-              onClick={onClose}
-              className="w-full py-3 bg-[#015335] text-white rounded-2xl font-black text-xs cursor-pointer shadow-md shadow-emerald-900/10 hover:bg-emerald-900 transition"
-            >
-              ড্যাশবোর্ডে ফিরে যান
-            </button>
-          </div>
-        </div>
+      <div className="bg-slate-50 text-slate-800 font-sans min-h-screen">
+        <RationApplicationForm 
+          liveUser={liveUser} 
+          appConfig={appConfig}
+          onClose={() => setActiveTab('dashboard')} 
+        />
       </div>
     );
   }
@@ -1070,10 +1089,10 @@ export const RationCardView = React.memo(function RationCardView({ liveUser, syn
             />
           )}
           <div className="w-8 h-8 bg-emerald-950 rounded-lg flex items-center justify-center font-black text-rose-50 border border-teal-800">
-            <span className="text-white text-xs tracking-tighter">AMB</span>
+            <span className="text-white text-xs tracking-tighter">BNB</span>
           </div>
           <div className="text-left font-sans">
-            <h1 className="text-xs sm:text-[13.5px] font-black text-emerald-950 tracking-tight leading-none">AMB রেশন কার্ড পোর্টাল</h1>
+            <h1 className="text-xs sm:text-[13.5px] font-black text-emerald-950 tracking-tight leading-none">BNB রেশন কার্ড পোর্টাল</h1>
           </div>
         </div>
 
@@ -1122,46 +1141,62 @@ export const RationCardView = React.memo(function RationCardView({ liveUser, syn
             </div>
           </div>
 
-          {/* 4 Compact Service Navigation Boxes - Style matches metrics perfectly */}
-          <div className="grid grid-cols-4 gap-1 sm:gap-4">
-            {[
-              { id: 'dashboard', label: 'সদস্য ড্যাশবোর্ড', desc: 'রেশন ড্যাশবোর্ড', icon: LayoutDashboard, color: 'emerald', bg: 'bg-emerald-50 text-emerald-600 border-emerald-100' },
-              { id: 'card', label: 'ডিজিটাল রেশন কার্ড', desc: 'স্মার্ট ভার্চুয়াল কার্ড', icon: CreditCard, color: 'blue', bg: 'bg-blue-50 text-blue-600 border-blue-100' },
-              { id: 'my_orders', label: 'আমার বুকিং ট্র্যাকার', desc: 'অর্ডার ট্র্যাকিং', icon: Truck, color: 'indigo', bg: 'bg-indigo-50 text-indigo-600 border-indigo-100' },
-              { id: 'profile', label: 'কার্ডধারী প্রোফাইল', desc: 'মেম্বারশিপ ভেরিফাইড তথ্য', icon: User, color: 'sky', bg: 'bg-sky-50 text-sky-600 border-sky-100' }
-            ].map((item, idx) => {
-              const Icon = item.icon;
-              const isSelected = activeTab === item.id;
-              return (
-                <button
-                  key={`${item.id}-${idx}`}
-                  type="button"
-                  onClick={() => setActiveTab(item.id as any)}
-                  className={`p-1 px-1.5 py-2 sm:p-4 rounded-xl sm:rounded-2xl border transition-all cursor-pointer shadow-3xs flex flex-col items-center justify-between min-h-[58px] sm:min-h-0 ${
-                    isSelected 
-                      ? 'bg-white border-[#006A4E] ring-2 ring-[#006A4E]/30 scale-[1.01]' 
-                      : 'bg-white border-slate-200/80 hover:bg-slate-50'
-                  }`}
-                >
-                  <div className="flex flex-col sm:flex-row items-center gap-1 sm:gap-2 text-center sm:text-left w-full justify-center">
-                    <div className={`w-5.5 h-5.5 sm:w-7 sm:h-7 ${item.bg} rounded-md sm:rounded-lg border flex items-center justify-center shrink-0`}>
-                      <Icon className="w-3 h-3 sm:w-4 sm:h-4" />
-                    </div>
-                    <span className="text-[8px] sm:text-[12px] md:text-[12.5px] font-black text-slate-800 tracking-tight leading-tight whitespace-normal break-words max-w-full">
-                      {item.label}
-                    </span>
-                  </div>
-                  <div className="hidden sm:block pl-0.5 mt-0.5">
-                    <span className="text-[8.5px] text-slate-400 font-bold">{item.desc}</span>
-                  </div>
-                </button>
-              );
-            })}
-          </div>
 
           {/* TAB 1: DASHBOARD TAB */}
           {activeTab === 'dashboard' && (
             <div className="space-y-4 sm:space-y-6">
+
+              {/* NON-CARD HOLDER NOTICE BANNER */}
+              {!rationCard && (
+                <div className="bg-gradient-to-r from-[#015335] via-emerald-800 to-teal-900 text-white rounded-2xl sm:rounded-3xl p-4 sm:p-5 shadow-md flex flex-col sm:flex-row items-center justify-between gap-3 border border-emerald-500/40">
+                  <div className="flex items-center gap-3">
+                    <div className="w-11 h-11 rounded-2xl bg-amber-400/20 border border-amber-300/40 flex items-center justify-center text-amber-300 shrink-0 shadow-inner">
+                      <CreditCard className="w-6 h-6" />
+                    </div>
+                    <div className="text-left font-sans">
+                      <div className="flex items-center gap-2">
+                        <h3 className="text-sm font-black text-amber-300">আপনার কোনো ডিজিটাল রেশন কার্ড নেই</h3>
+                        <span className="text-[9px] font-black bg-amber-400 text-slate-950 px-2 py-0.5 rounded-full uppercase">আবেদন প্রয়োজন</span>
+                      </div>
+                      <p className="text-[11px] text-emerald-100 font-bold mt-0.5 leading-tight">
+                        ভর্তুকি মূল্যে নিত্যপ্রয়োজনীয় ১০টি পণ্য থেকে ৫টি পণ্য সরাসরি কেনাকাটা করতে অনলাইন রেশন কার্ডের আবেদন সম্পন্ন করুন।
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab('apply')}
+                    className="w-full sm:w-auto px-5 py-2.5 bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-xs rounded-xl shadow-lg transition cursor-pointer shrink-0 flex items-center justify-center gap-1.5"
+                  >
+                    <span>💳 ডিজিটাল কার্ডের আবেদন করুন</span>
+                    <ChevronRight className="w-4 h-4" />
+                  </button>
+                </div>
+              )}
+
+              {/* PENDING CARD HOLDER NOTICE BANNER */}
+              {rationCard?.status === 'pending' && (
+                <div className="bg-amber-50 border border-amber-300 text-amber-950 rounded-2xl p-4 shadow-xs flex flex-col sm:flex-row items-center justify-between gap-3">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-amber-200/80 flex items-center justify-center text-amber-800 shrink-0">
+                      <Clock className="w-5 h-5 animate-spin" />
+                    </div>
+                    <div className="text-left font-sans">
+                      <h3 className="text-xs font-black text-amber-900">আপনার রেশন কার্ডের আবেদনটি ভেরিফিকেশনে আছে (Pending)</h3>
+                      <p className="text-[10.5px] text-amber-800 font-bold">
+                        এডমিন রিভিউ সম্পন্ন হলে কার্ডের স্ট্যাটাস সচল হবে। নিচে সমস্ত ক্যাটালগ ও কেনাকাটার সুযোগ দেওয়া রয়েছে।
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab('apply')}
+                    className="w-full sm:w-auto px-4 py-2 bg-amber-200 hover:bg-amber-300 text-amber-950 font-black text-xs rounded-xl border border-amber-400 transition cursor-pointer shrink-0"
+                  >
+                    আবেদন স্ট্যাটাস
+                  </button>
+                </div>
+              )}
               
               {/* BRAND HERO HIGHLIGHT & DIGITAL RATION CARD GRAPHIC MATCHING PRECISELY */}
               <div className="flex flex-col gap-6 items-center">
@@ -1225,7 +1260,29 @@ export const RationCardView = React.memo(function RationCardView({ liveUser, syn
                     <span className="text-[7.5px] sm:text-[10px] text-slate-400 uppercase font-black tracking-wide truncate">বাকি দিন</span>
                   </div>
                   <h3 className="text-[9px] sm:text-xs font-black text-slate-900 pt-1.5 font-mono leading-snug truncate w-full">
-                    365 দিন
+                    {(() => {
+                      if (!rationCard) return '0 দিন';
+                      const expiry = rationCard.expiryTimestamp ? new Date(rationCard.expiryTimestamp) : null;
+                      if (!expiry) {
+                        // Fallback: Try parsing the Bengali date string if timestamp is missing (for older records)
+                        const bnToEn = (str: string) => {
+                          const map: any = { '০': '0', '১': '1', '২': '2', '৩': '3', '৪': '4', '৫': '5', '৬': '6', '৭': '7', '৮': '8', '৯': '9' };
+                          return str.replace(/[০-৯]/g, (d) => map[d]);
+                        };
+                        const enDateStr = bnToEn(rationCard.expiryDate || '');
+                        const parts = enDateStr.split('/');
+                        if (parts.length === 3) {
+                          const expiryFallback = new Date(parseInt(parts[2]), parseInt(parts[1]) - 1, parseInt(parts[0]));
+                          const diff = expiryFallback.getTime() - new Date().getTime();
+                          const days = Math.ceil(diff / (1000 * 60 * 60 * 24));
+                          return `${days > 0 ? englishToBengali(days) : '0'} দিন`;
+                        }
+                        return '0 দিন';
+                      }
+                      const diff = expiry.getTime() - new Date().getTime();
+                      const days = Math.ceil(diff / (1000 * 60 * 60 * 24));
+                      return `${days > 0 ? englishToBengali(days) : '0'} দিন`;
+                    })()}
                   </h3>
                 </div>
 
@@ -1318,6 +1375,12 @@ export const RationCardView = React.memo(function RationCardView({ liveUser, syn
                         alert("অনুগ্রহ করে কমপক্ষে 1টি আইটেম নির্বাচন করুন!");
                         return;
                       }
+                      if (!rationCard || rationCard.status !== 'active') {
+                        if (window.confirm("ভর্তুকি মূল্যে রেশন পণ্য অর্ডার করতে সচল ডিজিটাল রেশন কার্ড প্রয়োজন। আপনার বর্তমানে কোনো সক্রিয় রেশন কার্ড নেই।\n\nআপনি কি এখন ডিজিটাল রেশন কার্ডের আবেদন করতে চান?")) {
+                          setActiveTab('apply');
+                        }
+                        return;
+                      }
                       setShowCheckoutModal(true);
                     }}
                     className="bg-[#006A4E] hover:bg-emerald-900 text-white font-extrabold py-2 px-6 rounded-xl text-xs flex items-center gap-1 transition active:scale-95 shadow-md cursor-pointer w-full sm:w-auto text-center justify-center"
@@ -1386,7 +1449,7 @@ export const RationCardView = React.memo(function RationCardView({ liveUser, syn
                     {[
                       { text: `আপনি সর্বমোট ${appConfig?.rationTotalItemsText || "10"}টি আইটেমের মধ্যে থেকে সর্বোচ্চ ${englishToBengali(appConfig?.rationMaxSelectLimit || 5)}টি বেছে নিতে পারবেন।` },
                       { text: "বাজার মূল্যের তুলনায় আমাদের পণ্যের দাম কম।" },
-                      { text: "অর্ডার করার পর নিকটস্থ AMB সেন্টার থেকে পণ্য সংগ্রহ করুন।" },
+                      { text: "অর্ডার করার পর নিকটস্থ BNB সেন্টার থেকে পণ্য সংগ্রহ করুন।" },
                       { text: "কার্ডের মেয়াদ শেষ হলে পুনরায় রিনিউ করতে হবে।", alert: true },
                       { text: "যেকোনো সমস্যায় সাপোর্টে যোগাযোগ করুন।" }
                     ].map((item, idx) => (
@@ -1442,12 +1505,110 @@ export const RationCardView = React.memo(function RationCardView({ liveUser, syn
                 </div>
  
                 {/* HIGH FIDELITY MEMBERSHIP RATION CARD FOR GRAPHIC SUBMISSION */}
-                {renderBeautifulRationCard(rationCard)}
+                {renderBeautifulRationCard({ ...rationCard, nominee: previewNominee, address: previewAddress })}
  
-                <div className="grid grid-cols-2 gap-4 text-xs font-semibold text-slate-650 bg-slate-50 p-4 rounded-2xl border border-slate-150 font-sans">
-                  <p>বিতরণ ক্যাটাগরিঃ <span className="font-extrabold text-slate-808 block mt-0.5">{rationCard.cardType || 'Regular Silver'}</span></p>
-                  <p>নমিনী ও সম্পর্কঃ <span className="font-extrabold text-slate-808 block mt-0.5">{rationCard.nominee || 'N/A'}</span></p>
-                  <p className="col-span-2">ডেলিভারি ঠিকানাঃ <span className="font-extrabold text-slate-808 block mt-0.5">{rationCard.address}</span></p>
+                <div className="bg-slate-50 p-5 rounded-3xl border border-slate-200 shadow-inner space-y-4 font-sans">
+                  <div className="flex items-center justify-between border-b border-slate-200 pb-2">
+                    <h4 className="text-[11px] font-black text-slate-800 uppercase flex items-center gap-1.5">
+                      📝 কাস্টমার তথ্য ও কার্ড কাস্টমাইজেশন
+                    </h4>
+                    <button 
+                      onClick={() => setIsEditingInfo(!isEditingInfo)}
+                      className="text-[10px] font-bold text-blue-600 hover:underline cursor-pointer"
+                    >
+                      {isEditingInfo ? 'বন্ধ করুন' : 'তথ্য পরিবর্তন করুন'}
+                    </button>
+                  </div>
+
+                  {isEditingInfo ? (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 animate-fade-in">
+                      <div className="space-y-1.5">
+                        <label className="text-[10px] font-black text-slate-500 uppercase">নমিনী ও সম্পর্ক</label>
+                        <input 
+                          type="text" 
+                          value={previewNominee}
+                          onChange={(e) => setPreviewNominee(e.target.value)}
+                          placeholder="উদাঃ স্ত্রী / মা / বাবা"
+                          className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-bold focus:border-blue-500 outline-none"
+                        />
+                      </div>
+                      <div className="space-y-1.5">
+                        <label className="text-[10px] font-black text-slate-500 uppercase">ডেলিভারি ঠিকানা</label>
+                        <input 
+                          type="text" 
+                          value={previewAddress}
+                          onChange={(e) => setPreviewAddress(e.target.value)}
+                          placeholder="পূর্ণাঙ্গ ঠিকানা লিখুন"
+                          className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-bold focus:border-blue-500 outline-none"
+                        />
+                      </div>
+                      <div className="col-span-full pt-2">
+                        <button 
+                          onClick={async () => {
+                            if (rationCard) {
+                              try {
+                                await updateDoc(doc(db, 'ration_cards', rationCard.id), {
+                                  nominee: previewNominee,
+                                  address: previewAddress
+                                });
+                                setIsEditingInfo(false);
+                                alert("তথ্য সফলভাবে আপডেট করা হয়েছে!");
+                              } catch (e) {
+                                alert("আপডেট করতে ব্যর্থ হয়েছে।");
+                              }
+                            } else {
+                              setIsEditingInfo(false);
+                            }
+                          }}
+                          className="w-full py-2 bg-blue-600 text-white rounded-xl text-xs font-black shadow-sm hover:bg-blue-700 transition cursor-pointer"
+                        >
+                          পরিবর্তনগুলো সংরক্ষণ করুন
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-2 gap-4 text-xs font-semibold text-slate-650">
+                      <div>
+                        <p className="text-[9px] text-slate-400 font-black uppercase">বিতরণ ক্যাটাগরি</p>
+                        <span className="font-extrabold text-slate-800 block mt-0.5">
+                          {previewCardType === 'red' ? 'Premium Red' : previewCardType === 'green' ? 'Special Green' : 'Regular White'}
+                        </span>
+                      </div>
+                      <div>
+                        <p className="text-[9px] text-slate-400 font-black uppercase">নমিনী ও সম্পর্ক</p>
+                        <span className="font-extrabold text-slate-800 block mt-0.5">{previewNominee || 'N/A'}</span>
+                      </div>
+                      <div className="col-span-2">
+                        <p className="text-[9px] text-slate-400 font-black uppercase">ডেলিভারি ঠিকানা</p>
+                        <span className="font-extrabold text-slate-800 block mt-0.5">{previewAddress || 'N/A'}</span>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Real-time Category Selector (Tabs) */}
+                  <div className="pt-3 border-t border-slate-200 space-y-3">
+                    <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest text-center">কার্ডের ধরণ বা রঙ নির্বাচন করুন</p>
+                    <div className="flex gap-2 p-1 bg-slate-100 rounded-2xl">
+                      <button 
+                        onClick={() => setPreviewCardType('red')}
+                        className={`flex-1 py-2.5 rounded-xl text-[10px] font-black transition-all flex items-center justify-center gap-1.5 ${previewCardType === 'red' ? 'bg-red-600 text-white shadow-md scale-105' : 'text-slate-600 hover:bg-slate-200'}`}
+                      >
+                        <div className="w-3 h-3 rounded-full bg-red-400 border border-white" /> লাল সাদা (দামি)
+                      </button>
+                      <button 
+                        onClick={() => setPreviewCardType('white')}
+                        className={`flex-1 py-2.5 rounded-xl text-[10px] font-black transition-all flex items-center justify-center gap-1.5 ${previewCardType === 'white' ? 'bg-white text-slate-900 shadow-md border border-slate-200 scale-105' : 'text-slate-600 hover:bg-slate-200'}`}
+                      >
+                        <div className="w-3 h-3 rounded-full bg-slate-300 border border-white" /> সাদা (রেগুলার)
+                      </button>
+                      <button 
+                        onClick={() => setPreviewCardType('green')}
+                        className={`flex-1 py-2.5 rounded-xl text-[10px] font-black transition-all flex items-center justify-center gap-1.5 ${previewCardType === 'green' ? 'bg-emerald-600 text-white shadow-md scale-105' : 'text-slate-600 hover:bg-slate-200'}`}
+                      >
+                        <div className="w-3 h-3 rounded-full bg-emerald-400 border border-white" /> সবুজ সাদা
+                      </button>
+                    </div>
+                  </div>
                 </div>
               </div>
 
@@ -1495,7 +1656,7 @@ export const RationCardView = React.memo(function RationCardView({ liveUser, syn
                         <div className="flex-1 flex flex-col justify-between">
                           <div className="flex items-center justify-between">
                             <div className="w-8 h-8 bg-amber-600 rounded-lg flex items-center justify-center font-black text-white border border-amber-400 shadow-3xs">
-                              <span className="text-[9px] tracking-tighter">AMB</span>
+                              <span className="text-[9px] tracking-tighter">BNB</span>
                             </div>
                             <span className="text-[8px] sm:text-[9.5px] text-amber-850 font-black tracking-tight leading-none">VIP GOLD 👑</span>
                           </div>
@@ -1508,7 +1669,7 @@ export const RationCardView = React.memo(function RationCardView({ liveUser, syn
                           </div>
                           
                           <div className="mt-2 flex items-center justify-between text-[7px] sm:text-[8px] font-bold text-amber-600">
-                            <span>AMB-VIP-GOLD</span>
+                            <span>BNB-VIP-GOLD</span>
                             <span className="text-[6.5px] text-amber-750 font-extrabold bg-amber-50 px-1.5 py-0.5 rounded">গ্যালারি আপলোড</span>
                           </div>
                         </div>
@@ -1523,7 +1684,7 @@ export const RationCardView = React.memo(function RationCardView({ liveUser, syn
                     <div className="flex-1 flex flex-col justify-between">
                       <div className="flex items-center justify-between">
                         <div className="w-8 h-8 bg-[#006A4E] rounded-lg flex items-center justify-center font-black text-white border border-teal-800 shadow-3xs">
-                          <span className="text-[9px] tracking-tighter">AMB</span>
+                          <span className="text-[9px] tracking-tighter">BNB</span>
                         </div>
                         <span className="text-[8px] sm:text-[9.5px] text-emerald-850 font-black tracking-tight leading-none">PREMIUM 💎</span>
                       </div>
@@ -1536,7 +1697,7 @@ export const RationCardView = React.memo(function RationCardView({ liveUser, syn
                       </div>
                       
                       <div className="mt-2 flex items-center justify-between text-[7px] sm:text-[8px] font-bold text-emerald-600">
-                        <span>AMB-PREM-GREEN</span>
+                        <span>BNB-PREM-GREEN</span>
                         <span className="text-[6.5px] text-emerald-850 font-extrabold bg-emerald-50 px-1.5 py-0.5 rounded">অটো ডিজাইন</span>
                       </div>
                     </div>
@@ -1653,6 +1814,12 @@ export const RationCardView = React.memo(function RationCardView({ liveUser, syn
                     onClick={() => {
                       if (selectedItemIds.length === 0) {
                         alert("অনুগ্রহ করে কমপক্ষে 1টি আইটেম সিলেক্ট করুন!");
+                        return;
+                      }
+                      if (!rationCard || rationCard.status !== 'active') {
+                        if (window.confirm("ভর্তুকি মূল্যে রেশন পণ্য অর্ডার করতে সচল ডিজিটাল রেশন কার্ড প্রয়োজন। আপনার বর্তমানে কোনো সক্রিয় রেশন কার্ড নেই।\n\nআপনি কি এখন ডিজিটাল রেশন কার্ডের আবেদন করতে চান?")) {
+                          setActiveTab('apply');
+                        }
                         return;
                       }
                       setShowCheckoutModal(true);
@@ -1797,22 +1964,22 @@ export const RationCardView = React.memo(function RationCardView({ liveUser, syn
                 <div className="grid grid-cols-2 gap-4 text-xs font-bold font-sans text-slate-700">
                   <div className="space-y-1">
                     <p className="text-slate-400 text-[10px] uppercase font-black tracking-wide">সদস্যের নামঃ</p>
-                    <p className="text-slate-900 text-sm font-black">{rationCard.userName}</p>
+                    <p className="text-slate-900 text-sm font-black">{rationCard?.userName || liveUser?.name}</p>
                   </div>
 
                   <div className="space-y-1">
                     <p className="text-slate-400 text-[10px] uppercase font-black tracking-wide">ব্যক্তিগত মোবাইলঃ</p>
-                    <p className="text-slate-900 text-sm font-mono tracking-tight">{rationCard.phone || liveUser.phone}</p>
+                    <p className="text-slate-900 text-sm font-mono tracking-tight">{rationCard?.phone || liveUser?.phone}</p>
                   </div>
 
                    <div className="space-y-1 col-span-2">
                     <p className="text-slate-400 text-[10px] uppercase font-black tracking-wide">ডিজিটাল রেশন আইডিঃ</p>
-                    <p className="text-slate-900 text-sm font-mono tracking-widest text-emerald-800 font-black">{rationCard.cardNo}</p>
+                    <p className="text-slate-900 text-sm font-mono tracking-widest text-emerald-800 font-black">{rationCard?.cardNo || 'আবেদন করা হয়নি'}</p>
                   </div>
 
                   <div className="col-span-2 space-y-1">
                     <p className="text-slate-400 text-[10px] uppercase font-black tracking-wide">বিতরণ ঠিকানাঃ</p>
-                    <p className="text-slate-900 leading-relaxed font-black">{rationCard.address}</p>
+                    <p className="text-slate-900 leading-relaxed font-black">{rationCard?.address || (liveUser as any)?.address || 'N/A'}</p>
                   </div>
                 </div>
               </div>
@@ -1826,7 +1993,7 @@ export const RationCardView = React.memo(function RationCardView({ liveUser, syn
               <div className="bg-white border border-slate-200 rounded-3xl p-5 md:p-6 space-y-4 shadow-3xs">
                 <h3 className="text-xs font-black text-gray-900 uppercase tracking-widest border-b border-slate-100 pb-2.5">গ্রাহক সেবা ও বিতরণ কেন্দ্র সহায়তা</h3>
                 <p className="text-xs text-slate-500 font-bold leading-relaxed">
-                  আপনার রেশন কার্ড, অর্ডার সংগ্রহ, বা পেমেন্ট সংক্রান্ত কোনো সমস্যা হলে আমাদের কাস্টমার হটলাইন অথবা সরাসরি নিকটস্থ বিতরণ কর্মকর্তা বা AMB সাভার হেমায়েতপুর মেইন সেন্টারে যোগাযোগ করুন।
+                  আপনার রেশন কার্ড, অর্ডার সংগ্রহ, বা পেমেন্ট সংক্রান্ত কোনো সমস্যা হলে আমাদের কাস্টমার হটলাইন অথবা সরাসরি নিকটস্থ বিতরণ কর্মকর্তা বা BNB সাভার হেমায়েতপুর মেইন সেন্টারে যোগাযোগ করুন।
                 </p>
 
                 <div className="space-y-3 pt-2 text-xs font-bold">
@@ -1854,7 +2021,7 @@ export const RationCardView = React.memo(function RationCardView({ liveUser, syn
                     <MessageCircle className="w-4 h-4" />
                   </div>
                   <div>
-                    <h3 className="text-xs font-black text-gray-900 uppercase tracking-widest">AMB লাইভ কাস্টমার চ্যাট</h3>
+                    <h3 className="text-xs font-black text-gray-900 uppercase tracking-widest">BNB লাইভ কাস্টমার চ্যাট</h3>
                     <p className="text-[10px] text-[#006A4E] font-black">সরাসরি সাপোর্ট রুম (রেশন সেক্টর)</p>
                   </div>
                 </div>
@@ -1868,7 +2035,7 @@ export const RationCardView = React.memo(function RationCardView({ liveUser, syn
                         className={`flex flex-col max-w-[85%] ${msg.sender === 'user' ? 'ml-auto items-end' : 'mr-auto items-start'}`}
                       >
                         <span className="text-[8px] text-slate-400 font-bold mb-0.5 px-1">
-                          {msg.sender === 'user' ? 'আপনি' : 'AMB সাপোর্ট'}
+                          {msg.sender === 'user' ? 'আপনি' : 'BNB সাপোর্ট'}
                         </span>
                         <div className={`p-2.5 rounded-2xl text-[11px] leading-relaxed font-semibold shadow-3xs ${
                           msg.sender === 'user' 
@@ -1883,7 +2050,7 @@ export const RationCardView = React.memo(function RationCardView({ liveUser, syn
 
                     {isChatTyping && (
                       <div className="mr-auto items-start max-w-[85%] flex flex-col animate-pulse">
-                        <span className="text-[8px] text-slate-400 font-bold mb-0.5 px-1">AMB সাপোর্ট টাইপ করছে...</span>
+                        <span className="text-[8px] text-slate-400 font-bold mb-0.5 px-1">BNB সাপোর্ট টাইপ করছে...</span>
                         <div className="p-2.5 rounded-2xl bg-white text-slate-500 border border-slate-200 rounded-tl-xs shadow-3xs flex items-center gap-1">
                           <span className="w-1.5 h-1.5 bg-slate-400 rounded-full animate-bounce" />
                           <span className="w-1.5 h-1.5 bg-slate-400 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }} />
@@ -2035,7 +2202,7 @@ export const RationCardView = React.memo(function RationCardView({ liveUser, syn
             <div className="border border-slate-200 rounded-2xl overflow-hidden shadow-sm bg-slate-50 p-2 max-h-[220px] overflow-y-auto flex items-center justify-center">
               <img 
                 src={generatedCardUrl} 
-                alt="AMB Digital Ration Card" 
+                alt="BNB Digital Ration Card" 
                 className="max-w-full max-h-[180px] object-contain rounded-xl"
                 referrerPolicy="no-referrer"
               />
@@ -2043,7 +2210,7 @@ export const RationCardView = React.memo(function RationCardView({ liveUser, syn
             
             <a 
               href={generatedCardUrl} 
-              download={`AMB-Ration-Card-${rationCard?.cardNo || liveUser?.memberId}.png`}
+              download={`BNB-Ration-Card-${rationCard?.cardNo || liveUser?.memberId}.png`}
               className="block w-full py-2.5 bg-emerald-700 hover:bg-emerald-800 text-white rounded-xl text-xs font-black transition cursor-pointer text-center shadow-3xs"
             >
               📥 সরাসরি গ্যালারিতে সেভ করুন

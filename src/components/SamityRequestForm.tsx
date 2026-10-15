@@ -119,8 +119,11 @@ export default function SamityRequestForm({ user, appConfig, onClose, onSubmitSu
       return;
     }
 
+    // Nominee validation based on category
+    const requiredNominees = user.memberCategory === 'owner' || user.memberCategory === 'shareholder' ? 3 : (user.memberCategory === 'investor' ? 2 : 1);
+    
     if (!nomineeName.trim()) {
-      setErrorCode('অনুগ্রহ করে নমিনির নাম প্রদান করুন।');
+      setErrorCode(`অনুগ্রহ করে ${requiredNominees} জন নমিনির নাম প্রদান করুন।`);
       return;
     }
 
@@ -330,7 +333,7 @@ export default function SamityRequestForm({ user, appConfig, onClose, onSubmitSu
               <div>
                 <label className="text-slate-450 font-semibold block">অ্যাকাউন্ট রোল (Account Role):</label>
                 <div className="text-slate-700 font-semibold bg-white border border-slate-200 rounded-xl px-3 py-2 mt-1 capitalize">
-                  {user.role === 'admin' ? 'এডমিন (AMB Admin)' : 'প্রিমিয়াম সদস্য'}
+                  {user.role === 'admin' ? 'এডমিন (BNB Admin)' : 'প্রিমিয়াম সদস্য'}
                 </div>
               </div>
             </div>

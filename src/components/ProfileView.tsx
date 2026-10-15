@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { User, PhoneChangeRequest, AppConfig } from '../types';
+import { User, PhoneChangeRequest, AppConfig, MemberNominee } from '../types';
 import { 
   maskSecretPhone, 
   normalizePhoneNumber, 
@@ -28,7 +28,9 @@ import {
   Sparkles,
   PhoneCall,
   Crown,
-  Trash2
+  Trash2,
+  Plus,
+  Users
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { doc, updateDoc, collection, addDoc, query, where, onSnapshot, serverTimestamp, increment } from 'firebase/firestore';
@@ -86,12 +88,141 @@ export default function ProfileView({ user, onUpdate, onTriggerAdmin, appConfig 
   const [phoneModalMsg, setPhoneModalMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [myPhoneRequests, setMyPhoneRequests] = useState<PhoneChangeRequest[]>([]);
 
-  // Shareholder & Investor Upgrade Application Modals
+  // Category Information & Upgrade Application Modals
+  const [showOwnerModal, setShowOwnerModal] = useState(false);
   const [showShareholderModal, setShowShareholderModal] = useState(false);
   const [showInvestorModal, setShowInvestorModal] = useState(false);
+  const [showGeneralMemberModal, setShowGeneralMemberModal] = useState(false);
   const [modalSavingsTarget, setModalSavingsTarget] = useState<number>(1000);
   const [submittingUpgrade, setSubmittingUpgrade] = useState(false);
   const [upgradeModalMsg, setUpgradeModalMsg] = useState<string | null>(null);
+
+  // Dedicated Nominee Management State
+  const [showNomineeModal, setShowNomineeModal] = useState(false);
+  const [editingNomineeIndex, setEditingNomineeIndex] = useState<number | null>(null);
+  const [nomFormName, setNomFormName] = useState('');
+  const [nomFormRel, setNomFormRel] = useState('');
+  const [nomFormPhone, setNomFormPhone] = useState('');
+  const [nomFormNid, setNomFormNid] = useState('');
+  const [savingNominees, setSavingNominees] = useState(false);
+
+  const getNormalizedNominees = (): MemberNominee[] => {
+    if (Array.isArray(user.nominees) && user.nominees.length > 0) {
+      return user.nominees;
+    }
+    if (user.nomineeName && user.nomineeName.trim()) {
+      return [{
+        id: 'nom_1',
+        name: user.nomineeName.trim(),
+        relation: user.nomineeRelation?.trim() || 'উত্তরাধিকার',
+        phone: user.nomineePhone?.trim() || '',
+        nid: user.nomineeNid?.trim() || ''
+      }];
+    }
+    return [];
+  };
+
+  const handleOpenAddNomineeModal = () => {
+    setEditingNomineeIndex(null);
+    setNomFormName('');
+    setNomFormRel('');
+    setNomFormPhone('');
+    setNomFormNid('');
+    setShowNomineeModal(true);
+  };
+
+  const handleOpenEditNomineeModal = (nom: MemberNominee, idx: number) => {
+    setEditingNomineeIndex(idx);
+    setNomFormName(nom.name || '');
+    setNomFormRel(nom.relation || '');
+    setNomFormPhone(nom.phone || '');
+    setNomFormNid(nom.nid || '');
+    setShowNomineeModal(true);
+  };
+
+  const handleSaveNomineeModal = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!nomFormName.trim()) return;
+
+    setSavingNominees(true);
+    try {
+      const currentList = [...getNormalizedNominees()];
+      const newNomObj: MemberNominee = {
+        id: editingNomineeIndex !== null && currentList[editingNomineeIndex]?.id ? currentList[editingNomineeIndex].id : `nom_${Date.now()}`,
+        name: nomFormName.trim(),
+        relation: nomFormRel.trim(),
+        phone: nomFormPhone.trim(),
+        nid: nomFormNid.trim()
+      };
+
+      if (editingNomineeIndex !== null && editingNomineeIndex >= 0 && editingNomineeIndex < currentList.length) {
+        currentList[editingNomineeIndex] = newNomObj;
+      } else {
+        currentList.push(newNomObj);
+      }
+
+      const primary = currentList[0] || { name: '', relation: '', phone: '', nid: '' };
+      const userRef = doc(db, 'users', user.uid);
+      await updateDoc(userRef, {
+        nominees: currentList,
+        nomineeName: primary.name || '',
+        nomineeRelation: primary.relation || '',
+        nomineePhone: primary.phone || '',
+        nomineeNid: primary.nid || '',
+        updatedAt: serverTimestamp()
+      });
+
+      await addDoc(collection(db, 'user_notifications'), {
+        userId: user.uid,
+        title: '👥 নমিনি তথ্য আপডেট সফল',
+        message: `আপনার মনোনীত নমিনির তথ্য (${newNomObj.name}) সফলভাবে সংরক্ষণ করা হয়েছে।`,
+        type: 'success',
+        read: false,
+        createdAt: serverTimestamp()
+      });
+
+      setShowNomineeModal(false);
+      setEditingNomineeIndex(null);
+      setNomFormName('');
+      setNomFormRel('');
+      setNomFormPhone('');
+      setNomFormNid('');
+      setSuccessMsg('🎉 নমিনির তথ্য সফলভাবে সংরক্ষিত ও আপডেট করা হয়েছে!');
+      if (onUpdate) onUpdate();
+      setTimeout(() => setSuccessMsg(''), 5000);
+    } catch (err: any) {
+      console.error('Error saving nominee:', err);
+      setErrorMsg('নমিনি তথ্য সংরক্ষণে ত্রুটি হয়েছে।');
+    } finally {
+      setSavingNominees(false);
+    }
+  };
+
+  const handleDeleteNominee = async (indexToDelete: number) => {
+    if (!confirm('আপনি কি নিশ্চিত যে এই নমিনির তথ্য মুছে ফেলতে চান?')) return;
+    setSavingNominees(true);
+    try {
+      const currentList = getNormalizedNominees().filter((_, idx) => idx !== indexToDelete);
+      const primary = currentList[0] || { name: '', relation: '', phone: '', nid: '' };
+      const userRef = doc(db, 'users', user.uid);
+      await updateDoc(userRef, {
+        nominees: currentList,
+        nomineeName: primary.name || '',
+        nomineeRelation: primary.relation || '',
+        nomineePhone: primary.phone || '',
+        nomineeNid: primary.nid || '',
+        updatedAt: serverTimestamp()
+      });
+
+      setSuccessMsg('নমিনি তথ্য মুছে ফেলা হয়েছে।');
+      if (onUpdate) onUpdate();
+      setTimeout(() => setSuccessMsg(''), 4000);
+    } catch (err) {
+      setErrorMsg('নমিনি মুছতে ব্যর্থ হয়েছে।');
+    } finally {
+      setSavingNominees(false);
+    }
+  };
 
   // ----------------------------------------------------
   // Interactive Image Cropper Modal States (WhatsApp-style)
@@ -741,59 +872,97 @@ export default function ProfileView({ user, onUpdate, onTriggerAdmin, appConfig 
         <div className="absolute -top-16 -left-16 w-44 h-44 bg-emerald-500/15 rounded-full blur-3xl pointer-events-none" />
         <div className="absolute -bottom-16 -right-16 w-44 h-44 bg-teal-400/15 rounded-full blur-3xl pointer-events-none" />
 
-        {/* Top Action Row: Left (👑 শেয়ার হোল্ডার) & Right (💎 ইনভেস্টার) Buttons */}
-        <div className="flex items-center justify-between gap-2 mb-3 relative z-10">
-          {/* Left Side Button: 👑 শেয়ার হোল্ডার */}
+        {/* Top Category Buttons Row: 🔴 অনার | 🔵 শেয়ার হোল্ডার | 🟢 ইনভেস্টার | ⚪ সাধারণ সদস্য (এক লাইনে ফুটিয়ে তোলা হয়েছে) */}
+        <div className="grid grid-cols-4 gap-1 sm:gap-2 mb-3.5 relative z-10 w-full">
+          {/* 1. 🔴 অনার (Owner) */}
+          <button
+            type="button"
+            onClick={() => setShowOwnerModal(true)}
+            className={`px-1 sm:px-2 py-2 rounded-xl border transition-all cursor-pointer flex flex-col items-center justify-center text-center shadow-md active:scale-95 ${
+              memberCategoryMeta.key === 'owner'
+                ? 'bg-gradient-to-b from-red-600 via-rose-600 to-red-700 text-white border-red-300 shadow-red-900/70 ring-2 ring-red-400'
+                : 'bg-gradient-to-b from-red-900/90 to-red-950/90 hover:from-red-800 hover:to-red-900 text-white border-red-500/70 shadow-red-950/60'
+            }`}
+            title="অনার মেম্বারশিপের নিয়ম ও সুবিধাবলী"
+          >
+            <div className="flex items-center gap-0.5 text-[10px] sm:text-xs font-black leading-tight text-white">
+              <span className="text-xs sm:text-sm">👑</span>
+              <span className="truncate">অনার</span>
+            </div>
+            <span className="text-[7.5px] sm:text-[9px] text-red-200 font-medium leading-none mt-1">নিয়ম</span>
+          </button>
+
+          {/* 2. 🔵 শেয়ার হোল্ডার (Shareholder) */}
+          <button
+            type="button"
+            onClick={() => {
+              setModalSavingsTarget(user.monthlySavingsTarget || 2000);
+              setShowShareholderModal(true);
+            }}
+            className={`px-1 sm:px-2 py-2 rounded-xl border transition-all cursor-pointer flex flex-col items-center justify-center text-center shadow-md active:scale-95 ${
+              memberCategoryMeta.key === 'shareholder'
+                ? 'bg-gradient-to-b from-blue-600 via-indigo-600 to-blue-700 text-white border-blue-300 shadow-blue-900/70 ring-2 ring-blue-400'
+                : 'bg-gradient-to-b from-blue-900/90 to-blue-950/90 hover:from-blue-800 hover:to-blue-900 text-white border-blue-500/70 shadow-blue-950/60'
+            }`}
+            title="শেয়ার হোল্ডার হওয়ার শর্তাবলী, নিয়ম ও আবেদন ফরম"
+          >
+            <div className="flex items-center gap-0.5 text-[10px] sm:text-xs font-black leading-tight text-white">
+              <span className="text-xs sm:text-sm">🛡️</span>
+              <span className="truncate">শেয়ারহোল্ডার</span>
+            </div>
+            <span className="text-[7.5px] sm:text-[9px] text-blue-200 font-medium leading-none mt-1">আবেদন</span>
+          </button>
+
+          {/* 3. 🟢 ইনভেস্টার (Investor) */}
           <button
             type="button"
             onClick={() => {
               setModalSavingsTarget(user.monthlySavingsTarget || 1000);
-              setShowShareholderModal(true);
-            }}
-            className={`px-2.5 sm:px-3 py-1.5 rounded-2xl border text-xs font-black transition-all cursor-pointer flex items-center gap-1.5 shadow-md active:scale-95 ${
-              memberCategoryMeta.key === 'shareholder'
-                ? 'bg-rose-600/90 text-white border-rose-400 shadow-rose-900/40 ring-2 ring-rose-400/50'
-                : 'bg-rose-950/70 hover:bg-rose-900 text-rose-200 border-rose-500/40 hover:border-rose-400'
-            }`}
-            title="শেয়ার হোল্ডার হওয়ার শর্তাবলী, নিয়ম ও আবেদন ফরম"
-          >
-            <span className="text-sm">👑</span>
-            <div className="text-left">
-              <span className="block leading-none text-[10.5px] sm:text-[11px] font-black">শেয়ার হোল্ডার</span>
-              <span className="text-[8px] sm:text-[8.5px] text-rose-300 font-medium">নিয়ম ও আবেদন</span>
-            </div>
-          </button>
-
-          {/* Right Side Button: 💎 ইনভেস্টার */}
-          <button
-            type="button"
-            onClick={() => {
-              setModalSavingsTarget(user.monthlySavingsTarget || 500);
               setShowInvestorModal(true);
             }}
-            className={`px-2.5 sm:px-3 py-1.5 rounded-2xl border text-xs font-black transition-all cursor-pointer flex items-center gap-1.5 shadow-md active:scale-95 ${
+            className={`px-1 sm:px-2 py-2 rounded-xl border transition-all cursor-pointer flex flex-col items-center justify-center text-center shadow-md active:scale-95 ${
               memberCategoryMeta.key === 'investor'
-                ? 'bg-sky-600/90 text-white border-sky-400 shadow-sky-900/40 ring-2 ring-sky-400/50'
-                : 'bg-sky-950/70 hover:bg-sky-900 text-sky-200 border-sky-500/40 hover:border-sky-400'
+                ? 'bg-gradient-to-b from-emerald-600 via-green-600 to-emerald-700 text-white border-emerald-300 shadow-emerald-900/70 ring-2 ring-emerald-400'
+                : 'bg-gradient-to-b from-emerald-900/90 to-emerald-950/90 hover:from-emerald-800 hover:to-emerald-900 text-white border-emerald-500/70 shadow-emerald-950/60'
             }`}
             title="ইনভেস্টার হওয়ার শর্তাবলী, নিয়ম ও আবেদন ফরম"
           >
-            <div className="text-right">
-              <span className="block leading-none text-[10.5px] sm:text-[11px] font-black">ইনভেস্টার</span>
-              <span className="text-[8px] sm:text-[8.5px] text-sky-300 font-medium">নিয়ম ও আবেদন</span>
+            <div className="flex items-center gap-0.5 text-[10px] sm:text-xs font-black leading-tight text-white">
+              <span className="text-xs sm:text-sm">💎</span>
+              <span className="truncate">ইনভেস্টার</span>
             </div>
-            <span className="text-sm">💎</span>
+            <span className="text-[7.5px] sm:text-[9px] text-emerald-200 font-medium leading-none mt-1">আবেদন</span>
+          </button>
+
+          {/* 4. ⚪ সাধারণ সদস্য (General Member) */}
+          <button
+            type="button"
+            onClick={() => setShowGeneralMemberModal(true)}
+            className={`px-1 sm:px-2 py-2 rounded-xl border transition-all cursor-pointer flex flex-col items-center justify-center text-center shadow-md active:scale-95 ${
+              memberCategoryMeta.key === 'regular' || (!memberCategoryMeta.key)
+                ? 'bg-gradient-to-b from-slate-600 via-slate-700 to-slate-800 text-white border-slate-300 shadow-slate-900/70 ring-2 ring-slate-300'
+                : 'bg-gradient-to-b from-slate-800/90 to-slate-900/90 hover:from-slate-700 hover:to-slate-800 text-slate-100 border-slate-500/70 shadow-slate-950/60'
+            }`}
+            title="সাধারণ সদস্যের নিয়মাবলী ও সুযোগ সুবিধা"
+          >
+            <div className="flex items-center gap-0.5 text-[10px] sm:text-xs font-black leading-tight text-white">
+              <span className="text-xs sm:text-sm">👤</span>
+              <span className="truncate">সাধারণ</span>
+            </div>
+            <span className="text-[7.5px] sm:text-[9px] text-slate-300 font-medium leading-none mt-1">সুযোগ</span>
           </button>
         </div>
 
         {/* Profile Avatar Wrapper (Enlarged) */}
         <div className="relative w-32 h-32 sm:w-36 sm:h-36 mx-auto mb-3 group">
           <div className={`w-full h-full rounded-full ring-4 ring-offset-4 p-1 shadow-2xl flex items-center justify-center overflow-hidden transition-all duration-300 ${
-            memberCategoryMeta.key === 'shareholder'
+            memberCategoryMeta.key === 'owner'
               ? 'ring-red-600 ring-offset-slate-950 bg-red-600/20 border-2 border-red-500 shadow-red-900/60'
-              : memberCategoryMeta.key === 'investor'
+              : memberCategoryMeta.key === 'shareholder'
               ? 'ring-blue-600 ring-offset-slate-950 bg-blue-600/20 border-2 border-blue-500 shadow-blue-900/60'
-              : 'ring-emerald-400/60 ring-offset-emerald-950 bg-slate-900 border-2 border-slate-700'
+              : memberCategoryMeta.key === 'investor'
+              ? 'ring-emerald-500 ring-offset-slate-950 bg-emerald-600/20 border-2 border-emerald-400 shadow-emerald-900/60'
+              : 'ring-slate-400 ring-offset-slate-950 bg-slate-800/40 border-2 border-slate-600'
           }`}>
             {isCustomPic ? (
               <img 
@@ -814,17 +983,24 @@ export default function ProfileView({ user, onUpdate, onTriggerAdmin, appConfig 
           </div>
           
           {/* Verification Badge based on Member Tier */}
-          {memberCategoryMeta.key === 'shareholder' ? (
+          {memberCategoryMeta.key === 'owner' ? (
             <div 
               className="absolute bottom-1 right-1 w-8 h-8 bg-red-600 border-2 border-slate-950 rounded-full flex items-center justify-center text-white shadow-xl z-20"
-              title="শেয়ার হোল্ডার ভেরিফাইড (লাল টিক)"
+              title="ওনার ভেরিফাইড (লাল টিক)"
+            >
+              <Check className="w-4.5 h-4.5 stroke-[3] text-white" />
+            </div>
+          ) : memberCategoryMeta.key === 'shareholder' ? (
+            <div 
+              className="absolute bottom-1 right-1 w-8 h-8 bg-blue-600 border-2 border-slate-950 rounded-full flex items-center justify-center text-white shadow-xl z-20"
+              title="শেয়ার হোল্ডার ভেরিফাইড (ব্লু টিক)"
             >
               <Check className="w-4.5 h-4.5 stroke-[3] text-white" />
             </div>
           ) : memberCategoryMeta.key === 'investor' ? (
             <div 
-              className="absolute bottom-1 right-1 w-8 h-8 bg-blue-600 border-2 border-slate-950 rounded-full flex items-center justify-center text-white shadow-xl z-20"
-              title="ইনভেস্টার ভেরিফাইড (ব্লু টিক)"
+              className="absolute bottom-1 right-1 w-8 h-8 bg-emerald-600 border-2 border-slate-950 rounded-full flex items-center justify-center text-white shadow-xl z-20"
+              title="ইনভেস্টার ভেরিফাইড (গ্রীন টিক)"
             >
               <Check className="w-4.5 h-4.5 stroke-[3] text-white" />
             </div>
@@ -833,7 +1009,7 @@ export default function ProfileView({ user, onUpdate, onTriggerAdmin, appConfig 
               type="button"
               onClick={() => fileInputRef.current?.click()}
               title="গ্যালারি থেকে ফটো নির্বাচন ও ক্রপ করুন"
-              className="absolute bottom-1 right-1 p-2 bg-emerald-600 hover:bg-emerald-500 border-2 border-emerald-950 rounded-full transition-all text-white cursor-pointer hover:scale-110 active:scale-95 shadow-lg flex items-center justify-center z-20"
+              className="absolute bottom-1 right-1 p-2 bg-slate-700 hover:bg-slate-600 border-2 border-slate-950 rounded-full transition-all text-white cursor-pointer hover:scale-110 active:scale-95 shadow-lg flex items-center justify-center z-20"
             >
               <Camera className="w-4 h-4" />
             </button>
@@ -842,18 +1018,20 @@ export default function ProfileView({ user, onUpdate, onTriggerAdmin, appConfig 
 
         {/* Line 1: [1. পদবী] -> [2. নাম] -> [3. একটিভ] */}
         <div className="flex items-center justify-center gap-1.5 sm:gap-2 flex-wrap mb-1.5">
-          {/* 1. পদবী (শেয়ার হোল্ডার / ইনভেস্টার / সাধারণ সদস্য) */}
+          {/* 1. পদবী (ওনার / শেয়ার হোল্ডার / ইনভেস্টার / সাধারণ সদস্য) */}
           <span 
             className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-black shadow-md border ${
-              memberCategoryMeta.key === 'shareholder'
+              memberCategoryMeta.key === 'owner'
                 ? 'bg-red-600 text-white border-red-400 shadow-red-950/50'
-                : memberCategoryMeta.key === 'investor'
+                : memberCategoryMeta.key === 'shareholder'
                 ? 'bg-blue-600 text-white border-blue-400 shadow-blue-950/50'
+                : memberCategoryMeta.key === 'investor'
+                ? 'bg-emerald-600 text-white border-emerald-400 shadow-emerald-950/50'
                 : 'bg-slate-700/90 text-slate-200 border-slate-600'
             }`}
             title={memberCategoryMeta.titleBn}
           >
-            <span>{memberCategoryMeta.key === 'shareholder' ? '👑' : memberCategoryMeta.key === 'investor' ? '💎' : '👤'}</span>
+            <span>{memberCategoryMeta.key === 'owner' ? '🔴' : memberCategoryMeta.key === 'shareholder' ? '🔵' : memberCategoryMeta.key === 'investor' ? '🟢' : '⚪'}</span>
             <span>{memberCategoryMeta.shortLabel || memberCategoryMeta.badgeBn}</span>
           </span>
 
@@ -1877,7 +2055,7 @@ export default function ProfileView({ user, onUpdate, onTriggerAdmin, appConfig 
               </div>
             </div>
 
-            {/* Card 7: Nominee Details */}
+            {/* Card 7: Nominee Summary & Shortcut */}
             <div className="p-3 bg-slate-50 hover:bg-slate-100/70 rounded-2xl border border-slate-200/80 transition space-y-2 flex flex-col justify-between">
               <div>
                 <div className="flex items-center justify-between gap-1 mb-1">
@@ -1885,31 +2063,30 @@ export default function ProfileView({ user, onUpdate, onTriggerAdmin, appConfig 
                     <div className="w-6 h-6 rounded-lg bg-pink-50 text-pink-700 flex items-center justify-center font-bold text-xs">
                       <UserIcon className="w-3.5 h-3.5" />
                     </div>
-                    <span className="text-[10px] text-slate-400 font-bold">মনোনীত নমিনি (Nominee)</span>
+                    <span className="text-[10px] text-slate-400 font-bold">মনোনীত প্রধান নমিনি</span>
                   </div>
-                  {user.nomineePhone && (
-                    <button onClick={() => handleCopy(user.nomineePhone || '', 'নমিনি ফোন')} className="p-1 hover:bg-slate-200 text-slate-400 hover:text-slate-600 rounded-md cursor-pointer" title="নমিনি ফোন কপি">
-                      <Copy className="w-3 h-3" />
-                    </button>
-                  )}
+                  <button onClick={handleOpenAddNomineeModal} className="text-[9.5px] font-bold text-pink-600 hover:underline cursor-pointer">
+                    + নমিনি ম্যানেজ
+                  </button>
                 </div>
                 <div className="grid grid-cols-2 gap-2 text-xs">
                   <div>
                     <span className="text-[9.5px] text-slate-400 font-medium block">নমিনির নামঃ</span>
                     <strong className="text-slate-800 font-bold block truncate">
-                      {user.nomineeName || '(নেই)'}
+                      {user.nomineeName || getNormalizedNominees()[0]?.name || '(নেই)'}
                     </strong>
                   </div>
                   <div>
                     <span className="text-[9.5px] text-slate-400 font-medium block">নমিনির ফোনঃ</span>
                     <strong className="text-slate-800 font-mono font-bold block truncate">
-                      {user.nomineePhone ? maskSecretPhone(user.nomineePhone) : '(নেই)'}
+                      {(user.nomineePhone || getNormalizedNominees()[0]?.phone) ? maskSecretPhone(user.nomineePhone || getNormalizedNominees()[0]?.phone) : '(নেই)'}
                     </strong>
                   </div>
                 </div>
               </div>
-              <div className="text-[9.5px] text-slate-400 pt-1 border-t border-slate-200/60">
-                উত্তরাধিকার ও অ্যাকাউন্টের মনোনীত নমিনি তথ্য
+              <div className="text-[9.5px] text-slate-400 pt-1 border-t border-slate-200/60 flex items-center justify-between">
+                <span>মোট রেজিস্টার্ড নমিনি: {getNormalizedNominees().length} জন</span>
+                <span className="font-bold text-emerald-600">বাধ্যতামূলক: {memberCategoryMeta.requiredNominees || 1} জন</span>
               </div>
             </div>
 
@@ -1955,20 +2132,312 @@ export default function ProfileView({ user, onUpdate, onTriggerAdmin, appConfig 
             </div>
           )}
 
-          {/* Member Category 3-Tier Explanation Card */}
-          <div className="p-3 bg-gradient-to-r from-slate-50 to-emerald-50/40 rounded-2xl border border-slate-200/80 space-y-1.5">
-            <div className="flex items-center justify-between">
-              <span className="text-[9.5px] font-black text-slate-600 uppercase tracking-wider flex items-center gap-1">
-                <Crown className="w-3.5 h-3.5 text-amber-500" />
-                সদস্য ক্যাটাগরি ও স্ট্যাটাস
-              </span>
-              <span className={`text-[9.5px] font-black px-2 py-0.5 rounded-lg ${memberCategoryMeta.tagColor}`}>
-                {memberCategoryMeta.titleBn}
+          {/* ========================================================================= */}
+          {/* DEDICATED NOMINEE MANAGEMENT SECTION */}
+          {/* ========================================================================= */}
+          {(() => {
+            const reqNominees = memberCategoryMeta.requiredNominees || (memberCategoryMeta.key === 'owner' || memberCategoryMeta.key === 'shareholder' ? 3 : (memberCategoryMeta.key === 'investor' ? 2 : 1));
+            const currentNominees = getNormalizedNominees();
+            const isFulfilled = currentNominees.length >= reqNominees;
+
+            return (
+              <div className="bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-950 text-white rounded-3xl p-4 sm:p-5 border border-indigo-500/40 shadow-xl space-y-3.5 text-left">
+                {/* Header Row */}
+                <div className="flex items-center justify-between gap-2 border-b border-indigo-800/60 pb-2.5 flex-wrap">
+                  <div className="flex items-center gap-2">
+                    <div className="w-8 h-8 rounded-xl bg-pink-500/20 text-pink-300 border border-pink-500/40 flex items-center justify-center font-bold">
+                      <Users className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <h3 className="text-xs sm:text-sm font-black text-white flex items-center gap-1.5">
+                        <span>মনোনীত নমিনি রেজিস্ট্রি ও তথ্য ব্যবস্থাপনা</span>
+                      </h3>
+                      <p className="text-[10px] text-indigo-200/80">সদস্যের ক্যাটাগরি অনুযায়ী প্রয়োজনীয় সকল নমিনির বিস্তারিত তালিকা</p>
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={handleOpenAddNomineeModal}
+                    className="px-3 py-1.5 bg-pink-600 hover:bg-pink-500 text-white text-xs font-bold rounded-xl transition cursor-pointer flex items-center gap-1 shadow-md shadow-pink-900/30 active:scale-95"
+                  >
+                    <Plus className="w-3.5 h-3.5 stroke-[3]" />
+                    <span>নতুন নমিনি যোগ</span>
+                  </button>
+                </div>
+
+                {/* Requirement Banner based on Category */}
+                <div className={`p-3 rounded-2xl border text-xs font-medium flex items-center justify-between gap-2 ${
+                  isFulfilled 
+                    ? 'bg-emerald-950/70 border-emerald-500/80 text-emerald-200' 
+                    : 'bg-amber-950/80 border-amber-500/80 text-amber-200'
+                }`}>
+                  <div className="flex items-center gap-2">
+                    <span className="text-base">{isFulfilled ? '✓' : '⚠️'}</span>
+                    <div>
+                      <strong className="block text-[11px] font-black">
+                        {memberCategoryMeta.badgeBn} ক্যাটাগরি: {reqNominees} জন নমিনির তথ্য বাধ্যতামূলক
+                      </strong>
+                      <span className="text-[10px] opacity-90">
+                        {isFulfilled
+                          ? `আপনার অ্যাকাউন্টে আবশ্যকীয় ${reqNominees} জন নমিনির তথ্য সফলভাবে নিবন্ধিত রয়েছে।`
+                          : `অনুগ্রহ করে আপনার অ্যাকাউন্টে বাধ্যতামূলক আরও ${reqNominees - currentNominees.length} জন নমিনির বিবরণ যোগ করুন।`}
+                      </span>
+                    </div>
+                  </div>
+                  <span className={`text-[10px] font-black px-2.5 py-1 rounded-full whitespace-nowrap ${
+                    isFulfilled ? 'bg-emerald-500 text-slate-950' : 'bg-amber-500 text-slate-950'
+                  }`}>
+                    {currentNominees.length} / {reqNominees} জন
+                  </span>
+                </div>
+
+                {/* Nominee List Cards Grid */}
+                {currentNominees.length > 0 ? (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
+                    {currentNominees.map((nom, idx) => (
+                      <div 
+                        key={nom.id || idx}
+                        className="bg-slate-900/90 border border-indigo-800/60 rounded-2xl p-3 space-y-2 flex flex-col justify-between hover:border-pink-500/50 transition group"
+                      >
+                        <div className="space-y-1.5">
+                          <div className="flex items-center justify-between">
+                            <span className="text-[10px] font-black bg-pink-950/80 text-pink-300 border border-pink-700/60 px-2 py-0.5 rounded-md flex items-center gap-1">
+                              <span>👤</span>
+                              <span>নমিনি #{idx + 1}</span>
+                            </span>
+                            <div className="flex items-center gap-1">
+                              <button
+                                type="button"
+                                onClick={() => handleOpenEditNomineeModal(nom, idx)}
+                                className="p-1 hover:bg-slate-800 text-indigo-300 hover:text-white rounded cursor-pointer"
+                                title="সম্পাদন করুন"
+                              >
+                                <Edit3 className="w-3.5 h-3.5" />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteNominee(idx)}
+                                className="p-1 hover:bg-rose-950 text-rose-400 hover:text-rose-200 rounded cursor-pointer"
+                                title="মুছে ফেলুন"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          </div>
+
+                          <div className="pt-1">
+                            <strong className="text-xs sm:text-sm font-black text-white block truncate">
+                              {nom.name}
+                            </strong>
+                            {nom.relation && (
+                              <span className="text-[10.5px] text-pink-300 font-bold block">
+                                সম্পর্ক: {nom.relation}
+                              </span>
+                            )}
+                          </div>
+
+                          <div className="space-y-0.5 text-[10.5px] font-mono text-indigo-200 pt-1 border-t border-indigo-900/60">
+                            <div>মোবাইল: <span className="font-bold text-white">{nom.phone ? maskSecretPhone(nom.phone) : '—'}</span></div>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-6 bg-slate-950/50 rounded-2xl border border-dashed border-indigo-900/60 space-y-2">
+                    <p className="text-xs text-indigo-300 font-bold">এখনো কোনো নমিনির তথ্য যুক্ত করা হয়নি</p>
+                    <p className="text-[10px] text-slate-400">আপনার ক্যাটাগরি অনুযায়ী বাধ্যতামূলক নমিনি তথ্য অন্তর্ভুক্ত করতে উপরের বাটনে চাপুন</p>
+                    <button
+                      type="button"
+                      onClick={handleOpenAddNomineeModal}
+                      className="px-3 py-1.5 bg-pink-600 hover:bg-pink-500 text-white text-xs font-bold rounded-xl transition cursor-pointer inline-flex items-center gap-1 shadow-md shadow-pink-900/30"
+                    >
+                      <Plus className="w-3.5 h-3.5 stroke-[3]" />
+                      <span>নমিনি তথ্য যুক্ত করুন</span>
+                    </button>
+                  </div>
+                )}
+              </div>
+            );
+          })()}
+
+          {/* ========================================================================= */}
+          {/* MEMBER CATEGORIES & PROFILE COLOR GUIDE (৪টি ক্যাটাগরি ও কালার গাইড) */}
+          {/* ========================================================================= */}
+          <div className="bg-white rounded-3xl p-4 sm:p-5 border border-slate-200 shadow-md space-y-3.5 text-left">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-2.5 flex-wrap gap-2">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-xl bg-amber-500/10 text-amber-600 border border-amber-500/30 flex items-center justify-center font-bold">
+                  <Crown className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="text-xs sm:text-sm font-black text-slate-900 flex items-center gap-1.5">
+                    <span>সদস্য ক্যাটাগরি ও প্রোফাইল কালার গাইড</span>
+                  </h3>
+                  <p className="text-[10px] text-slate-500 font-medium">নিচে ৪টি মেম্বারশিপ ক্যাটাগরি, কিস্তির পরিমাণ ও প্রোফাইল কালার তালিকা</p>
+                </div>
+              </div>
+
+              <span className={`text-[10.5px] font-black px-3 py-1 rounded-full border shadow-sm ${memberCategoryMeta.tagColor} ${memberCategoryMeta.borderColor}`}>
+                আপনার বর্তমান ক্যাটাগরিঃ {memberCategoryMeta.shortLabel}
               </span>
             </div>
-            <p className="text-[10.5px] text-slate-600 font-medium leading-relaxed">
-              {memberCategoryMeta.descBn}
-            </p>
+
+            {/* 4 Category Cards Grid */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+              {/* 1. ওনার (Owner) - Red */}
+              <div className={`p-3 rounded-2xl border transition-all ${
+                memberCategoryMeta.key === 'owner' 
+                  ? 'bg-rose-50/90 border-red-500 ring-2 ring-red-500/40 shadow-md' 
+                  : 'bg-slate-50/80 border-slate-200 opacity-90 hover:opacity-100'
+              }`}>
+                <div className="flex items-center justify-between mb-1.5">
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-base">🔴</span>
+                    <div>
+                      <h4 className="text-xs font-black text-red-700 flex items-center gap-1">
+                        <span>ওনার (Owner)</span>
+                        {memberCategoryMeta.key === 'owner' && (
+                          <span className="text-[9px] bg-red-600 text-white font-black px-1.5 py-0.2 rounded-full">বর্তমান</span>
+                        )}
+                      </h4>
+                      <span className="text-[9.5px] text-red-600 font-bold">প্রোফাইল কালারঃ লাল</span>
+                    </div>
+                  </div>
+                  <span className="text-[10px] font-black text-red-700 bg-red-100 px-2 py-0.5 rounded-lg border border-red-200">
+                    ৳৪,০০০/মাস
+                  </span>
+                </div>
+                <div className="space-y-1 text-[10px] text-slate-600 font-medium pt-1 border-t border-slate-200/80">
+                  <div className="flex justify-between">
+                    <span>• ৩ মাস পর পর কিস্তিঃ</span>
+                    <strong className="text-red-700 font-bold">৳১০,০০০</strong>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>• বাধ্যতামূলক নমিনিঃ</span>
+                    <strong className="text-slate-800 font-bold">৩ জন</strong>
+                  </div>
+                  <p className="text-[9.5px] text-slate-500 pt-0.5 leading-tight">
+                    সকল প্রিমিয়াম সুবিধা ও সর্বোচ্চ সমবায় অংশীদারিত্ব।
+                  </p>
+                </div>
+              </div>
+
+              {/* 2. শেয়ার হোল্ডার (Share Holder) - Blue */}
+              <div className={`p-3 rounded-2xl border transition-all ${
+                memberCategoryMeta.key === 'shareholder' 
+                  ? 'bg-blue-50/90 border-blue-500 ring-2 ring-blue-500/40 shadow-md' 
+                  : 'bg-slate-50/80 border-slate-200 opacity-90 hover:opacity-100'
+              }`}>
+                <div className="flex items-center justify-between mb-1.5">
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-base">🔵</span>
+                    <div>
+                      <h4 className="text-xs font-black text-blue-700 flex items-center gap-1">
+                        <span>শেয়ার হোল্ডার</span>
+                        {memberCategoryMeta.key === 'shareholder' && (
+                          <span className="text-[9px] bg-blue-600 text-white font-black px-1.5 py-0.2 rounded-full">বর্তমান</span>
+                        )}
+                      </h4>
+                      <span className="text-[9.5px] text-blue-600 font-bold">প্রোফাইল কালারঃ নীল</span>
+                    </div>
+                  </div>
+                  <span className="text-[10px] font-black text-blue-700 bg-blue-100 px-2 py-0.5 rounded-lg border border-blue-200">
+                    ৳২,০০০/মাস
+                  </span>
+                </div>
+                <div className="space-y-1 text-[10px] text-slate-600 font-medium pt-1 border-t border-slate-200/80">
+                  <div className="flex justify-between">
+                    <span>• ৩ মাস পর পর কিস্তিঃ</span>
+                    <strong className="text-blue-700 font-bold">৳৫,০০০</strong>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>• বাধ্যতামূলক নমিনিঃ</span>
+                    <strong className="text-slate-800 font-bold">৩ জন</strong>
+                  </div>
+                  <p className="text-[9.5px] text-slate-500 pt-0.5 leading-tight">
+                    সমিতির নিয়মিত শেয়ার হোল্ডার মেম্বারশিপ ও সঞ্চয় সুবিধা।
+                  </p>
+                </div>
+              </div>
+
+              {/* 3. ইনভেস্টর (Investor) - Green */}
+              <div className={`p-3 rounded-2xl border transition-all ${
+                memberCategoryMeta.key === 'investor' 
+                  ? 'bg-emerald-50/90 border-emerald-500 ring-2 ring-emerald-500/40 shadow-md' 
+                  : 'bg-slate-50/80 border-slate-200 opacity-90 hover:opacity-100'
+              }`}>
+                <div className="flex items-center justify-between mb-1.5">
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-base">🟢</span>
+                    <div>
+                      <h4 className="text-xs font-black text-emerald-700 flex items-center gap-1">
+                        <span>ইনভেস্টর</span>
+                        {memberCategoryMeta.key === 'investor' && (
+                          <span className="text-[9px] bg-emerald-600 text-white font-black px-1.5 py-0.2 rounded-full">বর্তমান</span>
+                        )}
+                      </h4>
+                      <span className="text-[9.5px] text-emerald-600 font-bold">প্রোফাইল কালারঃ সবুজ</span>
+                    </div>
+                  </div>
+                  <span className="text-[10px] font-black text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-lg border border-emerald-200">
+                    ৳১,০০০/মাস
+                  </span>
+                </div>
+                <div className="space-y-1 text-[10px] text-slate-600 font-medium pt-1 border-t border-slate-200/80">
+                  <div className="flex justify-between">
+                    <span>• ৩ মাস পর পর কিস্তিঃ</span>
+                    <strong className="text-emerald-700 font-bold">কোনো ফি নেই (৳০)</strong>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>• বাধ্যতামূলক নমিনিঃ</span>
+                    <strong className="text-slate-800 font-bold">২ জন</strong>
+                  </div>
+                  <p className="text-[9.5px] text-slate-500 pt-0.5 leading-tight">
+                    নির্ধারিত ১,০০০ টাকা মাসিক কিস্তি ব্যতিরেকে কোনো অতিরিক্ত টাকা দিতে হবে না।
+                  </p>
+                </div>
+              </div>
+
+              {/* 4. সাধারণ সদস্য (General) - Silver */}
+              <div className={`p-3 rounded-2xl border transition-all ${
+                memberCategoryMeta.key === 'regular' 
+                  ? 'bg-slate-100/90 border-slate-400 ring-2 ring-slate-400/40 shadow-md' 
+                  : 'bg-slate-50/80 border-slate-200 opacity-90 hover:opacity-100'
+              }`}>
+                <div className="flex items-center justify-between mb-1.5">
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-base">⚪</span>
+                    <div>
+                      <h4 className="text-xs font-black text-slate-800 flex items-center gap-1">
+                        <span>সাধারণ সদস্য</span>
+                        {memberCategoryMeta.key === 'regular' && (
+                          <span className="text-[9px] bg-slate-700 text-white font-black px-1.5 py-0.2 rounded-full">বর্তমান</span>
+                        )}
+                      </h4>
+                      <span className="text-[9.5px] text-slate-600 font-bold">প্রোফাইল কালারঃ সিলভার/ডার্ক</span>
+                    </div>
+                  </div>
+                  <span className="text-[10px] font-black text-slate-700 bg-slate-200 px-2 py-0.5 rounded-lg border border-slate-300">
+                    সাধারণ ব্যবহারকারী
+                  </span>
+                </div>
+                <div className="space-y-1 text-[10px] text-slate-600 font-medium pt-1 border-t border-slate-200/80">
+                  <div className="flex justify-between">
+                    <span>• ৩ মাস পর পর কিস্তিঃ</span>
+                    <strong className="text-slate-700 font-bold">প্রযোজ্য নয়</strong>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>• বাধ্যতামূলক নমিনিঃ</span>
+                    <strong className="text-slate-800 font-bold">১ জন</strong>
+                  </div>
+                  <p className="text-[9.5px] text-slate-500 pt-0.5 leading-tight">
+                    অ্যাপস ব্যবহার ও লেনদেন করতে পারবেন (সমিতি সেকশন সীমিত)।
+                  </p>
+                </div>
+              </div>
+            </div>
           </div>
 
           {/* Admin panel gate for admins only */}
@@ -2352,6 +2821,111 @@ export default function ProfileView({ user, onUpdate, onTriggerAdmin, appConfig 
                       <>
                         <Send className="w-3.5 h-3.5" />
                         <span>আবেদন সাবমিট করুন</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* 👥 Add / Edit Nominee Modal */}
+      <AnimatePresence>
+        {showNomineeModal && (
+          <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 text-left">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="bg-white rounded-3xl max-w-md w-full p-5 shadow-2xl border border-pink-200 overflow-hidden space-y-4"
+            >
+              <div className="flex items-center justify-between pb-3 border-b border-pink-100">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-9 h-9 rounded-2xl bg-pink-50 border border-pink-200 text-pink-600 flex items-center justify-center font-bold">
+                    <Users className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-black text-slate-900">
+                      {editingNomineeIndex !== null ? 'মনোনীত নমিনি তথ্য সংশোধন' : 'নতুন নমিনির তথ্য যোগ'}
+                    </h3>
+                    <p className="text-[10px] text-slate-500 font-medium">উত্তরাধিকার নমিনির নাম, মোবাইল নম্বর ও সম্পর্ক তথ্য দিন</p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowNomineeModal(false)}
+                  className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-full cursor-pointer"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              <form onSubmit={handleSaveNomineeModal} className="space-y-3 text-xs">
+                <div>
+                  <label className="block text-[10.5px] font-bold text-slate-700 mb-1">
+                    নমিনির পূর্ণ নাম <span className="text-rose-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={nomFormName}
+                    onChange={(e) => setNomFormName(e.target.value)}
+                    placeholder="নমিনির নাম লিখুন"
+                    className="w-full text-xs p-2.5 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-pink-500"
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-2.5">
+                  <div>
+                    <label className="block text-[10.5px] font-bold text-slate-700 mb-1">
+                      সম্পর্ক (স্ত্রী, সন্তান, পিতা)*
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={nomFormRel}
+                      onChange={(e) => setNomFormRel(e.target.value)}
+                      placeholder="যেমন: স্ত্রী"
+                      className="w-full text-xs p-2.5 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-pink-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[10.5px] font-bold text-slate-700 mb-1">
+                      মোবাইল নম্বর*
+                    </label>
+                    <input
+                      type="tel"
+                      required
+                      value={nomFormPhone}
+                      onChange={(e) => setNomFormPhone(e.target.value)}
+                      placeholder="01XXXXXXXXX"
+                      className="w-full text-xs p-2.5 bg-slate-50 border border-slate-200 rounded-xl font-mono font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-pink-500"
+                    />
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2 pt-2 border-t border-slate-100">
+                  <button
+                    type="button"
+                    onClick={() => setShowNomineeModal(false)}
+                    className="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl text-xs transition cursor-pointer text-center"
+                  >
+                    বাতিল
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={savingNominees}
+                    className="flex-1 py-2.5 bg-pink-600 hover:bg-pink-700 text-white font-black rounded-xl text-xs transition cursor-pointer flex items-center justify-center gap-1.5 shadow-md shadow-pink-900/20"
+                  >
+                    {savingNominees ? (
+                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    ) : (
+                      <>
+                        <Check className="w-4 h-4 stroke-[3]" />
+                        <span>ডাটা সেভ করুন</span>
                       </>
                     )}
                   </button>

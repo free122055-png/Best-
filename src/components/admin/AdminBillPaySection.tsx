@@ -62,8 +62,6 @@ export default function AdminBillPaySection({
   requestConfirm = async (title, msg) => window.confirm(`${title}\n${msg}`),
   isMasterAdmin = true
 }: AdminBillPaySectionProps) {
-  if (adminTab !== 'bill_pay_admin') return null;
-
   const [activeSubTab, setActiveSubTab] = useState<'requests' | 'archive' | 'settings'>('requests');
   const [searchQuery, setSearchQuery] = useState('');
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
@@ -287,6 +285,8 @@ export default function AdminBillPaySection({
     return { icon: Receipt, color: 'bg-slate-100 text-slate-800 border-slate-300', label: 'ইউটিলিটি বিল' };
   };
 
+  if (adminTab !== 'bill_pay_admin') return null;
+
   return (
     <div className="w-full text-left space-y-4 animate-fade-in text-slate-800" id="admin-bill-pay-section">
       {/* 1. Header Navigation Bar */}
@@ -309,7 +309,7 @@ export default function AdminBillPaySection({
                 <Receipt className="w-4 h-4" />
               </span>
               <h1 className="text-base sm:text-lg font-black tracking-tight text-white">
-                AMB বিল পে এডমিন কন্ট্রোল প্যানেল
+                BNB বিল পে এডমিন কন্ট্রোল প্যানেল
               </h1>
             </div>
             <p className="text-xs text-purple-200 font-medium mt-0.5">

@@ -25,14 +25,14 @@ import { User, Transaction, Notice, Offer, BapReport, BapGroup, BapAdminRequest,
 import { normalizeMemberId, formatBanglaAmount, normalizePhoneNumber, findUserInFirestoreByPhone, getNextSequentialMemberId, deleteUserCompletelyFromDatabase, convertBengaliToEnglishDigits } from '../../lib/memberUtils';
 import { sortTransactionsNewestFirst, getTxTime } from '../../lib/transactionUtils';
 import { saveAppConfig, DEFAULT_QARD_CONFIG } from '../../lib/config';
-import { AMBLogo } from '../AMBLogo';
+import { BNBLogo } from '../BNBLogo';
 import { HeaderPendingModal } from '../HeaderPendingModal';
 import SamityScreen from '../SamityScreen';
 import UnifiedBackButton from '../UnifiedBackButton';
 import SamityAdmin from '../SamityAdmin';
 import SafiPremiumShop from '../SafiPremiumShop';
 import TelecomAdmin from '../TelecomAdmin';
-import AmbSalaryAdmin from '../AmbSalaryAdmin';
+import BNBSalaryAdmin from '../BNBSalaryAdmin';
 import { HistoryRetentionSettings } from '../HistoryRetentionSettings';
 import { runWalletEndToEndTests, TestResultItem } from '../../lib/walletTests';
 import { 
@@ -301,10 +301,10 @@ export function AdminAgentSection(props: any) {
             <div className="bg-slate-50 border border-slate-200/80 p-6 rounded-3xl">
               <div className="border-b border-slate-200/80 pb-4 mb-5">
                 <h2 className="text-base sm:text-lg font-black text-emerald-450 flex items-center gap-2">
-                  💼 AMB কো-অপারেティブ ক্যারিয়ার ও এজেন্ট রিক্রুটিং সেল
+                  💼 BNB কো-অপারেティブ ক্যারিয়ার ও এজেন্ট রিক্রুটিং সেল
                 </h2>
                 <p className="text-xs text-slate-450 mt-1 font-semibold leading-relaxed">
-                  এখানে সারা বাংলাদেশ ও বিশ্বজুড়ে সমবায় সদস্যদের সাবমিট করা AMB এজেন্ট পার্টনারশিপ আবেদনগুলো অনুমোদন করতে পারবেন এবং সরাসরি নতুন এজেন্টদের পজিশন সেট ও ডিলিট করতে পারবেন।
+                  এখানে সারা বাংলাদেশ ও বিশ্বজুড়ে সমবায় সদস্যদের সাবমিট করা BNB এজেন্ট পার্টনারশিপ আবেদনগুলো অনুমোদন করতে পারবেন এবং সরাসরি নতুন এজেন্টদের পজিশন সেট ও ডিলিট করতে পারবেন।
                 </p>
               </div>
 
@@ -488,6 +488,13 @@ export function AdminAgentSection(props: any) {
                                     <span>📍</span> 
                                     <strong className="text-slate-500">এলাকা ও জেলাঃ</strong> 
                                     <span className="text-slate-900 font-extrabold">{req.area || 'N/A'}, {req.district || 'N/A'}</span>
+                                  </p>
+                                  <p className="flex items-center gap-1.5 col-span-1 md:col-span-2">
+                                    <span>🏪</span> 
+                                    <strong className="text-slate-500">লিখিত লোকেশনঃ</strong> 
+                                    <span className="text-emerald-800 font-black bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-200">
+                                      {req.shopMapLink || 'দেওয়া হয়নি'}
+                                    </span>
                                   </p>
                                   <p className="flex items-center gap-1.5 col-span-1 md:col-span-2">
                                     <span>🛰️</span> 

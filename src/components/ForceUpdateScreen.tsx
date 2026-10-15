@@ -2,7 +2,7 @@ import React from 'react';
 import { motion } from 'motion/react';
 import { Download, ShieldCheck, Rocket, Star, ShieldAlert, Lock } from 'lucide-react';
 import { AppConfig, User } from '../types';
-import { AMBLogo } from './AMBLogo';
+import { BNBLogo } from './BNBLogo';
 
 interface ForceUpdateScreenProps {
   appConfig: AppConfig;
@@ -37,12 +37,12 @@ export default function ForceUpdateScreen({ appConfig, currentUser, onBypassAdmi
             {appConfig.logoUrl ? (
               <img 
                 src={appConfig.logoUrl} 
-                alt="AMB Logo" 
+                alt="BNB Logo" 
                 className="h-12 w-auto object-contain drop-shadow-[0_0_15px_rgba(212,175,55,0.3)]"
                 referrerPolicy="no-referrer"
               />
             ) : (
-              <AMBLogo className="h-12 w-auto drop-shadow-[0_0_15px_rgba(212,175,55,0.3)]" />
+              <BNBLogo className="h-12 w-auto drop-shadow-[0_0_15px_rgba(212,175,55,0.3)]" />
             )}
           </div>
         ) : (
@@ -50,18 +50,18 @@ export default function ForceUpdateScreen({ appConfig, currentUser, onBypassAdmi
             {appConfig.logoUrl ? (
               <img 
                 src={appConfig.logoUrl} 
-                alt="AMB Logo" 
+                alt="BNB Logo" 
                 className="h-12 w-auto object-contain drop-shadow-[0_0_15px_rgba(212,175,55,0.3)]"
                 referrerPolicy="no-referrer"
               />
             ) : (
-              <AMBLogo className="h-12 w-auto drop-shadow-[0_0_15px_rgba(212,175,55,0.3)]" />
+              <BNBLogo className="h-12 w-auto drop-shadow-[0_0_15px_rgba(212,175,55,0.3)]" />
             )}
           </div>
         )}
 
         <h2 className="text-white text-xs font-black tracking-[0.2em] uppercase mt-2 font-sans">
-          AMB BUSINESS
+          BNB BUSINESS
         </h2>
         <p className="text-slate-400 text-[9.5px] font-semibold tracking-wider -mt-0.5">
           Network Bangladesh
@@ -78,7 +78,7 @@ export default function ForceUpdateScreen({ appConfig, currentUser, onBypassAdmi
             {appConfig.updateTitle || 'নতুন সংস্করণ উপলব্ধ!'}
           </h1>
           <p className="text-[10.5px] text-slate-400 font-bold max-w-xs mx-auto leading-normal">
-            {appConfig.updateDescription || 'AMB BUSINESS Network Bangladesh-এর নতুন আপডেট প্রকাশিত হয়েছে।'}
+            {appConfig.updateDescription || 'BNB BUSINESS Network Bangladesh-এর নতুন আপডেট প্রকাশিত হয়েছে।'}
           </p>
         </div>
 

@@ -78,9 +78,9 @@ import {
   Briefcase
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { AMBLogo } from '../AMBLogo';
+import { BNBLogo } from '../BNBLogo';
 import SafeDealsEscrowView from '../SafeDealsEscrowView';
-import AMBTelecomScreen from '../AMBTelecomScreen';
+import BNBTelecomScreen from '../BNBTelecomScreen';
 import SamityScreen from '../SamityScreen';
 import SamityRequestForm from '../SamityRequestForm';
 import QardScreen from '../QardScreen';
@@ -89,15 +89,15 @@ import { QardLiveTicker } from '../QardLiveTicker';
 import ProfileView from '../ProfileView';
 import { formatBanglaAmount, hasCompletedSamityProfile } from '../../lib/memberUtils';
 import MoneyExchangeModule from '../MoneyExchangeModule';
-import { AmbMobileBankingPortal } from '../AmbMobileBankingPortal';
+import { BNBMobileBankingPortal } from '../BNBMobileBankingPortal';
 import RationCardView from '../RationCardView';
-import AmbAutoSalaryPay from '../AmbAutoSalaryPay';
-import AmbEducationCenter from '../AmbEducationCenter';
+import BNBAutoSalaryPay from '../BNBAutoSalaryPay';
+import BNBEducationCenter from '../BNBEducationCenter';
 import SmartExchange from '../SmartExchange';
 import SafiPremiumShop from '../SafiPremiumShop';
-import AmbCorporateGuide from '../AmbCorporateGuide';
-import AmbBillPayScreen from '../AmbBillPayScreen';
-import AmbAutoRechargeScreen from '../AmbAutoRechargeScreen';
+import BNBCorporateGuide from '../BNBCorporateGuide';
+import BNBBillPayScreen from '../BNBBillPayScreen';
+import BNBAutoRechargeScreen from '../BNBAutoRechargeScreen';
 import { useBackHandler } from '../../lib/navigationManager';
 
 const cleanDescription = (desc: string, status?: string): string => {
@@ -290,12 +290,19 @@ const {
               
                 {modalType === 'samity' && (
                   <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-50 w-full h-full min-h-screen font-sans">
-                    {(
-                      (liveUser.role === 'admin' || liveUser.role === 'sub_admin') ||
-                      liveUser.samityStatus === 'approved' ||
-                      liveUser.samityApproved === true ||
-                      liveUser.isSamityMember === true ||
-                      hasCompletedSamityProfile(liveUser)
+                    {liveUser.memberCategory === 'regular' ? (
+                      <div className="p-6 text-center mt-20">
+                        <p className="text-sm font-bold text-slate-600">দুঃখিত, সাধারণ সদস্যরা এই সেকশনে প্রবেশের অনুমতি নেই।</p>
+                        <button onClick={() => setModalType(null)} className="mt-4 px-4 py-2 bg-slate-200 rounded-lg">ফিরে যান</button>
+                      </div>
+                    ) : (
+                      (
+                        (liveUser.role === 'admin' || liveUser.role === 'sub_admin') ||
+                        liveUser.samityStatus === 'approved' ||
+                        liveUser.samityApproved === true ||
+                        liveUser.isSamityMember === true ||
+                        hasCompletedSamityProfile(liveUser)
+                      )
                     ) ? (
                       <SamityScreen
                         user={liveUser}
@@ -509,7 +516,7 @@ const {
                 )}
                 {modalType === 'telecom' && (
                   <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-50 w-full h-full min-h-screen font-sans">
-                    <AMBTelecomScreen
+                    <BNBTelecomScreen
                       user={liveUser}
                       allOffers={allOffers}
                       onBack={() => setModalType(null)}
@@ -554,6 +561,47 @@ const {
                     />
                   </div>
                 )}
+                {(modalType === 'deposit' || (modalType as any) === 'add_money') && (
+                  <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/90 backdrop-blur-md w-full h-full min-h-screen font-sans flex items-center justify-center p-2 sm:p-4 animate-fade-in">
+                    <div className="bg-slate-950 border border-emerald-500/30 rounded-3xl max-w-lg w-full overflow-hidden shadow-2xl relative text-white">
+                      <header className="bg-slate-900 border-b border-white/10 px-4 py-3.5 flex items-center justify-between sticky top-0 z-40 backdrop-blur-md">
+                        <div className="flex items-center gap-3">
+                          <button 
+                            type="button"
+                            onClick={() => setModalType(null)}
+                            className="p-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-white transition-all cursor-pointer flex items-center justify-center"
+                          >
+                            <ChevronLeft className="w-5 h-5" />
+                          </button>
+                          <div>
+                            <h1 className="text-sm font-black flex items-center gap-1.5 text-white font-sans">
+                              <span className="text-emerald-400">💳</span>
+                              BNB এড মানি (অনলাইন পেমেন্ট গেটওয়ে)
+                            </h1>
+                            <p className="text-[9.5px] text-emerald-400 font-mono font-bold">
+                              ১ সেকেন্ডে ১০০% অটোমেটিক ওয়ালেট রিচার্জ
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-1.5 bg-emerald-500/10 border border-emerald-500/30 px-3 py-1 rounded-xl">
+                          <span className="text-[9px] text-emerald-300 font-bold uppercase">বর্তমান ব্যালেন্স:</span>
+                          <strong className="text-xs font-black text-white font-mono">৳ {(liveUser.balance || 0).toLocaleString('bn-BD')}</strong>
+                        </div>
+                      </header>
+
+                      <div className="p-3 sm:p-5 w-full flex-1">
+                        <BNBMobileBankingPortal 
+                          user={liveUser}
+                          onClose={() => setModalType(null)}
+                          syncLiveProfile={syncLiveProfile}
+                          appConfig={appConfig}
+                          initialTab="auto_add_money"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )}
                 {modalType === 'bank' && (
                   <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-50 w-full h-full min-h-screen font-sans">
                     <div className="bg-slate-50 min-h-screen flex flex-col relative text-slate-800">
@@ -585,11 +633,12 @@ const {
                       </header>
 
                       <div className="p-2 md:p-6 w-full flex-1 pb-16">
-                        <AmbMobileBankingPortal 
+                        <BNBMobileBankingPortal 
                           user={liveUser}
                           onClose={() => setModalType(null)}
                           syncLiveProfile={syncLiveProfile}
                           appConfig={appConfig}
+                          initialTab="auto_add_money"
                         />
                       </div>
                     </div>
@@ -1320,7 +1369,7 @@ const {
 
                 {modalType === 'bill_pay' && (
                   <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-50 w-full h-full min-h-screen font-sans">
-                    <AmbBillPayScreen
+                    <BNBBillPayScreen
                       user={liveUser}
                       onBack={() => setModalType(null)}
                       syncLiveProfile={syncLiveProfile}
@@ -1331,7 +1380,7 @@ const {
 
                 {modalType === 'salary' && (
                   <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-50 w-full h-full min-h-screen font-sans">
-                    <AmbAutoSalaryPay
+                    <BNBAutoSalaryPay
                       user={liveUser}
                       onBack={() => setModalType(null)}
                       syncLiveProfile={syncLiveProfile}
@@ -1342,7 +1391,7 @@ const {
 
                 {modalType === 'auto_recharge' && (
                   <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-50 w-full h-full min-h-screen font-sans">
-                    <AmbAutoRechargeScreen
+                    <BNBAutoRechargeScreen
                       user={liveUser}
                       onBack={() => setModalType(null)}
                       syncLiveProfile={syncLiveProfile}
@@ -1353,7 +1402,7 @@ const {
 
                 {modalType === 'edu' && (
                   <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-50 w-full h-full min-h-screen font-sans">
-                    <AmbEducationCenter
+                    <BNBEducationCenter
                       user={liveUser}
                       onBack={() => setModalType(null)}
                       appConfig={appConfig}
@@ -1375,7 +1424,7 @@ const {
 
                 {modalType === 'about' && (
                   <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-50 w-full h-full min-h-screen font-sans">
-                    <AmbCorporateGuide
+                    <BNBCorporateGuide
                       user={liveUser}
                       onBack={() => setModalType(null)}
                       appConfig={appConfig}

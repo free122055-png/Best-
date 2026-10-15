@@ -1,0 +1,400 @@
+import React, { useState, useEffect, useRef } from 'react';
+import html2canvas from 'html2canvas';
+import { motion, AnimatePresence } from 'motion/react';
+import UnifiedBackButton from './UnifiedBackButton';
+import { 
+  CreditCard, 
+  HelpCircle, 
+  ShoppingBag, 
+  Check, 
+  CheckCircle, 
+  X, 
+  XCircle, 
+  ChevronRight, 
+  User, 
+  Users,
+  Phone, 
+  ShieldCheck, 
+  AlertCircle, 
+  ArrowLeft, 
+  ArrowDown, 
+  Truck, 
+  AlertTriangle,
+  Search,
+  Filter,
+  DollarSign,
+  Calendar,
+  Clock,
+  MapPin,
+  Heart,
+  FileText,
+  LifeBuoy,
+  LogOut,
+  Info,
+  QrCode,
+  MessageCircle,
+  Send,
+  LayoutDashboard
+} from 'lucide-react';
+import { db } from '../lib/firebase';
+import { 
+  collection, 
+  addDoc, 
+  getDocs, 
+  doc, 
+  updateDoc, 
+  query, 
+  where, 
+  onSnapshot 
+} from 'firebase/firestore';
+import { User as UserType, Transaction } from '../types';
+import { useBackHandler } from '../lib/navigationManager';
+
+interface RationCardViewProps {
+  liveUser: UserType;
+  syncLiveProfile: () => Promise<void>;
+  appConfig?: any;
+  onClose: () => void;
+}
+
+interface RationItem {
+  id: string;
+  name: string;
+  qty: string;
+  price: number;
+  marketPrice: number;
+  emoji: string;
+  color: string;
+}
+
+const RationCardContainer = ({ children }: { children: React.ReactNode }) => {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [scale, setScale] = useState(1);
+
+  useEffect(() => {
+    if (!containerRef.current) return;
+    const updateScale = () => {
+      if (containerRef.current) {
+        const width = containerRef.current.clientWidth;
+        // The card is designed to be 720px wide (16:9 ratio with 405px height)
+        const newScale = Math.min(1, width / 720);
+        setScale(newScale);
+      }
+    };
+    
+    // Initial scale computation
+    updateScale();
+    
+    let observer: ResizeObserver | null = null;
+    if (typeof ResizeObserver !== 'undefined') {
+      try {
+        observer = new ResizeObserver(() => {
+          updateScale();
+        });
+        if (containerRef.current) {
+          observer.observe(containerRef.current);
+        }
+      } catch (e) {
+        console.warn("ResizeObserver init error:", e);
+      }
+    }
+    
+    window.addEventListener('resize', updateScale);
+    return () => {
+      if (observer) observer.disconnect();
+      window.removeEventListener('resize', updateScale);
+    };
+  }, []);
+
+  return (
+    <div ref={containerRef} className="w-full flex justify-center items-center overflow-hidden py-1 select-none">
+      <div 
+        style={{ 
+          width: `${720 * scale}px`, 
+          height: `${405 * scale}px`, 
+          position: 'relative',
+          overflow: 'hidden',
+          flexShrink: 0,
+          transition: 'width 0.1s ease-out, height 0.1s ease-out'
+        }}
+      >
+        <div 
+          style={{ 
+            width: '720px', 
+            height: '405px',
+            transform: `scale(${scale})`,
+            transformOrigin: 'top left',
+            position: 'absolute',
+            top: 0,
+            left: 0
+          }}
+        >
+          {children}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+
+import RationApplicationForm from './RationApplicationForm';
+
+export const RationCardView = React.memo(function RationCardView({ liveUser, syncLiveProfile, appConfig, onClose }: RationCardViewProps) {
+
+  // Bengali translation helpers
+  const englishToBengali = (num: any) => {
+    if (num === undefined || num === null) return '0';
+    const numStr = num.toString();
+    const map: Record<string, string> = {
+      '0': '0', '1': '1', '2': '2', '3': '3', '4': '4',
+      '5': '5', '6': '6', '7': '7', '8': '8', '9': '9'
+    };
+    return numStr.split('').map((c: string) => map[c] || c).join('');
+  };
+
+  // Navigation active tab
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'card' | 'items' | 'order' | 'my_orders' | 'history' | 'profile' | 'support' | 'apply'>('dashboard');
+
+  // Ration Card internal back handler
+  useBackHandler(() => {
+    if (showCardImageModal) { setShowCardImageModal(false); return true; }
+    if (showCheckoutModal) { setShowCheckoutModal(false); return true; }
+    if (activeTab !== 'dashboard') {
+      setActiveTab('dashboard');
+      return true;
+    }
+    return false;
+  }, true, 25);
+
+  const handleBack = () => {
+    if (showCardImageModal) { setShowCardImageModal(false); return; }
+    if (showCheckoutModal) { setShowCheckoutModal(false); return; }
+    if (activeTab !== 'dashboard') {
+      setActiveTab('dashboard');
+    } else {
+      if (onClose) onClose();
+    }
+  };
+
+  const cardRef = useRef<HTMLDivElement>(null);
+
+  // Reusable 100% accurate visual representation of the Digital Ration Card
+  const renderBeautifulRationCard = (rcData: any, scaleClass = "") => {
+    const cNo = rcData?.cardNo || liveUser?.memberId || 'BNB00000000';
+    
+    const cardType = rcData?.cardType || previewCardType || 'black_white';
+    
+    // Mapping for 4 stages of cards
+    const isRed = cardType === 'red_white';
+    const isBlue = cardType === 'blue_white';
+    const isGreen = cardType === 'green_white';
+    const isBlack = cardType === 'black_white';
+
+    let mainColorHex = "#1E293B"; // Default Black/Slate
+    let borderHex = "#1E293B";
+    let bgGradientClass = "bg-white";
+    let labelBgHex = "#F3F4F6";
+    let textPrimaryClass = "text-slate-900 font-black";
+    let textSecondaryClass = "text-slate-500 font-bold";
+    let cardTypeLabelBn = appConfig?.rationCardConfigs?.black_white?.label || "রেগুলার হোয়াইট কার্ড";
+    let accentEmoji = "⚪";
+
+    if (isRed) {
+      mainColorHex = appConfig?.rationCardConfigs?.red_white?.colorHex || "#DC2626";
+      borderHex = mainColorHex;
+      labelBgHex = "#FEE2E2";
+      textPrimaryClass = "text-red-950 font-black";
+      textSecondaryClass = "text-red-700 font-bold";
+      cardTypeLabelBn = appConfig?.rationCardConfigs?.red_white?.label || "গোল্ডেন প্রিমিয়াম কার্ড";
+      accentEmoji = "👑";
+    } else if (isBlue) {
+      mainColorHex = appConfig?.rationCardConfigs?.blue_white?.colorHex || "#2563EB";
+      borderHex = mainColorHex;
+      labelBgHex = "#DBEAFE";
+      textPrimaryClass = "text-blue-950 font-black";
+      textSecondaryClass = "text-blue-700 font-bold";
+      cardTypeLabelBn = appConfig?.rationCardConfigs?.blue_white?.label || "গোল্ডেন কার্ড";
+      accentEmoji = "🎖️";
+    } else if (isGreen) {
+      mainColorHex = appConfig?.rationCardConfigs?.green_white?.colorHex || "#059669";
+      borderHex = mainColorHex;
+      labelBgHex = "#D1FAE5";
+      textPrimaryClass = "text-emerald-950 font-black";
+      textSecondaryClass = "text-emerald-700 font-bold";
+      cardTypeLabelBn = appConfig?.rationCardConfigs?.green_white?.label || "প্রিমিয়াম কার্ড";
+      accentEmoji = "✨";
+    } else if (isBlack) {
+      mainColorHex = appConfig?.rationCardConfigs?.black_white?.colorHex || "#1E293B";
+      borderHex = mainColorHex;
+      labelBgHex = "#F1F5F9";
+      textPrimaryClass = "text-slate-950 font-black";
+      textSecondaryClass = "text-slate-700 font-bold";
+      cardTypeLabelBn = appConfig?.rationCardConfigs?.black_white?.label || "রেগুলার কার্ড";
+      accentEmoji = "🥈";
+    }
+
+    const mainColorClean = mainColorHex.replace('#', '');
+    const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&color=${mainColorClean}&data=${encodeURIComponent(`https://businessnetworkbangladesh.com/verify-ration?id=${cNo}`)}`;
+    
+    return (
+      <RationCardContainer>
+        <div className="mb-4 flex justify-center gap-2 px-4 overflow-x-auto no-scrollbar">
+          {[
+            { id: 'red_white', label: appConfig?.rationCardConfigs?.red_white?.label || 'গোল্ডেন প্রিমিয়াম', color: 'bg-red-600' },
+            { id: 'blue_white', label: appConfig?.rationCardConfigs?.blue_white?.label || 'গোল্ডেন', color: 'bg-blue-600' },
+            { id: 'green_white', label: appConfig?.rationCardConfigs?.green_white?.label || 'প্রিমিয়াম', color: 'bg-emerald-600' },
+            { id: 'black_white', label: appConfig?.rationCardConfigs?.black_white?.label || 'রেগুলার', color: 'bg-slate-900' }
+          ].map((ct) => (
+            <button
+              key={ct.id}
+              onClick={() => setPreviewCardType(ct.id as any)}
+              className={`px-3 py-1.5 rounded-full text-[10px] font-black transition-all flex items-center gap-1.5 shrink-0 shadow-sm ${
+                (previewCardType === ct.id || (!previewCardType && ct.id === 'black_white'))
+                  ? 'bg-emerald-800 text-white scale-105 ring-2 ring-emerald-200' 
+                  : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'
+              }`}
+            >
+              <div className={`w-2 h-2 rounded-full ${ct.color}`} />
+              {ct.label}
+            </button>
+          ))}
+        </div>
+        <div 
+          ref={cardRef}
+          id="bnb-ration-card-canvas"
+          className={`w-[720px] h-[405px] text-zinc-900 rounded-[1.25rem] shadow-2xl overflow-hidden font-sans flex flex-col justify-between border-[6px] p-0 relative select-none bg-white ${scaleClass}`}
+          style={{ borderColor: borderHex }}
+        >
+        {/* Card Top Header */}
+        <div className="flex flex-row justify-between items-center gap-3 px-6 py-4 border-b border-slate-100/50 bg-white/95">
+          
+          {/* Left Side: Logo */}
+          <div className="flex items-center gap-3">
+            <div className="w-14 h-14 rounded-2xl flex items-center justify-center shadow-md shrink-0" style={{ backgroundColor: mainColorHex }}>
+              <svg className="w-10 h-10 text-white fill-white" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+                <path d="M 100 22 C 80 45 84 82 100 102 C 116 82 120 45 100 22 Z" fillRule="evenodd" />
+                <path d="M 91 100 C 62 92 42 70 45 42 C 62 36 82 58 91 100 Z" fillRule="evenodd" />
+                <path d="M 109 100 C 138 92 158 70 155 42 C 138 36 118 58 109 100 Z" fillRule="evenodd" />
+                <text x="100" y="126" textAnchor="middle" className="font-sans font-black text-[24px]" style={{ fontWeight: 955, fill: mainColorHex }}>BNB</text>
+              </svg>
+            </div>
+            <div className="text-left font-sans">
+              <h2 className="text-[28px] font-black leading-none tracking-tight" style={{ color: mainColorHex }}>BNB</h2>
+              <p className="text-[10px] text-zinc-500 font-extrabold tracking-[0.2em] leading-none mt-1 uppercase">Bangladesh</p>
+            </div>
+          </div>
+          
+          {/* Right Side: Title */}
+          <div className="text-right">
+            <div className="flex items-center justify-end gap-1.5 text-[22px] font-black tracking-tight leading-none" style={{ color: mainColorHex }}>
+              <span>RATION CARD</span>
+              <span className="text-xl">{accentEmoji}</span>
+            </div>
+            <p className="text-[10px] text-zinc-400 font-extrabold mt-1.5 uppercase tracking-wider">Digital Subscriber Membership</p>
+          </div>
+
+        </div>
+
+        {/* Central Content Area */}
+        <div className="grid grid-cols-12 gap-6 px-7 py-5 items-center flex-1">
+          
+          {/* Photo Frame */}
+          <div className="col-span-3 flex items-center justify-center">
+            <div className="w-[125px] h-[155px] border-2 rounded-[1.5rem] overflow-hidden flex flex-col items-center justify-center relative shadow-inner bg-slate-50 p-1" style={{ borderColor: `${mainColorHex}30` }}>
+              {rcData?.photoUrl || rcData?.photo || liveUser?.profilePic ? (
+                <img
+                  src={rcData?.photoUrl || rcData?.photo || liveUser?.profilePic}
+                  alt="Cardholder"
+                  referrerPolicy="no-referrer"
+                  className="w-full h-full object-cover rounded-[1.25rem]"
+                  onError={(e) => {
+                    (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=300';
+                  }}
+                />
+              ) : (
+                <div className="flex flex-col items-center justify-center opacity-20">
+                  <User className="w-16 h-16" style={{ color: mainColorHex }} />
+                </div>
+              )}
+              <div className="absolute bottom-1 px-3 py-1 rounded-full text-[9px] font-black text-white leading-none tracking-widest uppercase shadow-sm" style={{ backgroundColor: mainColorHex }}>
+                PHOTO
+              </div>
+            </div>
+          </div>
+
+          {/* User Info Fields */}
+          <div className="col-span-6 space-y-4 text-left">
+            
+            {/* Name Field */}
+            <div className="flex items-start gap-3">
+              <div className="w-8 h-8 rounded-full flex items-center justify-center text-white shrink-0 shadow-sm" style={{ backgroundColor: mainColorHex }}>
+                <User className="w-4.5 h-4.5" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-[10px] text-zinc-400 font-extrabold leading-none uppercase tracking-wider">Subscriber Name</p>
+                <p className={`text-[16px] tracking-tight leading-tight mt-1.5 uppercase truncate ${textPrimaryClass}`}>
+                  {rcData?.userName || rcData?.name || liveUser?.name || 'MEMBER NAME'}
+                </p>
+              </div>
+            </div>
+
+            {/* Phone Field */}
+            <div className="flex items-start gap-3">
+              <div className="w-8 h-8 rounded-full flex items-center justify-center text-white shrink-0 shadow-sm" style={{ backgroundColor: mainColorHex }}>
+                <Phone className="w-4.5 h-4.5" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-[10px] text-zinc-400 font-extrabold leading-none uppercase tracking-wider">Mobile Number</p>
+                <p className="text-[16px] font-mono font-black leading-tight mt-1.5" style={{ color: mainColorHex }}>
+                  {rcData?.phone || liveUser?.phone || '01XXXXXXXXX'}
+                </p>
+              </div>
+            </div>
+
+            {/* Address Field */}
+            <div className="flex items-start gap-3">
+              <div className="w-8 h-8 rounded-full flex items-center justify-center text-white shrink-0 shadow-sm" style={{ backgroundColor: mainColorHex }}>
+                <MapPin className="w-4.5 h-4.5" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-[10px] text-zinc-400 font-extrabold leading-none uppercase tracking-wider">Subscriber Address</p>
+                <div className={`text-[12px] font-bold leading-snug mt-1.5 max-w-[280px] line-clamp-2 ${textPrimaryClass}`}>
+                  {rcData?.address || (rcData?.village ? `${rcData.village}, ${rcData.upazila}, ${rcData.district}` : 'Address not specified')}
+                </div>
+              </div>
+            </div>
+
+          </div>
+
+          {/* Validation Block */}
+          <div className="col-span-3 flex flex-col items-center justify-center border-l border-slate-100 pl-4">
+            <div className="bg-white p-2 border-2 rounded-[1.75rem] shadow-sm relative overflow-hidden flex flex-col items-center shrink-0 w-32" style={{ borderColor: mainColorHex }}>
+              <div className="relative flex items-center justify-center mb-1.5">
+                <img 
+                  src={qrUrl} 
+                  alt="QR" 
+                  className="w-24 h-24"
+                />
+              </div>
+              <div className="text-white w-full text-[9px] font-black py-1 px-1 rounded-lg flex items-center justify-center gap-1 uppercase tracking-tighter" style={{ backgroundColor: mainColorHex }}>
+                <ShieldCheck className="w-3.5 h-3.5 text-emerald-300" />
+                <span>Verified ID</span>
+              </div>
+            </div>
+          </div>
+
+        </div>
+
+        {/* Footer Details Strip */}
+        <div className="grid grid-cols-4 gap-0 border-t border-slate-100 px-6 py-4 items-center bg-slate-50/50">
+          
+          <div className="border-r border-slate-200/60 pr-3">
+            <span className="text-[9px] text-zinc-400 block font-extrabold uppercase tracking-widest leading-none">Card ID No.</span>
+            <span className="text-[12px] font-mono font-black uppercase block tracking-tighter mt-1" style={{ color: mainColorHex }}>
+              {cNo}
+            </span>
+          </div>
+
+          <div className="border-r border-slate-200/60 px-3">
+            <span className="text-[9px] text-zinc-400 block font-extrabold uppercase tracking-widest leading-none">Issue Date</span>
+            <span className="text-[12px] font-mono font-black text-slate-800 block mt-1">

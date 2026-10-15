@@ -3,8 +3,8 @@ import { motion, AnimatePresence } from 'motion/react';
 import { User, Transaction, AppConfig } from '../types';
 import { db } from '../lib/firebase';
 import { DEFAULT_QARD_CONFIG } from '../lib/config';
-import { hasCompletedSamityProfile, getMissingProfileFields } from '../lib/memberUtils';
-import AmbPaymentReceiptModal from './AmbPaymentReceiptModal';
+import { hasCompletedSamityProfile, getMissingProfileFields, getMembershipCategory } from '../lib/memberUtils';
+import BNBPaymentReceiptModal from './BNBPaymentReceiptModal';
 import UnifiedBackButton from './UnifiedBackButton';
 import { useBackHandler } from '../lib/navigationManager';
 import { 
@@ -33,8 +33,9 @@ import {
   Users, 
   Sparkles, 
   HelpCircle, 
-  CheckCircle, 
+  CheckCircle,
   AlertCircle, 
+  AlertTriangle,
   Mail, 
   Download, 
   DollarSign, 
@@ -47,6 +48,8 @@ import {
   TrendingUp, 
   TrendingDown, 
   HeartHandshake,
+  HandHeart,
+  HelpingHand,
   CreditCard,
   PlusCircle,
   Clock,
@@ -137,7 +140,7 @@ export const QardScreen = React.memo(function QardScreen({ user, onBack, syncLiv
 
   // States for Gold Loan / স্বর্ণ রেখে জরুরি টাকা
   const [goldLoansList, setGoldLoansList] = useState<any[]>([]);
-  const [goldJewelryType, setGoldJewelryType] = useState('স্বর্ণের চেইন ও গহনা');
+  const [goldJewelryType, setGoldJewelryType] = useState('');
   const [goldCarat, setGoldCarat] = useState<'22k' | '21k' | '18k' | '24k'>('22k');
   const [goldWeightVori, setGoldWeightVori] = useState('');
   const [goldWeightGrams, setGoldWeightGrams] = useState('');
@@ -149,22 +152,35 @@ export const QardScreen = React.memo(function QardScreen({ user, onBack, syncLiv
   const [goldSubmitting, setGoldSubmitting] = useState(false);
   const [goldSuccessMsg, setGoldSuccessMsg] = useState('');
   const [goldErrorMsg, setGoldErrorMsg] = useState('');
-  const [calcMarketValue, setCalcMarketValue] = useState<string>('200000');
+  const [calcMarketValue, setCalcMarketValue] = useState<string>('');
 
   // Internal Qard Back Handler
   useBackHandler(() => {
+    if (showPayForMemberModal) { setShowPayForMemberModal(false); return true; }
     if (showDonorsModal) { setShowDonorsModal(false); return true; }
     if (showBorrowersModal) { setShowBorrowersModal(false); return true; }
     if (showReceiptModal) { setShowReceiptModal(false); return true; }
     if (showCertificate) { setShowCertificate(false); return true; }
-    if (showRepayModal) { setShowRepayModal(false); return true; }
+    if (showRepayModal) {
+      if (repaySubTab !== 'my_loan') {
+        setRepaySubTab('my_loan');
+        return true;
+      }
+      setShowRepayModal(false);
+      return true;
+    }
     if (showSectionTxHistory) { setShowSectionTxHistory(false); return true; }
+    if (selectedQardSection !== 'none') {
+      setSelectedQardSection('none');
+      return true;
+    }
     if (activeTab !== 'landing') {
       setActiveTab('landing');
       return true;
     }
     return false;
   }, true, 25);
+
   const [showDonorsModal, setShowDonorsModal] = useState(false);
   const [showBorrowersModal, setShowBorrowersModal] = useState(false);
   const [donorsSearchQuery, setDonorsSearchQuery] = useState('');
@@ -173,6 +189,7 @@ export const QardScreen = React.memo(function QardScreen({ user, onBack, syncLiv
   const [withdrawAmount, setWithdrawAmount] = useState<string>('');
   const [withdrawWhatsapp, setWithdrawWhatsapp] = useState<string>('');
   const [withdrawPin, setWithdrawPin] = useState<string>('');
+  const [selectedQardSection, setSelectedQardSection] = useState<'none' | 'investor' | 'general'>('none');
 
   const defaultAdSlides = [
     {
@@ -228,8 +245,8 @@ export const QardScreen = React.memo(function QardScreen({ user, onBack, syncLiv
       : new Date().toLocaleString('bn-BD', { hour12: true });
 
     const text = `====================================
-BUSINESS NETWORK BANGLADESH (AMB)
-AMB Business Co-operative Welfare Fund
+BUSINESS NETWORK BANGLADESH (BNB)
+BNB Business Co-operative Welfare Fund
 ====================================
 অফিসিয়াল রসিদ (Official Receipt)
 ------------------------------------
@@ -279,7 +296,7 @@ AMB Business Co-operative Welfare Fund
 
     ctx.fillStyle = '#64748b'; // Slate-500
     ctx.font = '500 13px "Segoe UI", "Helvetica Neue", Arial, sans-serif';
-    ctx.fillText('AMB Business Co-operative Welfare Fund', 250, 85);
+    ctx.fillText('BNB Business Co-operative Welfare Fund', 250, 85);
 
     ctx.strokeStyle = '#cbd5e1';
     ctx.lineWidth = 1;
@@ -379,7 +396,7 @@ AMB Business Co-operative Welfare Fund
 
   // Form states - Donation
   const [donationType, setDonationType] = useState<'one_time' | 'monthly'>('one_time');
-  const [donationPurpose, setDonationPurpose] = useState<string>('');
+  const [donationPurpose, setDonationPurpose] = useState<string>('general');
   const [isPurposeMenuOpen, setIsPurposeMenuOpen] = useState<boolean>(false);
   const [donationAmount, setDonationAmount] = useState<string>('');
   const [paymentGateway, setPaymentGateway] = useState<'bkash' | 'nagad' | 'rocket' | 'bank' | 'card'>('bkash');
@@ -411,12 +428,12 @@ AMB Business Co-operative Welfare Fund
 
   // Eligibility check states
   const [activeDays, setActiveDays] = useState<number>(0);
-  const [ambTxVolume, setAmbTxVolume] = useState<number>(0);
+  const [ambTxVolume, setBNBTxVolume] = useState<number>(0);
   const [eligibilityLoaded, setEligibilityLoaded] = useState<boolean>(false);
 
   // Coop 50% Instant Auto-Loan States
   const [instantLoanAmtInput, setInstantLoanAmtInput] = useState<string>('');
-  const [instantLoanDurationInput, setInstantLoanDurationInput] = useState<number>(3);
+  const [instantLoanDurationInput, setInstantLoanDurationInput] = useState<number>(1);
   const [instantLoanPinInput, setInstantLoanPinInput] = useState<string>('');
   const [instantLoanLoading, setInstantLoanLoading] = useState<boolean>(false);
 
@@ -424,8 +441,30 @@ AMB Business Co-operative Welfare Fund
   const [selectedReceiptTx, setSelectedReceiptTx] = useState<Transaction | null>(null);
   const [showCertificate, setShowCertificate] = useState<boolean>(false);
   const [showRepayModal, setShowRepayModal] = useState<boolean>(false);
-  const [emailInput, setEmailInput] = useState<string>(user.phone + '@amb-network.org');
+  const [repaySubTab, setRepaySubTab] = useState<'my_loan' | 'borrowers_list' | 'all_beneficiaries' | 'late_defaulters'>('my_loan');
+
+  // Automatically reset repaySubTab to 'my_loan' whenever modal closes/opens or user navigates
+  useEffect(() => {
+    setRepaySubTab('my_loan');
+  }, [showRepayModal, selectedQardSection, activeTab]);
+  const [beneficiariesSearchQuery, setBeneficiariesSearchQuery] = useState<string>('');
+  const [defaultersSearchQuery, setDefaultersSearchQuery] = useState<string>('');
+  const [thirdPartyPhoneInput, setThirdPartyPhoneInput] = useState<string>('');
+  const [thirdPartyPayAmount, setThirdPartyPayAmount] = useState<string>('');
+  const [thirdPartyPayLoading, setThirdPartyPayLoading] = useState<boolean>(false);
+  const [emailInput, setEmailInput] = useState<string>(user.phone + '@bnb-network.org');
   const [emailSending, setEmailSending] = useState<boolean>(false);
+
+  // States for paying another member's loan installment directly
+  const [selectedTargetUser, setSelectedTargetUser] = useState<any | null>(null);
+  const [showPayForMemberModal, setShowPayForMemberModal] = useState<boolean>(false);
+  const [payMemberAmountInput, setPayMemberAmountInput] = useState<string>('');
+  const [payMemberPinInput, setPayMemberPinInput] = useState<string>('');
+  const [payMemberLoading, setPayMemberLoading] = useState<boolean>(false);
+  const [payMemberError, setPayMemberError] = useState<string>('');
+
+  // Selected Donor details state for history popup
+  const [selectedDonorForDetails, setSelectedDonorForDetails] = useState<any | null>(null);
 
   const showReceiptForTx = (tx: Transaction) => {
     setReceiptData({
@@ -619,7 +658,7 @@ AMB Business Co-operative Welfare Fund
           vol += tx.amount || 0;
         }
       });
-      setAmbTxVolume(vol);
+      setBNBTxVolume(vol);
       setEligibilityLoaded(true);
     } catch (err) {
       console.error("Eligibility fetch error:", err);
@@ -653,8 +692,8 @@ AMB Business Co-operative Welfare Fund
           addDoc(collection(db, 'user_notifications'), {
             userId: user.uid,
             title: '⚠️ করযে হাসানা ঋণ পরিশোধের সতর্কতা (২ দিন বাকি)',
-            message: `আপনার ৳${dueLoan.toLocaleString('bn-BD')} করযে হাসানা ঋণের ৩০ দিন মেয়াদের আর মাত্র ${daysLeft === 0 ? 'আজকেই শেষ দিন (পরের মাসের একই তারিখ)' : `${daysLeft} দিন বাকি`}। অতিরিক্ত জরিমানা এড়াতে অবিলম্বে ঋণ পরিশোধ করুন, অন্যথায় ৩০ দিন অতিক্রান্ত হলে প্রতিদিন প্রতি ১,০০০ টাকায় ১০ টাকা বিলম্ব জরিমানা অটোমেটিক মেইন ব্যালেন্স থেকে কর্তন করা শুরু হবে।`,
-            body: `আপনার ৳${dueLoan.toLocaleString('bn-BD')} করযে হাসানা ঋণের ৩০ দিন মেয়াদের আর মাত্র ${daysLeft === 0 ? 'আজকেই শেষ দিন (পরের মাসের একই তারিখ)' : `${daysLeft} দিন বাকি`}। অতিরিক্ত জরিমানা এড়াতে অবিলম্বে ঋণ পরিশোধ করুন, অন্যথায় ৩০ দিন অতিক্রান্ত হলে প্রতিদিন প্রতি ১,০০০ টাকায় ১০ টাকা বিলম্ব জরিমানা অটোমেটিক মেইন ব্যালেন্স থেকে কর্তন করা শুরু হবে।`,
+            message: `আপনার ৳${dueLoan.toLocaleString('en-US')} করযে হাসানা ঋণের ৩০ দিন মেয়াদের আর মাত্র ${daysLeft === 0 ? 'আজকেই শেষ দিন (পরের মাসের একই তারিখ)' : `${daysLeft} দিন বাকি`}। অতিরিক্ত জরিমানা এড়াতে অবিলম্বে ঋণ পরিশোধ করুন, অন্যথায় ৩০ দিন অতিক্রান্ত হলে প্রতিদিন প্রতি ১,০০০ টাকায় ১০ টাকা বিলম্ব জরিমানা অটোমেটিক মেইন ব্যালেন্স থেকে কর্তন করা শুরু হবে।`,
+            body: `আপনার ৳${dueLoan.toLocaleString('en-US')} করযে হাসানা ঋণের ৩০ দিন মেয়াদের আর মাত্র ${daysLeft === 0 ? 'আজকেই শেষ দিন (পরের মাসের একই তারিখ)' : `${daysLeft} দিন বাকি`}। অতিরিক্ত জরিমানা এড়াতে অবিলম্বে ঋণ পরিশোধ করুন, অন্যথায় ৩০ দিন অতিক্রান্ত হলে প্রতিদিন প্রতি ১,০০০ টাকায় ১০ টাকা বিলম্ব জরিমানা অটোমেটিক মেইন ব্যালেন্স থেকে কর্তন করা শুরু হবে।`,
             type: 'qard_due_warning',
             read: false,
             createdAt: nowIso
@@ -708,7 +747,7 @@ AMB Business Co-operative Welfare Fund
               amount: dailyFine,
               status: 'success',
               category: 'qard_late_fine',
-              description: `⚠️ করযে হাসানা ঋণের ৩০ দিন মেয়াদ অতিক্রান্ত হওয়ায় (${daysElapsed - 30}তম দিন ওভারডিউ) আজ ${todayKey}-এ প্রতি হাজারে ১০ টাকা হারে ৳${dailyFine.toLocaleString('bn-BD')} বিলম্ব জরিমানা ${deductedFromBal > 0 ? `মেইন ওয়ালেট থেকে ৳${deductedFromBal} অটো কর্তন` : ''}${addedToDue > 0 ? `${deductedFromBal > 0 ? ' ও বাকি ' : ''}৳${addedToDue} বকেয়া ঋণে যুক্ত` : ''} করা হয়েছে।`,
+              description: `⚠️ করযে হাসানা ঋণের ৩০ দিন মেয়াদ অতিক্রান্ত হওয়ায় (${daysElapsed - 30}তম দিন ওভারডিউ) আজ ${todayKey}-এ প্রতি হাজারে ১০ টাকা হারে ৳${dailyFine.toLocaleString('en-US')} বিলম্ব জরিমানা ${deductedFromBal > 0 ? `মেইন ওয়ালেট থেকে ৳${deductedFromBal} অটো কর্তন` : ''}${addedToDue > 0 ? `${deductedFromBal > 0 ? ' ও বাকি ' : ''}৳${addedToDue} বকেয়া ঋণে যুক্ত` : ''} করা হয়েছে।`,
               paymentMethod: deductedFromBal >= dailyFine ? 'AUTO_WALLET_DEDUCT' : 'AUTO_FINE',
               receiptNo: `FINE-${Math.floor(100000 + Math.random() * 900000)}`,
               createdAt: nowIso
@@ -718,8 +757,8 @@ AMB Business Co-operative Welfare Fund
             addDoc(collection(db, 'user_notifications'), {
               userId: user.uid,
               title: '⚠️ করযে হাসানা বিলম্ব জরিমানা কর্তন',
-              message: `আপনার করযে হাসানা ঋণের ৩০ দিনের মেয়াদ অতিক্রান্ত হওয়ায় আজ (${todayKey}) নিয়ম অনুযায়ী প্রতি ১,০০০ টাকায় ১০ টাকা হারে ৳${dailyFine.toLocaleString('bn-BD')} বিলম্ব জরিমানা ${deductedFromBal > 0 ? 'আপনার মেইন ওয়ালেট ব্যালেন্স থেকে অটোমেটিক কর্তন করা হয়েছে' : 'বকেয়া ঋণে যুক্ত করা হয়েছে'}। অতিরিক্ত জরিমানা এড়াতে অবিলম্বে সম্পূর্ণ ঋণ পরিশোধ করুন।`,
-              body: `আপনার করযে হাসানা ঋণের ৩০ দিনের মেয়াদ অতিক্রান্ত হওয়ায় আজ (${todayKey}) নিয়ম অনুযায়ী প্রতি ১,০০০ টাকায় ১০ টাকা হারে ৳${dailyFine.toLocaleString('bn-BD')} বিলম্ব জরিমানা ${deductedFromBal > 0 ? 'আপনার মেইন ওয়ালেট ব্যালেন্স থেকে অটোমেটিক কর্তন করা হয়েছে' : 'বকেয়া ঋণে যুক্ত করা হয়েছে'}। অতিরিক্ত জরিমানা এড়াতে অবিলম্বে সম্পূর্ণ ঋণ পরিশোধ করুন।`,
+              message: `আপনার করযে হাসানা ঋণের ৩০ দিনের মেয়াদ অতিক্রান্ত হওয়ায় আজ (${todayKey}) নিয়ম অনুযায়ী প্রতি ১,০০০ টাকায় ১০ টাকা হারে ৳${dailyFine.toLocaleString('en-US')} বিলম্ব জরিমানা ${deductedFromBal > 0 ? 'আপনার মেইন ওয়ালেট ব্যালেন্স থেকে অটোমেটিক কর্তন করা হয়েছে' : 'বকেয়া ঋণে যুক্ত করা হয়েছে'}। অতিরিক্ত জরিমানা এড়াতে অবিলম্বে সম্পূর্ণ ঋণ পরিশোধ করুন।`,
+              body: `আপনার করযে হাসানা ঋণের ৩০ দিনের মেয়াদ অতিক্রান্ত হওয়ায় আজ (${todayKey}) নিয়ম অনুযায়ী প্রতি ১,০০০ টাকায় ১০ টাকা হারে ৳${dailyFine.toLocaleString('en-US')} বিলম্ব জরিমানা ${deductedFromBal > 0 ? 'আপনার মেইন ওয়ালেট ব্যালেন্স থেকে অটোমেটিক কর্তন করা হয়েছে' : 'বকেয়া ঋণে যুক্ত করা হয়েছে'}। অতিরিক্ত জরিমানা এড়াতে অবিলম্বে সম্পূর্ণ ঋণ পরিশোধ করুন।`,
               type: 'qard_fine_charged',
               read: false,
               createdAt: nowIso
@@ -822,7 +861,7 @@ AMB Business Co-operative Welfare Fund
               amount: dailyFine,
               status: 'success',
               category: 'qard_late_fine',
-              description: `⚠️ করযে হাসানা ৩ মাস মেয়াদী ঋণের কিস্তির ৩০ দিন মেয়াদ অতিক্রান্ত হওয়ায় আজ ${todayKey}-এ প্রতি হাজারে ১০ টাকা হারে ৳${dailyFine.toLocaleString('bn-BD')} বিলম্ব জরিমানা ${deductedFromBal > 0 ? `মেইন ওয়ালেট থেকে ৳${deductedFromBal} অটো কর্তন` : ''}${addedToDue > 0 ? `${deductedFromBal > 0 ? ' ও বাকি ' : ''}৳${addedToDue} বকেয়া ঋণে যুক্ত` : ''} করা হয়েছে।`,
+              description: `⚠️ করযে হাসানা ৩ মাস মেয়াদী ঋণের কিস্তির ৩০ দিন মেয়াদ অতিক্রান্ত হওয়ায় আজ ${todayKey}-এ প্রতি হাজারে ১০ টাকা হারে ৳${dailyFine.toLocaleString('en-US')} বিলম্ব জরিমানা ${deductedFromBal > 0 ? `মেইন ওয়ালেট থেকে ৳${deductedFromBal} অটো কর্তন` : ''}${addedToDue > 0 ? `${deductedFromBal > 0 ? ' ও বাকি ' : ''}৳${addedToDue} বকেয়া ঋণে যুক্ত` : ''} করা হয়েছে।`,
               paymentMethod: deductedFromBal >= dailyFine ? 'AUTO_WALLET_DEDUCT' : 'AUTO_FINE',
               receiptNo: `FINE-${Math.floor(100000 + Math.random() * 900000)}`,
               createdAt: nowIso
@@ -831,8 +870,8 @@ AMB Business Co-operative Welfare Fund
             addDoc(collection(db, 'user_notifications'), {
               userId: user.uid,
               title: '⚠️ করযে হাসানা বিলম্ব জরিমানা কর্তন',
-              message: `আপনার ৩ মাস মেয়াদী করযে হাসানা ঋণের কিস্তির মেয়াদ অতিক্রান্ত হওয়ায় প্রতিদিন প্রতি ১,০০০ টাকায় ১০ টাকা হারে আজ ৳${dailyFine.toLocaleString('bn-BD')} জরিমানা ${deductedFromBal > 0 ? 'মেইন ব্যালেন্স থেকে অটোমেটিক কর্তন করা হয়েছে' : 'বকেয়া ঋণে যুক্ত করা হয়েছে'}। অতিসত্বর কিস্তি পরিশোধ করুন।`,
-              body: `আপনার ৩ মাস মেয়াদী করযে হাসানা ঋণের কিস্তির মেয়াদ অতিক্রান্ত হওয়ায় প্রতিদিন প্রতি ১,০০০ টাকায় ১০ টাকা হারে আজ ৳${dailyFine.toLocaleString('bn-BD')} জরিমানা ${deductedFromBal > 0 ? 'মেইন ব্যালেন্স থেকে অটোমেটিক কর্তন করা হয়েছে' : 'বকেয়া ঋণে যুক্ত করা হয়েছে'}। অতিসত্বর কিস্তি পরিশোধ করুন।`,
+              message: `আপনার ৩ মাস মেয়াদী করযে হাসানা ঋণের কিস্তির মেয়াদ অতিক্রান্ত হওয়ায় প্রতিদিন প্রতি ১,০০০ টাকায় ১০ টাকা হারে আজ ৳${dailyFine.toLocaleString('en-US')} জরিমানা ${deductedFromBal > 0 ? 'মেইন ব্যালেন্স থেকে অটোমেটিক কর্তন করা হয়েছে' : 'বকেয়া ঋণে যুক্ত করা হয়েছে'}। অতিসত্বর কিস্তি পরিশোধ করুন।`,
+              body: `আপনার ৩ মাস মেয়াদী করযে হাসানা ঋণের কিস্তির মেয়াদ অতিক্রান্ত হওয়ায় প্রতিদিন প্রতি ১,০০০ টাকায় ১০ টাকা হারে আজ ৳${dailyFine.toLocaleString('en-US')} জরিমানা ${deductedFromBal > 0 ? 'মেইন ব্যালেন্স থেকে অটোমেটিক কর্তন করা হয়েছে' : 'বকেয়া ঋণে যুক্ত করা হয়েছে'}। অতিসত্বর কিস্তি পরিশোধ করুন।`,
               type: 'qard_fine_charged',
               read: false,
               createdAt: nowIso
@@ -858,17 +897,19 @@ AMB Business Co-operative Welfare Fund
   useEffect(() => {
     try {
       const unsub = onSnapshot(collection(db, 'users'), (snapshot) => {
-        const map: Record<string, { photoURL?: string; photo?: string; name?: string }> = {};
+        const map: Record<string, { photoURL?: string; photo?: string; profilePic?: string; name?: string; phone?: string; memberId?: string }> = {};
         snapshot.forEach((docSnap) => {
           const d = docSnap.data();
-          const photo = d.photoURL || d.photo || d.avatar || d.image || d.profileImage || '';
-          const name = d.name || '';
-          const info = { photoURL: photo, photo, name };
+          const photo = d.photoURL || d.photo || d.profilePic || d.avatar || d.image || d.profileImage || d.profilePicUrl || '';
+          const name = d.name || d.userName || '';
+          const info = { photoURL: photo, photo: photo, profilePic: photo, name: name, phone: d.phone, memberId: d.memberId };
 
-          map[docSnap.id] = info;
+          if (docSnap.id) map[docSnap.id] = info;
           if (d.uid) map[d.uid] = info;
           if (d.phone) map[d.phone] = info;
           if (d.memberId) map[d.memberId] = info;
+          if (name) map[name] = info;
+          if (d.userName) map[d.userName] = info;
         });
         setUsersMap(map);
       }, (err) => {
@@ -1025,6 +1066,9 @@ AMB Business Co-operative Welfare Fund
       const newTx: any = {
         userId: user.uid,
         userName: isAnonymous ? 'গোপন দাতা' : user.name,
+        userPhone: user.phone || '',
+        userPhoto: isAnonymous ? '' : (user.photoURL || user.profilePic || (user as any).photo || ''),
+        photoURL: isAnonymous ? '' : (user.photoURL || user.profilePic || (user as any).photo || ''),
         memberId: user.memberId,
         type: 'qard_donation',
         typeLabel: 'করযে হাসানা দান',
@@ -1066,7 +1110,7 @@ AMB Business Co-operative Welfare Fund
       const userRef = doc(db, 'users', user.uid);
       addDoc(collection(db, 'admin_notifications'), {
         title: '💖 করজে হাসানা ফান্ডে নতুন অনুদান প্রাপ্তি',
-        message: `${user.name || 'সদস্য'} (${user.memberId || 'N/A'}) করজে হাসানা ফান্ডে ৳${amt.toLocaleString('bn-BD')} টাকা অনুদান দিয়েছেন।`,
+        message: `${user.name || 'সদস্য'} (${user.memberId || 'N/A'}) করজে হাসানা ফান্ডে ৳${amt.toLocaleString('en-US')} টাকা অনুদান দিয়েছেন।`,
         userId: user.uid,
         userName: user.name || '',
         memberId: user.memberId || '',
@@ -1097,17 +1141,20 @@ AMB Business Co-operative Welfare Fund
     setSuccessMsg('');
     setErrorMsg('');
 
+    // Lifetime Ban Check for 2+ Late Repayments
+    const userLateStrikes = (user.qardLateCount || 0) + qardHistory.filter(t => t.userId === user.uid && (t.type === 'qard_fine' || t.category === 'qard_late_fine')).length;
+    if (userLateStrikes >= 2 || user.isLifetimeBannedFromQard === true) {
+      setErrorMsg('⚠️ দুঃখিত! আপনি পূর্বে ২ বার সময়মতো ঋণ পরিশোধে ব্যর্থ হয়েছেন। করযে হাসানা নিয়ম অনুযায়ী আপনি আজীবনের জন্য সুদমুক্ত ঋণ গ্রহণ থেকে স্থায়ীভাবে নিষিদ্ধ (LIFETIME BANNED)।');
+      return;
+    }
+
     const amt = parseFloat(loanAmount);
     if (isNaN(amt) || amt <= 0) {
       setErrorMsg('অনুগ্রহ করে সঠিক ঋণের পরিমাণ লিখুন।');
       return;
     }
 
-    const monthlyRepay = parseFloat(loanMonthlyRepay);
-    if (isNaN(monthlyRepay) || monthlyRepay <= 0) {
-      setErrorMsg('অনুগ্রহ করে প্রতি মাসে কত টাকা পরিশোধ করতে পারবেন তা লিখুন।');
-      return;
-    }
+    const monthlyRepay = amt; // 1 month full repayment rule
 
     // Mandatory Complete Profile Check
     const missingProfileFields = getMissingProfileFields(user);
@@ -1116,9 +1163,11 @@ AMB Business Co-operative Welfare Fund
       return;
     }
 
-    // Limit check - Min 500, Max 10,000 (Based on new policies)
-    if (amt < 500 || amt > 10000) {
-      setErrorMsg('প্রাথমিকভাবে ঋণের পরিমাণ সর্বনিম্ন 500 টাকা থেকে সর্বোচ্চ 10,000 টাকা হতে হবে।');
+    // General member limit check (Min 1 BDT, Max 2,000 BDT for manual admin review)
+    const minLimit = appConfig?.qardConfig?.minLoanAmount || 1;
+    const maxLimit = appConfig?.qardConfig?.maxLoanAmount || 2000;
+    if (amt < minLimit || amt > maxLimit) {
+      setErrorMsg(`সাধারণ সদস্যদের ক্ষেত্রে সুদমুক্ত ঋণের পরিমাণ সর্বনিম্ন ৳${minLimit} টাকা থেকে সর্বোচ্চ ৳${maxLimit.toLocaleString('en-US')} টাকা হতে হবে (যা এডমিন ম্যানুয়ালি পর্যালোচনা করে সিদ্ধান্ত গ্রহণ করবেন)।`);
       return;
     }
 
@@ -1131,7 +1180,7 @@ AMB Business Co-operative Welfare Fund
 
     // Transaction volume constraint (Min 20,000 BDT for general members)
     if (!isSamityInvestor && ambTxVolume < 20000) {
-      setErrorMsg(`দুঃখিত! সাধারণ সদস্যদের ক্ষেত্রে এই 2 মাসে কমপক্ষে AMB টু AMB 20,000 টাকার লেনদেন থাকতে হবে। আপনার বর্তমান লেনদেন ৳${ambTxVolume.toLocaleString('bn-BD')} BDT`);
+      setErrorMsg(`দুঃখিত! সাধারণ সদস্যদের ক্ষেত্রে এই 2 মাসে কমপক্ষে BNB টু BNB 20,000 টাকার লেনদেন থাকতে হবে। আপনার বর্তমান লেনদেন ৳${ambTxVolume.toLocaleString('en-US')} BDT`);
       return;
     }
 
@@ -1186,7 +1235,7 @@ AMB Business Co-operative Welfare Fund
       await addDoc(collection(db, 'transactions'), newTx);
       addDoc(collection(db, 'admin_notifications'), {
         title: '🤝 নতুন করজে হাসানা ঋণ সহায়তা আবেদন',
-        message: `${user.name || 'সদস্য'} (${user.memberId || 'N/A'}) ৳${amt.toLocaleString('bn-BD')} টাকা সুদমুক্ত ঋণ আবেদন করেছেন (মেয়াদ: ${loanDuration} মাস, কিস্তি: ৳${monthlyRepay}/মাস)।`,
+        message: `${user.name || 'সদস্য'} (${user.memberId || 'N/A'}) ৳${amt.toLocaleString('en-US')} টাকা সুদমুক্ত ঋণ আবেদন করেছেন (মেয়াদ: ${loanDuration} মাস, কিস্তি: ৳${monthlyRepay}/মাস)।`,
         userId: user.uid,
         userName: user.name || '',
         memberId: user.memberId || '',
@@ -1234,6 +1283,13 @@ AMB Business Co-operative Welfare Fund
     setSuccessMsg('');
     setErrorMsg('');
 
+    // Lifetime Ban Check for 2+ Late Repayments
+    const userLateStrikes = (user.qardLateCount || 0) + qardHistory.filter(t => t.userId === user.uid && (t.type === 'qard_fine' || t.category === 'qard_late_fine')).length;
+    if (userLateStrikes >= 2 || user.isLifetimeBannedFromQard === true) {
+      setErrorMsg('⚠️ দুঃখিত! আপনি পূর্বে ২ বার সময়মতো ঋণ পরিশোধে ব্যর্থ হয়েছেন। করযে হাসানা নিয়ম অনুযায়ী আপনি আজীবনের জন্য সুদমুক্ত ঋণ গ্রহণ থেকে স্থায়ীভাবে নিষিদ্ধ (LIFETIME BANNED)।');
+      return;
+    }
+
     const coopInstantCfg = appConfig?.qardConfig?.coopInstantLoanConfig || DEFAULT_QARD_CONFIG.coopInstantLoanConfig;
     if (coopInstantCfg.enabled === false) {
       setErrorMsg('সমবায় ইনস্ট্যান্ট অটো-ঋণ সুবিধাটি সাময়িকভাবে বন্ধ রয়েছে।');
@@ -1249,13 +1305,15 @@ AMB Business Co-operative Welfare Fund
 
     const userSavings = user.savings || 0;
     if (userSavings <= 0) {
-      setErrorMsg('আপনার সমিতিতে কোনো সঞ্চয় জমা নেই। 1% - 50% অটো-ঋণ নিতে আগে সমিতিতে সঞ্চয় আমানত জমা রাখুন।');
+      setErrorMsg('আপনার সমিতিতে কোনো সঞ্চয় জমা নেই। অটো-ঋণ নিতে আগে সমিতিতে সঞ্চয় জমা রাখুন।');
       return;
     }
 
-    const percent = coopInstantCfg.percentage ?? 50;
-    const minInstantLimit = Math.max(1, Math.floor(userSavings * 0.01)); // Minimum 1% of savings
-    const maxInstantLimit = Math.floor(userSavings * (percent / 100)); // Maximum 50% of savings
+    // Role/Category Based Percentage: Owner 70%, Shareholder 60%, Investor/Regular 50%
+    const cat = user.memberCategory || 'investor';
+    const percent = cat === 'owner' ? 70 : cat === 'shareholder' ? 60 : 50;
+    const minInstantLimit = Math.max(1, Math.floor(userSavings * 0.01));
+    const maxInstantLimit = Math.floor(userSavings * (percent / 100));
 
     const requestedAmt = parseFloat(instantLoanAmtInput || String(maxInstantLimit));
 
@@ -1265,31 +1323,27 @@ AMB Business Co-operative Welfare Fund
     }
 
     if (requestedAmt < minInstantLimit) {
-      setErrorMsg(`ইনস্ট্যান্ট ঋণের সর্বনিম্ন সীমা সঞ্চয়ের 1% (৳${minInstantLimit.toLocaleString('bn-BD')} BDT)।`);
+      setErrorMsg(`ইনস্ট্যান্ট ঋণের সর্বনিম্ন সীমা সঞ্চয়ের 1% (৳${minInstantLimit.toLocaleString('en-US')} BDT)।`);
       return;
     }
 
     if (requestedAmt > maxInstantLimit) {
-      setErrorMsg(`আপনার সঞ্চয়ের (${percent}%) সর্বোচ্চ প্রাপ্যতা সীমা ৳${maxInstantLimit.toLocaleString('bn-BD')} BDT। এর বেশি ঋণ গ্রহণ করা সম্ভব নয়।`);
+      setErrorMsg(`আপনার ক্যাটাগরির (${cat === 'owner' ? 'অনার ৭০%' : cat === 'shareholder' ? 'শেয়ারহোল্ডার ৬০%' : 'ইনভেস্টর ৫০%'}) সর্বোচ্চ সীমা ৳${maxInstantLimit.toLocaleString('en-US')} BDT।`);
       return;
     }
 
     // Calculate percentage taken relative to savings
-    const loanPercent = userSavings > 0 ? Math.round(((requestedAmt / userSavings) * 100) * 10) / 10 : 50;
+    const loanPercent = userSavings > 0 ? Math.round(((requestedAmt / userSavings) * 100) * 10) / 10 : percent;
 
     // 1. Check existing active due loan
     if ((user.dueLoan || 0) > 0) {
-      setErrorMsg(`আপনার নিকট বর্তমানে ৳${(user.dueLoan || 0).toLocaleString('bn-BD')} BDT বকেয়া ঋণ রয়েছে। ইনস্ট্যান্ট অটো-ঋণ নিতে প্রথমে বর্তমান বকেয়া ঋণ সম্পূর্ণ পরিশোধ করুন।`);
+      setErrorMsg(`আপনার নিকট বর্তমানে ৳${(user.dueLoan || 0).toLocaleString('en-US')} BDT বকেয়া ঋণ রয়েছে। ইনস্ট্যান্ট অটো-ঋণ নিতে প্রথমে বর্তমান বকেয়া ঋণ সম্পূর্ণ পরিশোধ করুন।`);
       return;
     }
 
-    // 2. Repayment-based Cooldown check:
-    // If loan percentage <= 25%: 1 month (30 days) cooldown after FULL repayment.
-    // If loan percentage > 25%: 3 months (90 days) cooldown after FULL repayment.
+    // 2. Repayment-based Cooldown check: 60 days after repayment
     const lastLoanAmt = user.lastCoopInstantLoanAmount || 0;
-    const calcPercent = userSavings > 0 ? (lastLoanAmt / userSavings) * 100 : 50;
-    const effectivePercent = user.lastCoopLoanPercentage ?? calcPercent;
-    const effectiveCooldownDays = effectivePercent <= 25 ? 30 : 90;
+    const effectiveCooldownDays = 60;
 
     if (user.lastCoopInstantLoanRepaidAt) {
       const repaidTime = new Date(user.lastCoopInstantLoanRepaidAt).getTime();
@@ -1297,8 +1351,7 @@ AMB Business Co-operative Welfare Fund
       if (daysSinceRepaid < effectiveCooldownDays) {
         const remainingDays = effectiveCooldownDays - daysSinceRepaid;
         const nextDateStr = new Date(repaidTime + effectiveCooldownDays * 24 * 60 * 60 * 1000).toLocaleDateString('bn-BD');
-        const cooldownLabel = effectivePercent <= 25 ? '1 মাস (30 দিন)' : '3 মাস (90 দিন)';
-        setErrorMsg(`আপনি গত ${new Date(user.lastCoopInstantLoanRepaidAt).toLocaleDateString('bn-BD')}-এ (${daysSinceRepaid} দিন আগে) পূর্বের ${lastLoanAmt > 0 ? `৳${lastLoanAmt.toLocaleString('bn-BD')} (${effectivePercent.toFixed(1)}%) ` : ''}ঋণ সম্পূর্ণ পরিশোধ করেছেন। নিয়ম অনুযায়ী ${effectivePercent <= 25 ? '1% - 25%' : '25% - 50%'} ঋণ পরিশোধের পর ${cooldownLabel} পর (${nextDateStr}) পুনরায় ইনস্ট্যান্ট অটো-ঋণ নেওয়া যাবে। (আর ${remainingDays} দিন বাকি)`);
+        setErrorMsg(`আপনি গত ${new Date(user.lastCoopInstantLoanRepaidAt).toLocaleDateString('bn-BD')}-এ পূর্বের ঋণ সম্পূর্ণ পরিশোধ করেছেন। নিয়ম অনুযায়ী পরিশোধের ৬০ দিন পর (${nextDateStr}) পুনরায় অটো-ঋণ নেওয়া যাবে। (আর ${remainingDays} দিন বাকি)`);
         return;
       }
     }
@@ -1362,7 +1415,7 @@ AMB Business Co-operative Welfare Fund
         amount: requestedAmt,
         status: 'success',
         category: 'coop_instant_auto_loan',
-        description: `🏢 সমবায় সঞ্চয়ের (${loanPercent}%) ইনস্ট্যান্ট অটো-ঋণ (সঞ্চয়: ৳${userSavings.toLocaleString('bn-BD')}, ${durationMonths === 3 ? '3 মাস' : '1 মাস (30 দিন)'} মেয়াদে ডিসবার্সড)${ratioNote}`,
+        description: `🏢 সমবায় সঞ্চয়ের (${loanPercent}%) ইনস্ট্যান্ট অটো-ঋণ (সঞ্চয়: ৳${userSavings.toLocaleString('en-US')}, ${durationMonths === 3 ? '3 মাস' : '1 মাস (30 দিন)'} মেয়াদে ডিসবার্সড)${ratioNote}`,
         loanDuration: durationMonths,
         monthlyRepayAmount: monthlyPay,
         createdAt: nowIso,
@@ -1373,7 +1426,7 @@ AMB Business Co-operative Welfare Fund
       await addDoc(collection(db, 'transactions'), txRecord);
       addDoc(collection(db, 'admin_notifications'), {
         title: '⚡ সমবায় ইনস্ট্যান্ট অটো-ঋণ ডিসবার্সড',
-        message: `${user.name || 'সদস্য'} (${user.memberId || 'N/A'}) সমবায় সঞ্চয়ের বিপরীতে ৳${requestedAmt.toLocaleString('bn-BD')} ইনস্ট্যান্ট ঋণ নিয়েছেন (${durationMonths} মাস মেয়াদ)।`,
+        message: `${user.name || 'সদস্য'} (${user.memberId || 'N/A'}) সমবায় সঞ্চয়ের বিপরীতে ৳${requestedAmt.toLocaleString('en-US')} ইনস্ট্যান্ট ঋণ নিয়েছেন (${durationMonths} মাস মেয়াদ)।`,
         userId: user.uid,
         userName: user.name || '',
         memberId: user.memberId || '',
@@ -1388,14 +1441,14 @@ AMB Business Co-operative Welfare Fund
       const notifData = {
         userId: user.uid,
         title: '🏢 1% - 50% ইনস্ট্যান্ট অটো-ঋণ অনুমোদিত!',
-        message: `আপনার সমবায় সঞ্চয় (৳${userSavings.toLocaleString('bn-BD')}) ভিত্তি ধরে ৳${requestedAmt.toLocaleString('bn-BD')} ইনস্ট্যান্ট অটো-ঋণ সরাসরি ওয়ালেটে জমা দেওয়া হয়েছে। পরিশোধের নিয়মঃ যেই তারিখে টাকা নেওয়া হয়েছে, ঠিক পরের মাসে সেই একই তারিখে পরিশোধ করতে হবে (30 দিন গণনা)। ${durationMonths === 3 ? '3 মাস মেয়াদের ক্ষেত্রে 90 দিন গণনা হবে এবং প্রতি 30 দিন পর পর 3টি সমান কিস্তিতে পরিশোধ করতে হবে।' : '1 মাস মেয়াদের ক্ষেত্রে 30 দিন পর সম্পূর্ণ পরিশোধ করতে হবে।'} মেয়াদ শেষ হওয়ার 2 দিন পূর্বে রিমাইন্ডার নোটিফিকেশন যাবে এবং 30 দিন পার হলে প্রতিদিন প্রতি হাজারে 10 টাকা বিলম্ব জরিমানা কার্যকর হবে।`,
+        message: `আপনার সমবায় সঞ্চয় (৳${userSavings.toLocaleString('en-US')}) ভিত্তি ধরে ৳${requestedAmt.toLocaleString('en-US')} ইনস্ট্যান্ট অটো-ঋণ সরাসরি ওয়ালেটে জমা দেওয়া হয়েছে। পরিশোধের নিয়মঃ যেই তারিখে টাকা নেওয়া হয়েছে, ঠিক পরের মাসে সেই একই তারিখে পরিশোধ করতে হবে (30 দিন গণনা)। ${durationMonths === 3 ? '3 মাস মেয়াদের ক্ষেত্রে 90 দিন গণনা হবে এবং প্রতি 30 দিন পর পর 3টি সমান কিস্তিতে পরিশোধ করতে হবে।' : '1 মাস মেয়াদের ক্ষেত্রে 30 দিন পর সম্পূর্ণ পরিশোধ করতে হবে।'} মেয়াদ শেষ হওয়ার 2 দিন পূর্বে রিমাইন্ডার নোটিফিকেশন যাবে এবং 30 দিন পার হলে প্রতিদিন প্রতি হাজারে 10 টাকা বিলম্ব জরিমানা কার্যকর হবে।`,
         type: 'qard_disbursed',
         read: false,
         createdAt: nowIso
       };
       await addDoc(collection(db, 'user_notifications'), notifData);
 
-      // Open Professional AMB Receipt Modal
+      // Open Professional BNB Receipt Modal
       setReceiptData({
         receiptNo: generatedReceiptNo,
         transactionId: generatedTxId,
@@ -1409,7 +1462,7 @@ AMB Business Co-operative Welfare Fund
       });
       setShowReceiptModal(true);
 
-      setSuccessMsg(`🎉 অভিনন্দন! ৳${requestedAmt.toLocaleString('bn-BD')} ইনস্ট্যান্ট অটো-ঋণ সরাসরি আপনার মেইন ওয়ালেটে জমা হয়েছে! (${durationMonths} মাস মেয়াদের অটো-কিস্তি চালু করা হয়েছে)`);
+      setSuccessMsg(`🎉 অভিনন্দন! ৳${requestedAmt.toLocaleString('en-US')} ইনস্ট্যান্ট অটো-ঋণ সরাসরি আপনার মেইন ওয়ালেটে জমা হয়েছে! (${durationMonths} মাস মেয়াদের অটো-কিস্তি চালু করা হয়েছে)`);
       setInstantLoanAmtInput('');
       setInstantLoanPinInput('');
 
@@ -1433,7 +1486,7 @@ AMB Business Co-operative Welfare Fund
     }
 
     if (amt > myWithdrawableBalance) {
-      setErrorMsg(`আপনার সর্বোচ্চ উত্তোলনযোগ্য ব্যালেন্স ৳${myWithdrawableBalance?.toLocaleString('bn-BD')} BDT`);
+      setErrorMsg(`আপনার সর্বোচ্চ উত্তোলনযোগ্য ব্যালেন্স ৳${myWithdrawableBalance?.toLocaleString('en-US')} BDT`);
       return;
     }
 
@@ -1471,7 +1524,7 @@ AMB Business Co-operative Welfare Fund
       await addDoc(collection(db, 'transactions'), newTx);
       addDoc(collection(db, 'admin_notifications'), {
         title: '💸 করজে হাসানা অনুদান ফেরত/উত্তোলন আবেদন',
-        message: `${user.name || 'সদস্য'} (${user.memberId || 'N/A'}) করজে হাসানা ফান্ড হতে ৳${amt.toLocaleString('bn-BD')} টাকা উত্তোলনের আবেদন করেছেন।`,
+        message: `${user.name || 'সদস্য'} (${user.memberId || 'N/A'}) করজে হাসানা ফান্ড হতে ৳${amt.toLocaleString('en-US')} টাকা উত্তোলনের আবেদন করেছেন।`,
         userId: user.uid,
         userName: user.name || '',
         memberId: user.memberId || '',
@@ -1519,7 +1572,7 @@ AMB Business Co-operative Welfare Fund
     }
 
     if (user.balance < repayAmt) {
-      setErrorMsg(`দুঃখিত! ঋণ পরিশোধের জন্য আপনার মেইন ওয়ালেট ব্যালেন্স পর্যাপ্ত নয়। প্রয়োজন ৳${repayAmt.toLocaleString('bn-BD')} BDT, কিন্তু আপনার মেইন ব্যালেন্স আছে ৳${(user.balance || 0).toLocaleString('bn-BD')} BDT। অনুগ্রহ করে ওয়ালেটে ডিপোজিট/রিচার্জ করুন।`);
+      setErrorMsg(`দুঃখিত! ঋণ পরিশোধের জন্য আপনার মেইন ওয়ালেট ব্যালেন্স পর্যাপ্ত নয়। প্রয়োজন ৳${repayAmt.toLocaleString('en-US')} BDT, কিন্তু আপনার মেইন ব্যালেন্স আছে ৳${(user.balance || 0).toLocaleString('en-US')} BDT। অনুগ্রহ করে ওয়ালেটে ডিপোজিট/রিচার্জ করুন।`);
       return;
     }
 
@@ -1553,7 +1606,7 @@ AMB Business Co-operative Welfare Fund
         typeLabel: 'করযে হাসানা পরিশোধ',
         amount: repayAmt,
         status: 'success',
-        description: `মেইন ব্যালেন্স থেকে করযে হাসানা সুদমুক্ত ঋণ/কিস্তি পরিশোধ সম্পন্ন (বকেয়া অবশিষ্ট: ৳${newDue.toLocaleString('bn-BD')} BDT)`,
+        description: `মেইন ব্যালেন্স থেকে করযে হাসানা সুদমুক্ত ঋণ/কিস্তি পরিশোধ সম্পন্ন (বকেয়া অবশিষ্ট: ৳${newDue.toLocaleString('en-US')} BDT)`,
         createdAt: nowIso,
         paymentMethod: 'WALLET',
         transactionId: generatedTxId,
@@ -1567,14 +1620,14 @@ AMB Business Co-operative Welfare Fund
         memberId: user.memberId || user.phone,
         typeLabel: 'করযে হাসানা পরিশোধ',
         amount: repayAmt,
-        description: `মেইন ব্যালেন্স থেকে করযে হাসানা ঋণ/কিস্তি পরিশোধ সম্পন্ন (${newDue === 0 ? 'সম্পূর্ণ বকেয়া পরিশোধিত' : `বকেয়া অবশিষ্ট ৳${newDue.toLocaleString('bn-BD')} BDT`})`,
+        description: `মেইন ব্যালেন্স থেকে করযে হাসানা ঋণ/কিস্তি পরিশোধ সম্পন্ন (${newDue === 0 ? 'সম্পূর্ণ বকেয়া পরিশোধিত' : `বকেয়া অবশিষ্ট ৳${newDue.toLocaleString('en-US')} BDT`})`,
         createdAt: nowIso,
         paymentMethod: 'WALLET'
       });
       setShowReceiptModal(true);
       setSuccessMsg(newDue === 0 
         ? 'অভিনন্দন! আপনার বকেয়া করযে হাসানা ঋণ সম্পূর্ণ পরিশোধিত হয়েছে।' 
-        : `আপনার ৳${repayAmt.toLocaleString('bn-BD')} কিস্তি পরিশোধ সফল হয়েছে! বকেয়া ঋণ অবশিষ্ট: ৳${newDue.toLocaleString('bn-BD')} BDT।`);
+        : `আপনার ৳${repayAmt.toLocaleString('en-US')} কিস্তি পরিশোধ সফল হয়েছে! বকেয়া ঋণ অবশিষ্ট: ৳${newDue.toLocaleString('en-US')} BDT।`);
       setCustomRepayInput('');
       setLoading(false);
 
@@ -1591,7 +1644,7 @@ AMB Business Co-operative Welfare Fund
       await Promise.all([
         addDoc(collection(db, 'admin_notifications'), {
           title: '✅ করজে হাসানা ঋণ/কিস্তি পরিশোধ সফল',
-          message: `${user.name || 'সদস্য'} (${user.memberId || 'N/A'}) ৳${repayAmt.toLocaleString('bn-BD')} টাকা ঋণ কিস্তি পরিশোধ করেছেন। অবশিষ্ট বকেয়া: ৳${newDue.toLocaleString('bn-BD')}।`,
+          message: `${user.name || 'সদস্য'} (${user.memberId || 'N/A'}) ৳${repayAmt.toLocaleString('en-US')} টাকা ঋণ কিস্তি পরিশোধ করেছেন। অবশিষ্ট বকেয়া: ৳${newDue.toLocaleString('en-US')}।`,
           userId: user.uid,
           userName: user.name || '',
           memberId: user.memberId || '',
@@ -1606,7 +1659,7 @@ AMB Business Co-operative Welfare Fund
           id: `notif-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
           userId: user.uid,
           title: '✅ করজে হাসানা ঋণ/কিস্তি পরিশোধ সম্পন্ন',
-          body: `আপনার মেইন ওয়ালেট ব্যালেন্স থেকে ৳${repayAmt.toLocaleString('bn-BD')} সফলভাবে পরিশোধ করা হয়েছে। ${newDue === 0 ? 'আপনার সকল বকেয়া ঋণ সম্পূর্ণ পরিশোধিত।' : `বকেয়া অবশিষ্ট ৳${newDue.toLocaleString('bn-BD')} BDT।`}`,
+          body: `আপনার মেইন ওয়ালেট ব্যালেন্স থেকে ৳${repayAmt.toLocaleString('en-US')} সফলভাবে পরিশোধ করা হয়েছে। ${newDue === 0 ? 'আপনার সকল বকেয়া ঋণ সম্পূর্ণ পরিশোধিত।' : `বকেয়া অবশিষ্ট ৳${newDue.toLocaleString('en-US')} BDT।`}`,
           date: nowIso,
           read: false,
           type: 'SYSTEM'
@@ -1619,6 +1672,251 @@ AMB Business Co-operative Welfare Fund
     } catch (err: any) {
       setErrorMsg('ত্রুটি: ' + err.message);
       setLoading(false);
+    }
+  };
+
+  // Repay Qard Loan on behalf of another member (3rd party repayment via Phone or ID)
+  const handleThirdPartyLoanRepay = async (targetUserObj: any, repayAmt: number) => {
+    setErrorMsg('');
+    setSuccessMsg('');
+
+    if (!targetUserObj || !targetUserObj.uid) {
+      setErrorMsg('অনুগ্রহ করে সঠিক ঋণগ্রহীতা সদস্য নির্বাচন বা ফোন নম্বর প্রবেশ করান।');
+      return;
+    }
+
+    if (!repayAmt || repayAmt <= 0) {
+      setErrorMsg('অনুগ্রহ করে সঠিক পরিশোধের পরিমাণ লিখুন।');
+      return;
+    }
+
+    if (user.balance < repayAmt) {
+      setErrorMsg(`দুঃখিত! পরিশোধের জন্য আপনার মেইন ওয়ালেট ব্যালেন্স পর্যাপ্ত নয়। প্রয়োজন ৳${repayAmt.toLocaleString('en-US')} BDT, কিন্তু আপনার মেইন ব্যালেন্স আছে ৳${(user.balance || 0).toLocaleString('en-US')} BDT।`);
+      return;
+    }
+
+    const pin = prompt(`সদস্য ${targetUserObj.name || targetUserObj.phone}-এর ৳${repayAmt.toLocaleString('en-US')} করযে হাসানা কিস্তি পরিশোধ নিশ্চিত করতে আপনার 4 ডিজিটের সিকিউরিটি পিন দিনঃ`);
+    if (!pin || pin !== user.pin) {
+      setErrorMsg('ভুল সিকিউরিটি পিন। পরিশোধ বাতিল করা হয়েছে।');
+      return;
+    }
+
+    setThirdPartyPayLoading(true);
+    try {
+      const nowIso = new Date().toISOString();
+      const targetDue = targetUserObj.dueLoan || 0;
+      const newTargetDue = Math.max(0, targetDue - repayAmt);
+      const newPayerBalance = Math.max(0, user.balance - repayAmt);
+
+      // Optimistic local update ⚡
+      user.balance = newPayerBalance;
+      targetUserObj.dueLoan = newTargetDue;
+
+      const generatedReceiptNo = `REC-${Math.floor(100000 + Math.random() * 900000)}`;
+      const generatedTxId = `QRD-3RD-${Date.now().toString().slice(-6)}`;
+
+      setReceiptData({
+        receiptNo: generatedReceiptNo,
+        transactionId: generatedTxId,
+        userName: user.name,
+        memberId: user.memberId || user.phone,
+        typeLabel: 'অন্যের করযে হাসানা কিস্তি পরিশোধ',
+        amount: repayAmt,
+        description: `সদস্য ${targetUserObj.name || 'সদস্য'} (${targetUserObj.phone || 'N/A'})-এর বকেয়া করযে হাসানা কিস্তি পরিশোধিত (অবশিষ্ট বকেয়া: ৳${newTargetDue.toLocaleString('en-US')} BDT)`,
+        createdAt: nowIso,
+        paymentMethod: 'WALLET'
+      });
+      setShowReceiptModal(true);
+
+      setSuccessMsg(`ধন্যবাদ! আপনি সফলভাবে সদস্য ${targetUserObj.name || targetUserObj.phone}-এর ৳${repayAmt.toLocaleString('en-US')} টাকা করযে হাসানা কিস্তি পরিশোধ করেছেন।`);
+      setThirdPartyPayAmount('');
+      setThirdPartyPhoneInput('');
+
+      // Background Firestore updates
+      const payerRef = doc(db, 'users', user.uid);
+      const targetRef = doc(db, 'users', targetUserObj.uid);
+
+      await Promise.all([
+        updateDoc(payerRef, { balance: newPayerBalance }).catch(e => console.warn('Payer update err:', e)),
+        updateDoc(targetRef, { dueLoan: newTargetDue }).catch(e => console.warn('Target update err:', e)),
+        addDoc(collection(db, 'transactions'), {
+          userId: targetUserObj.uid,
+          payerUserId: user.uid,
+          payerName: user.name,
+          userName: targetUserObj.name || 'সদস্য',
+          memberId: targetUserObj.memberId || targetUserObj.phone,
+          type: 'qard_loan_repayment',
+          typeLabel: 'অন্যের মাধ্যমে করযে হাসানা কিস্তি পরিশোধ',
+          amount: repayAmt,
+          status: 'success',
+          description: `দাতা সদস্য ${user.name} (${user.phone}) আপনার ৳${repayAmt.toLocaleString('en-US')} টাকার করযে হাসানা কিস্তি পরিশোধ করে দিয়েছেন।`,
+          createdAt: nowIso,
+          paymentMethod: 'WALLET',
+          transactionId: generatedTxId,
+          receiptNo: generatedReceiptNo
+        }).catch(e => console.warn('Tx doc err:', e)),
+        addDoc(collection(db, 'user_notifications'), {
+          userId: targetUserObj.uid,
+          title: '🎉 আপনার করযে হাসানা কিস্তি পরিশোধ হয়েছে!',
+          message: `সম্মানিত সদস্য ${user.name} (${user.phone}) আপনার ৳${repayAmt.toLocaleString('en-US')} BDT করযে হাসানা কিস্তি পরিশোধ করেছেন। আপনার বকেয়া অবশিষ্ট: ৳${newTargetDue.toLocaleString('en-US')} BDT।`,
+          createdAt: nowIso,
+          read: false,
+          type: 'qard_repayment'
+        }).catch(e => console.warn('Notif err:', e)),
+        addDoc(collection(db, 'admin_notifications'), {
+          title: '🤝 অন্যের করযে হাসানা কিস্তি পরিশোধ সম্পন্ন',
+          message: `সদস্য ${user.name} (${user.phone}) অপর সদস্য ${targetUserObj.name} (${targetUserObj.phone})-এর ৳${repayAmt.toLocaleString('en-US')} টাকার করযে হাসানা কিস্তি পরিশোধ করেছেন।`,
+          userId: user.uid,
+          createdAt: nowIso,
+          read: false
+        }).catch(e => console.warn('Admin notif err:', e))
+      ]);
+
+      await syncLiveProfile();
+      await fetchLedgers();
+    } catch (err: any) {
+      console.error('Third party repay error:', err);
+      setErrorMsg('পরিশোধ প্রক্রিয়ায় ত্রুটি হয়েছে। অনুগ্রহ করে পুনরায় চেষ্টা করুন।');
+    } finally {
+      setThirdPartyPayLoading(false);
+    }
+  };
+
+  // Dedicated Pay For Member Submit Handler with 4-Digit Security PIN Validation
+  const handlePayForMemberSubmit = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    setPayMemberError('');
+
+    if (!selectedTargetUser) {
+      setPayMemberError('সদস্য নির্বাচন করা হয়নি।');
+      return;
+    }
+
+    const repayAmt = parseFloat(payMemberAmountInput);
+    if (isNaN(repayAmt) || repayAmt <= 0) {
+      setPayMemberError('অনুগ্রহ করে সঠিক টাকার পরিমাণ লিখুন।');
+      return;
+    }
+
+    const targetDue = selectedTargetUser.dueAmount !== undefined 
+      ? selectedTargetUser.dueAmount 
+      : (selectedTargetUser.rawDueAmount !== undefined ? selectedTargetUser.rawDueAmount : (selectedTargetUser.dueLoan || 0));
+
+    if (targetDue <= 0) {
+      setPayMemberError('এই সদস্যের বর্তমানে কোনো বকেয়া ঋণ নেই।');
+      return;
+    }
+
+    if (repayAmt > targetDue) {
+      setPayMemberError(`পরিশোধের পরিমাণ সদস্যের সর্বোচ্চ বকেয়া ৳${targetDue.toLocaleString('en-US')} টাকার বেশি হতে পারবে না।`);
+      return;
+    }
+
+    if ((user.balance || 0) < repayAmt) {
+      setPayMemberError(`আপনার ওয়ালেটে পর্যাপ্ত ব্যালেন্স নেই। আপনার বর্তমান ব্যালেন্স: ৳${(user.balance || 0).toLocaleString('en-US')} BDT।`);
+      return;
+    }
+
+    // 4-digit PIN verification
+    if (!payMemberPinInput || payMemberPinInput.trim().length !== 4) {
+      setPayMemberError('অনুগ্রহ করে আপনার ৪ সংখ্যার সিকিউরিটি পিন কোড লিখুন।');
+      return;
+    }
+
+    if (user.pin && payMemberPinInput.trim() !== user.pin.trim()) {
+      setPayMemberError('ভুল ৪ সংখ্যার সিকিউরিটি পিন কোড! পুনরায় সঠিক পিন দিন।');
+      return;
+    }
+
+    setPayMemberLoading(true);
+    try {
+      const nowIso = new Date().toISOString();
+      const targetUserId = selectedTargetUser.userId || selectedTargetUser.uid;
+      const targetName = selectedTargetUser.name || selectedTargetUser.userName || 'সম্মানিত সদস্য';
+      const targetPhone = selectedTargetUser.phone || selectedTargetUser.userPhone || '';
+      const targetMemberId = selectedTargetUser.memberId || targetPhone;
+
+      const newTargetDue = Math.max(0, targetDue - repayAmt);
+      const newPayerBalance = Math.max(0, (user.balance || 0) - repayAmt);
+
+      // Local optimistic update
+      user.balance = newPayerBalance;
+      selectedTargetUser.dueLoan = newTargetDue;
+      selectedTargetUser.dueAmount = newTargetDue;
+      if (selectedTargetUser.rawDueAmount !== undefined) selectedTargetUser.rawDueAmount = newTargetDue;
+
+      const generatedReceiptNo = `REC-${Math.floor(100000 + Math.random() * 900000)}`;
+      const generatedTxId = `QRD-3RD-${Date.now().toString().slice(-6)}`;
+
+      // Set digital receipt data
+      setReceiptData({
+        receiptNo: generatedReceiptNo,
+        transactionId: generatedTxId,
+        userName: user.name,
+        memberId: user.memberId || user.phone,
+        typeLabel: 'অন্যের করযে হাসানা কিস্তি পরিশোধ',
+        amount: repayAmt,
+        description: `সদস্য ${targetName} (${targetPhone || 'N/A'})-এর বকেয়া করযে হাসানা কিস্তি পরিশোধিত (অবশিষ্ট বকেয়া: ৳${newTargetDue.toLocaleString('en-US')} BDT)`,
+        createdAt: nowIso,
+        paymentMethod: 'WALLET'
+      });
+
+      setShowPayForMemberModal(false);
+      setShowReceiptModal(true);
+      setSuccessMsg(`ধন্যবাদ! আপনি সফলভাবে সদস্য ${targetName}-এর ৳${repayAmt.toLocaleString('en-US')} টাকা করযে হাসানা কিস্তি পরিশোধ করেছেন।`);
+
+      // Reset inputs
+      setPayMemberAmountInput('');
+      setPayMemberPinInput('');
+      setSelectedTargetUser(null);
+
+      // Firestore background operations
+      const payerRef = doc(db, 'users', user.uid);
+      const targetRef = doc(db, 'users', targetUserId);
+
+      await Promise.all([
+        updateDoc(payerRef, { balance: newPayerBalance, mainBalance: newPayerBalance }).catch(e => console.warn('Payer update err:', e)),
+        updateDoc(targetRef, { dueLoan: newTargetDue }).catch(e => console.warn('Target update err:', e)),
+        addDoc(collection(db, 'transactions'), {
+          userId: targetUserId,
+          payerUserId: user.uid,
+          payerName: user.name,
+          userName: targetName,
+          memberId: targetMemberId,
+          type: 'qard_loan_repayment',
+          typeLabel: 'অন্যের মাধ্যমে করযে হাসানা কিস্তি পরিশোধ',
+          amount: repayAmt,
+          status: 'success',
+          description: `দাতা সদস্য ${user.name} (${user.phone}) আপনার ৳${repayAmt.toLocaleString('en-US')} টাকার করযে হাসানা কিস্তি পরিশোধ করে দিয়েছেন।`,
+          createdAt: nowIso,
+          paymentMethod: 'WALLET',
+          transactionId: generatedTxId,
+          receiptNo: generatedReceiptNo
+        }).catch(e => console.warn('Tx doc err:', e)),
+        addDoc(collection(db, 'user_notifications'), {
+          userId: targetUserId,
+          title: '🎉 আপনার করযে হাসানা কিস্তি পরিশোধ হয়েছে!',
+          message: `সম্মানিত সদস্য ${user.name} (${user.phone}) আপনার ৳${repayAmt.toLocaleString('en-US')} BDT করযে হাসানা কিস্তি পরিশোধ করেছেন। আপনার বকেয়া অবশিষ্ট: ৳${newTargetDue.toLocaleString('en-US')} BDT।`,
+          createdAt: nowIso,
+          read: false,
+          type: 'qard_repayment'
+        }).catch(e => console.warn('Notif err:', e)),
+        addDoc(collection(db, 'admin_notifications'), {
+          title: '🤝 অন্যের করযে হাসানা কিস্তি পরিশোধ সম্পন্ন',
+          message: `সদস্য ${user.name} (${user.phone}) অপর সদস্য ${targetName} (${targetPhone})-এর ৳${repayAmt.toLocaleString('en-US')} টাকার করযে হাসানা কিস্তি পরিশোধ করেছেন।`,
+          userId: user.uid,
+          createdAt: nowIso,
+          read: false
+        }).catch(e => console.warn('Admin notif err:', e))
+      ]);
+
+      await syncLiveProfile();
+      await fetchLedgers();
+    } catch (err: any) {
+      console.error('Pay for member submit error:', err);
+      setPayMemberError('পরিশোধ প্রক্রিয়ায় ত্রুটি হয়েছে। পুনরায় চেষ্টা করুন।');
+    } finally {
+      setPayMemberLoading(false);
     }
   };
 
@@ -1670,7 +1968,7 @@ AMB Business Co-operative Welfare Fund
           </div>
           <div className="text-right">
             <span className="text-[9px] text-slate-500 font-extrabold block">মোট বকেয়া ঋণ</span>
-            <strong className="text-base font-mono font-black text-rose-700">৳ {activeDue.toLocaleString('bn-BD')} BDT</strong>
+            <strong className="text-base font-mono font-black text-rose-700">৳ {activeDue.toLocaleString('en-US')} BDT</strong>
           </div>
         </div>
 
@@ -1682,7 +1980,7 @@ AMB Business Co-operative Welfare Fund
               <span>⚠️ ৩০ দিন মেয়াদ অতিক্রান্ত! ({overdueDays} দিন ওভারডিউ)</span>
             </div>
             <p className="text-[10px] text-rose-100 leading-relaxed font-sans">
-              আপনার ঋণের নির্ধারিত ৩০ দিন মেয়াদ পার হয়ে গেছে। নিয়ম অনুযায়ী প্রতিদিন প্রতি ১,০০০ টাকায় ১০ টাকা হারে (আজকের জরিমানা ৳{dailyFineAmt.toLocaleString('bn-BD')}) আপনার মেইন ব্যালেন্স থেকে স্বয়ংক্রিয়ভাবে বিলম্ব জরিমানা কর্তন করা শুরু হয়েছে। আরও অতিরিক্ত জরিমানা এড়াতে এখনই সম্পূর্ণ ঋণ পরিশোধ করুন।
+              আপনার ঋণের নির্ধারিত ৩০ দিন মেয়াদ পার হয়ে গেছে। নিয়ম অনুযায়ী প্রতিদিন প্রতি ১,০০০ টাকায় ১০ টাকা হারে (আজকের জরিমানা ৳{dailyFineAmt.toLocaleString('en-US')}) আপনার মেইন ব্যালেন্স থেকে স্বয়ংক্রিয়ভাবে বিলম্ব জরিমানা কর্তন করা শুরু হয়েছে। আরও অতিরিক্ত জরিমানা এড়াতে এখনই সম্পূর্ণ ঋণ পরিশোধ করুন।
             </p>
           </div>
         )}
@@ -1707,7 +2005,7 @@ AMB Business Co-operative Welfare Fund
           </div>
           <div>
             <span className="text-slate-400 font-bold block text-[8px] uppercase">মাসিক নির্ধারিত কিস্তিঃ</span>
-            <span className="font-extrabold text-slate-800">৳ {monthlyInstalment.toLocaleString('bn-BD')}</span>
+            <span className="font-extrabold text-slate-800">৳ {monthlyInstalment.toLocaleString('en-US')}</span>
           </div>
         </div>
 
@@ -1738,7 +2036,7 @@ AMB Business Co-operative Welfare Fund
               }`}
             >
               <span>1 কিস্তি পরিশোধ</span>
-              <span className="text-[9.5px] opacity-90 font-mono">৳ {monthlyInstalment.toLocaleString('bn-BD')} BDT</span>
+              <span className="text-[9.5px] opacity-90 font-mono">৳ {monthlyInstalment.toLocaleString('en-US')} BDT</span>
             </button>
 
             <button
@@ -1751,7 +2049,7 @@ AMB Business Co-operative Welfare Fund
               }`}
             >
               <span>সম্পূর্ণ ঋণ পরিশোধ</span>
-              <span className="text-[9.5px] opacity-90 font-mono">৳ {activeDue.toLocaleString('bn-BD')} BDT</span>
+              <span className="text-[9.5px] opacity-90 font-mono">৳ {activeDue.toLocaleString('en-US')} BDT</span>
             </button>
           </div>
 
@@ -1774,7 +2072,7 @@ AMB Business Co-operative Welfare Fund
             className="w-full py-3 bg-rose-600 hover:bg-rose-700 text-white font-black text-xs rounded-2xl active:scale-95 transition cursor-pointer flex items-center justify-center gap-2 shadow-sm"
           >
             <Coins className="w-4 h-4 text-white" />
-            ওয়ালেট থেকে এক্ষুণি ৳ {payAmtToExecute.toLocaleString('bn-BD')} BDT পরিশোধ করুন
+            ওয়ালেট থেকে এক্ষুণি ৳ {payAmtToExecute.toLocaleString('en-US')} BDT পরিশোধ করুন
           </button>
         </div>
       </div>
@@ -1794,7 +2092,7 @@ AMB Business Co-operative Welfare Fund
     const totalDeduction = installmentAmount + penaltyAmount;
     
     if (user.balance < totalDeduction) {
-      setSimulationError(`দুঃখিত! আপনার মেইন ব্যালেন্স থেকে কিস্তি এবং জরিমানা বাবদ প্রয়োজনীয় ৳${totalDeduction.toLocaleString('bn-BD')} স্বয়ংক্রিয়ভাবে কাটার জন্য পর্যাপ্ত ব্যালেন্স নেই। অনুগ্রহ করে ওয়ালেটে ফান্ড অ্যাড করুন।`);
+      setSimulationError(`দুঃখিত! আপনার মেইন ব্যালেন্স থেকে কিস্তি এবং জরিমানা বাবদ প্রয়োজনীয় ৳${totalDeduction.toLocaleString('en-US')} স্বয়ংক্রিয়ভাবে কাটার জন্য পর্যাপ্ত ব্যালেন্স নেই। অনুগ্রহ করে ওয়ালেটে ফান্ড অ্যাড করুন।`);
       return;
     }
     
@@ -1851,12 +2149,12 @@ AMB Business Co-operative Welfare Fund
         id: notifId,
         userId: user.uid,
         title: '💸 করজে হাসানা কিস্তি অটো-ডেবিট সম্পন্ন',
-        body: `আপনার একাউন্টের মেইন ব্যালেন্স থেকে সফলভাবে কিস্তি বাবদ ৳${installmentAmount.toLocaleString('bn-BD')} ${penaltyAmount > 0 ? `এবং বিলম্ব জরিমানা বাবদ ৳${penaltyAmount.toLocaleString('bn-BD')}` : ''} স্বয়ংক্রিয়ভাবে কেটে নেওয়া হয়েছে। আপনার আমানত সুরক্ষায় সহযোগিতা করার জন্য ধন্যবাদ।`,
+        body: `আপনার একাউন্টের মেইন ব্যালেন্স থেকে সফলভাবে কিস্তি বাবদ ৳${installmentAmount.toLocaleString('en-US')} ${penaltyAmount > 0 ? `এবং বিলম্ব জরিমানা বাবদ ৳${penaltyAmount.toLocaleString('en-US')}` : ''} স্বয়ংক্রিয়ভাবে কেটে নেওয়া হয়েছে। আপনার আমানত সুরক্ষায় সহযোগিতা করার জন্য ধন্যবাদ।`,
         read: false,
         createdAt: new Date().toISOString()
       });
       
-      setSimulationSuccess(`আলহামদুলিল্লাহ! আপনার কিস্তি অটো-ডেবিট এবং জরিমানা সমন্বয় সফলভাবে সম্পন্ন হয়েছে। মেইন ওয়ালেট থেকে মোট ৳${totalDeduction.toLocaleString('bn-BD')} কেটে নেওয়া হয়েছে।`);
+      setSimulationSuccess(`আলহামদুলিল্লাহ! আপনার কিস্তি অটো-ডেবিট এবং জরিমানা সমন্বয় সফলভাবে সম্পন্ন হয়েছে। মেইন ওয়ালেট থেকে মোট ৳${totalDeduction.toLocaleString('en-US')} কেটে নেওয়া হয়েছে।`);
       
       await fetchLedgers();
       await syncLiveProfile();
@@ -1969,62 +2267,64 @@ AMB Business Co-operative Welfare Fund
       {/* Header Area */}
       <header className="bg-white/95 backdrop-blur-md sticky top-0 z-40 border-b border-slate-200/80 px-2 py-2 shrink-0 shadow-3xs overflow-x-auto no-scrollbar">
         <div className="max-w-2xl mx-auto flex items-center justify-between gap-1 min-w-max">
-          {/* Back button */}
-          <UnifiedBackButton 
-            onClick={() => {
-              if (showReceiptModal) { setShowReceiptModal(false); return; }
-              if (showCertificate) { setShowCertificate(false); return; }
-              if (showRepayModal) { setShowRepayModal(false); return; }
-              if (showSectionTxHistory) { setShowSectionTxHistory(false); return; }
-              if (activeTab !== 'landing') {
-                setActiveTab('landing');
-                return;
-              }
-              onBack();
-            }}
-            variant="dark"
-            title="পিছনে যান"
-          />
+          {/* Left Group: Back button + Section Name */}
+          <div className="flex items-center gap-1.5 shrink-0">
+            <UnifiedBackButton 
+              onClick={() => {
+                if (showReceiptModal) { setShowReceiptModal(false); return; }
+                if (showCertificate) { setShowCertificate(false); return; }
+                if (showRepayModal) { setShowRepayModal(false); return; }
+                if (showSectionTxHistory) { setShowSectionTxHistory(false); return; }
+                if (activeTab !== 'landing') {
+                  setActiveTab('landing');
+                  return;
+                }
+                onBack();
+              }}
+              variant="dark"
+              title="পিছনে যান"
+            />
 
-          {/* Item 1: Section Name (সেকশনের নাম: করযে হাসানা) */}
-          <div className="leading-tight shrink-0 px-1">
-            <div className="flex items-center gap-1">
+            <div className="shrink-0 px-0.5">
               <h1 className="text-xs font-black text-rose-600 font-sans tracking-tight leading-none">
                 করযে হাসানা
               </h1>
-              <span className="text-[7.5px] font-sans font-black uppercase bg-rose-100 text-rose-700 border border-rose-200 px-1 py-0.5 rounded-full leading-none">
-                সুদমুক্ত
-              </span>
-            </div>
-            <p className="text-[7.5px] text-slate-400 font-sans font-bold leading-none mt-0.5">Welfare Fund</p>
-          </div>
-
-          {/* Item 2 & 3 Joined: Main Balance + Qard Hasana Fund (একসাথে লাগানো ব্যালেন্স বক্স) */}
-          <div className="flex items-center bg-slate-50 border border-slate-200/80 rounded-xl px-2 py-1 shrink-0 divide-x divide-slate-200/90 gap-2">
-            {/* Main Balance */}
-            <div className="pr-1 text-left leading-none">
-              <span className="text-[7px] font-extrabold text-emerald-700 uppercase block tracking-tighter">মেইন ব্যালেন্স</span>
-              <span className="text-[10.5px] font-black text-emerald-950 font-sans block mt-0.5 whitespace-nowrap">৳ {(user.balance || 0).toLocaleString('bn-BD')}</span>
-            </div>
-            {/* Qard Hasana Fund (Main Fund Total / মোট করযে হাসানা তহবিল) */}
-            <div className="pl-2 text-left leading-none">
-              <span className="text-[7px] font-extrabold text-rose-700 uppercase block tracking-tighter">করযে হাসানা ফান্ড</span>
-              <span className="text-[10.5px] font-black text-rose-950 font-sans block mt-0.5 whitespace-nowrap">৳ {(qardTotalFund || 0).toLocaleString('bn-BD')}</span>
             </div>
           </div>
 
-          {/* Item 4: Transaction History (ছোট লেনদেন হিস্টোরি বাটন) */}
-          <button 
-            onClick={() => {
-              fetchLedgers();
-              setShowSectionTxHistory(true);
-            }}
-            className="p-1.5 px-2 bg-rose-50 border border-rose-100 hover:bg-rose-100 text-rose-700 rounded-xl transition active:scale-95 cursor-pointer flex items-center gap-1 shrink-0 shadow-3xs"
-            title="করযে হাসানা লেনদেন হিস্টোরি"
-          >
-            <ClipboardList className="w-3.5 h-3.5 text-rose-600 shrink-0" />
-            <span className="text-[9px] text-rose-700 font-black whitespace-nowrap">লেনদেন</span>
-          </button>
+          {/* Right Group: Joined Balances Box + Transaction History Button (ব্যালেন্সের ঠিক পাশে লেনদেন বাটন) */}
+          <div className="flex items-center gap-1.5 shrink-0">
+            <div className="flex items-center bg-slate-50 border border-slate-200/80 rounded-xl px-2 py-1 shrink-0 divide-x divide-slate-200/90 gap-1.5">
+              {/* Main Balance */}
+              <div className="pr-1 text-left leading-none">
+                <span className="text-[6.5px] sm:text-[7px] font-extrabold text-emerald-700 uppercase block tracking-tighter">মেইন ব্যালেন্স</span>
+                <span className="text-[10px] sm:text-[10.5px] font-black text-emerald-950 font-sans block mt-0.5 whitespace-nowrap">৳ {(user.balance || 0).toLocaleString('en-US')}</span>
+              </div>
+              {/* Qard Hasana Fund */}
+              <div className="px-1.5 text-left leading-none">
+                <span className="text-[6.5px] sm:text-[7px] font-extrabold text-rose-700 uppercase block tracking-tighter">করযে হাসানা ফান্ড</span>
+                <span className="text-[10px] sm:text-[10.5px] font-black text-rose-950 font-sans block mt-0.5 whitespace-nowrap">৳ {(qardTotalFund || 0).toLocaleString('en-US')}</span>
+              </div>
+              {/* Distributed Loans */}
+              <div className="pl-1.5 text-left leading-none">
+                <span className="text-[6.5px] sm:text-[7px] font-extrabold text-amber-700 uppercase block tracking-tighter">বিতরণকৃত ঋণ</span>
+                <span className="text-[10px] sm:text-[10.5px] font-black text-amber-950 font-sans block mt-0.5 whitespace-nowrap">৳ {(qardActiveLoansAmount || 0).toLocaleString('en-US')}</span>
+              </div>
+            </div>
+
+            {/* Transaction History Button */}
+            <button 
+              onClick={() => {
+                fetchLedgers();
+                setShowSectionTxHistory(true);
+              }}
+              className="p-1.5 px-2 bg-rose-50 border border-rose-100 hover:bg-rose-100 text-rose-700 rounded-xl transition active:scale-95 cursor-pointer flex items-center gap-1 shrink-0 shadow-3xs"
+              title="করযে হাসানা লেনদেন হিস্টোরি"
+            >
+              <ClipboardList className="w-3.5 h-3.5 text-rose-600 shrink-0" />
+              <span className="text-[9px] text-rose-700 font-black whitespace-nowrap">লেনদেন</span>
+            </button>
+          </div>
         </div>
       </header>
 
@@ -2075,9 +2375,9 @@ AMB Business Co-operative Welfare Fund
                 name: memberName,
                 role: 'সদস্য',
                 rawAmount: loanAmt,
-                amount: loanAmt.toLocaleString('bn-BD'),
+                amount: loanAmt.toLocaleString('en-US'),
                 installments: isComplete ? '3/3' : (t.loanDuration ? `1/${t.loanDuration}` : '1/3'),
-                dueAmount: remaining.toLocaleString('bn-BD'),
+                dueAmount: remaining.toLocaleString('en-US'),
                 rawDueAmount: remaining,
                 nextInstallment: t.loanDuration === 1 ? '30 দিন' : '25 জুন',
                 isComplete,
@@ -2091,34 +2391,103 @@ AMB Business Co-operative Welfare Fund
           // প্রথম 5 জনের তালিকা
           const displayLoans = liveLoansList.slice(0, 5);
 
-          const liveDonationsList = qardHistory
-            .filter(t => t.type === 'qard_donation' && t.status === 'success')
-            .map((t, idx) => {
-              const donateAmt = Number(t.amount) || 0;
-              const uInfo = usersMap[t.userId] || (t.userPhone ? usersMap[t.userPhone] : null) || (t.memberId ? usersMap[t.memberId] : null);
-              const memberName = uInfo?.name || t.userName || 'দানশীল সদস্য';
-              const memberPhoto = uInfo?.photoURL || uInfo?.photo || t.userPhoto || t.photoURL || '';
-              const initialLetter = (memberName || 'দ').trim().charAt(0).toUpperCase();
+          // Aggregate all donations by unique donor (userId/phone/name) for Cumulative Totals
+          const allDonationsTxs = qardHistory.filter(t => {
+            if (t.type !== 'qard_donation' || t.status !== 'success') return false;
+            const nameStr = String(t.userName || '');
+            if (nameStr.includes('জুবায়ের') || nameStr.includes('Jubayer')) return false;
+            if (Number(t.amount) === 2500) return false;
+            return true;
+          });
+          const donorMap: Record<string, {
+            userId: string;
+            name: string;
+            phone: string;
+            image: string;
+            initialLetter: string;
+            totalAmount: number;
+            donationCount: number;
+            latestDate: string;
+            latestTimestamp: number;
+            history: Array<{
+              id: string;
+              amount: number;
+              date: string;
+              typeLabel: string;
+              description: string;
+              receiptNo?: string;
+              transactionId?: string;
+            }>;
+          }> = {};
 
-              return {
-                userId: t.userId,
+          allDonationsTxs.forEach((t) => {
+            const key = t.userId || t.userPhone || t.userName || 'anonymous';
+            const donateAmt = Number(t.amount) || 0;
+            const uInfo = usersMap[t.userId] || 
+                          (t.userPhone ? usersMap[t.userPhone] : null) || 
+                          (t.memberId ? usersMap[t.memberId] : null) ||
+                          (t.userName ? usersMap[t.userName] : null);
+
+            const memberName = t.userName === 'গোপন দাতা' ? 'গোপন দাতা' : (uInfo?.name || t.userName || 'দানশীল সদস্য');
+            const memberPhone = (uInfo as any)?.phone || t.userPhone || '';
+            const memberPhoto = t.userName === 'গোপন দাতা' 
+              ? '' 
+              : (uInfo?.photoURL || uInfo?.photo || (uInfo as any)?.profilePic || t.userPhoto || t.photoURL || (t as any).profilePic || (user && (user.uid === t.userId || user.name === t.userName || user.phone === t.userPhone) ? (user.photoURL || user.profilePic || (user as any).photo) : '') || '');
+
+            const initialLetter = (memberName || 'দ').trim().charAt(0).toUpperCase();
+
+            const txDate = t.createdAt ? new Date(t.createdAt) : new Date();
+            const formattedDate = txDate.toLocaleDateString('bn-BD', { day: 'numeric', month: 'long', year: 'numeric' });
+            const typeLabel = t.description?.includes('মাসিক') ? 'মাসিক অনুদান' : (t.description?.includes('আমানত') ? 'কল্যাণ আমানত' : 'স্বেচ্ছা অনুদান');
+
+            if (!donorMap[key]) {
+              donorMap[key] = {
+                userId: key,
                 name: memberName,
-                relationship: 'সদস্য',
-                rawAmount: donateAmt,
-                amount: donateAmt.toLocaleString('bn-BD'),
-                date: new Date(t.createdAt).toLocaleDateString('bn-BD', { day: 'numeric', month: 'long', year: 'numeric' }),
-                type: 'donation',
-                typeLabel: t.description?.includes('মাসিক') ? 'মাসিক অনুদান' : (t.description?.includes('আমানত') ? 'কল্যাণ আমানত' : 'স্বেচ্ছা অনুদান'),
+                phone: memberPhone,
                 image: memberPhoto,
                 initialLetter,
-                bgColorClass: 'bg-emerald-600'
+                totalAmount: 0,
+                donationCount: 0,
+                latestDate: formattedDate,
+                latestTimestamp: txDate.getTime(),
+                history: []
               };
-            });
+            } else {
+              if (!donorMap[key].image && memberPhoto) {
+                donorMap[key].image = memberPhoto;
+              }
+              if (memberName && memberName !== 'দানশীল সদস্য' && donorMap[key].name === 'দানশীল সদস্য') {
+                donorMap[key].name = memberName;
+              }
+            }
 
-          // বেশি টাকা থেকে কম টাকার দিকে সাজানো (Descending sort: Highest to Lowest)
-          liveDonationsList.sort((a, b) => b.rawAmount - a.rawAmount);
-          // প্রথম 5 জনের তালিকা
-          const displayDonors = liveDonationsList.slice(0, 5); 
+            donorMap[key].totalAmount += donateAmt;
+            donorMap[key].donationCount += 1;
+            if (txDate.getTime() >= donorMap[key].latestTimestamp) {
+              donorMap[key].latestTimestamp = txDate.getTime();
+              donorMap[key].latestDate = formattedDate;
+            }
+
+            donorMap[key].history.push({
+              id: t.id || t.transactionId || String(Math.random()),
+              amount: donateAmt,
+              date: formattedDate,
+              typeLabel,
+              description: t.description || 'করযে হাসানা অনুদান',
+              receiptNo: t.receiptNo,
+              transactionId: t.transactionId
+            });
+          });
+
+          // Sort each donor's individual history descending by date
+          Object.values(donorMap).forEach((d) => {
+            d.history.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+          });
+
+          // Sorted donors array by total cumulative donation descending (Highest to Lowest)
+          const aggregatedDonorsList = Object.values(donorMap).sort((a, b) => b.totalAmount - a.totalAmount);
+          const displayDonors = aggregatedDonorsList.slice(0, 5);
 
           return (
             <div className="space-y-4 animate-fade-in text-left">
@@ -2139,60 +2508,98 @@ AMB Business Co-operative Welfare Fund
               {/* Premium Image Slider System (Memoized isolated slider) */}
               <QardBannerSlider adSlides={adSlides} />
 
-              {/* 4 Premium Quick Info Counters Row (ফান্ডে জমা টাকা, ঋণ দেওয়া আছে, কে টাকা দিয়েছে, স্বর্ণ রেখে লোন) - 1 Line 4 Columns */}
-              <div className="grid grid-cols-4 gap-1 sm:gap-2.5 my-2">
-                {/* Card 1: ফান্ডে জমা টাকা */}
+              {/* Top Section: Compact Sleek Full-Width Banner for 'কর্জে হাসানায় দান করুন' */}
+              <div className="my-2 w-full">
+                <div 
+                  onClick={() => setActiveTab('donate')}
+                  className="w-full bg-gradient-to-r from-emerald-800 via-teal-800 to-emerald-900 hover:from-emerald-900 hover:to-teal-900 text-white py-2.5 px-3.5 sm:py-3 sm:px-4 rounded-2.5xl shadow-md border border-emerald-500/70 flex items-center justify-between gap-2.5 cursor-pointer transition active:scale-98 group relative overflow-hidden"
+                >
+                  {/* Decorative subtle glowing background highlight */}
+                  <div className="absolute -right-6 -bottom-6 w-28 h-28 bg-amber-400/10 rounded-full blur-xl pointer-events-none" />
+
+                  <div className="flex items-center gap-2.5 relative z-10 text-left min-w-0 flex-1">
+                    <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-tr from-amber-400 to-amber-500 text-emerald-950 flex items-center justify-center shrink-0 shadow-xs group-hover:scale-105 transition border border-amber-300">
+                      <HeartHandshake className="w-5 h-5 sm:w-5.5 sm:h-5.5 text-emerald-950" />
+                    </div>
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-1.5 mb-0.5">
+                        <span className="text-[8.5px] sm:text-[9.5px] font-black bg-amber-400 text-emerald-950 px-2 py-0.2 rounded-full shadow-3xs leading-tight">
+                          ✨ ১৮ গুণ সওয়াব
+                        </span>
+                        <span className="text-[8.5px] font-bold text-emerald-200 bg-white/10 px-1.5 py-0.2 rounded-full border border-white/20 hidden sm:inline-block">
+                          সদকা এ جاریয়া
+                        </span>
+                      </div>
+                      <h3 className="text-xs sm:text-sm font-black text-amber-300 font-sans leading-tight truncate">
+                        উম্মাহর সেবায় করযে হাসানায় দান করুন
+                      </h3>
+                    </div>
+                  </div>
+
+                  {/* Right Action Button */}
+                  <div className="relative z-10 shrink-0">
+                    <div className="px-3 py-1.5 bg-gradient-to-r from-amber-400 to-amber-500 text-emerald-950 rounded-xl text-[11px] font-black shadow-xs flex items-center gap-1 group-hover:translate-x-0.5 transition border border-amber-300">
+                      <HandHeart className="w-3.5 h-3.5 text-emerald-950 fill-emerald-950" />
+                      <span>দান করুন ➔</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Active Loan Repayment Component if user has active due loan */}
+              {renderActiveLoanRepaymentCard()}
+
+              {/* Bottom 4 Section Cards Grid - 4 Columns Layout */}
+              <div className="grid grid-cols-4 gap-1.5 sm:gap-2.5 my-3">
+                {/* 1. টাকা নিতে আবেদন (First) */}
                 <button 
                   type="button"
-                  onClick={() => setShowDonorsModal(true)}
-                  className="bg-[#FAFDFB] hover:bg-emerald-50 border border-emerald-100/80 rounded-2xl p-1.5 sm:p-2.5 text-center shadow-4xs flex flex-col items-center justify-between min-w-0 cursor-pointer transition active:scale-95 group"
-                  title="ফান্ডের বর্তমান অবশিষ্ট ব্যালেন্স ও দাতা সদস্যদের তালিকা দেখতে ক্লিক করুন"
+                  onClick={() => setActiveTab('apply')}
+                  className="bg-emerald-50/60 hover:bg-emerald-100/80 border border-emerald-200/80 rounded-2xl p-2 sm:p-2.5 text-center shadow-4xs flex flex-col items-center justify-between min-w-0 cursor-pointer transition active:scale-95 group"
                 >
-                  <div className="w-7 h-7 sm:w-10 sm:h-10 bg-emerald-100 group-hover:bg-emerald-200 text-emerald-600 rounded-xl sm:rounded-2xl flex items-center justify-center shrink-0 transition mb-1">
-                    <HeartHandshake className="w-3.5 h-3.5 sm:w-5 sm:h-5" />
+                  <div className="w-8.5 h-8.5 sm:w-10 sm:h-10 rounded-2xl bg-emerald-600 text-white flex items-center justify-center shadow-2xs group-hover:scale-105 transition mb-1">
+                    <Coins className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
                   </div>
                   <div className="space-y-0.5 min-w-0 w-full">
-                    <span className="text-[7.5px] sm:text-[9px] text-slate-400 group-hover:text-emerald-700 font-extrabold block truncate leading-none">ফান্ডে জমা টাকা</span>
-                    <h3 className="text-[9.5px] sm:text-xs md:text-sm font-black text-emerald-700 group-hover:text-emerald-900 font-sans tracking-tight leading-none truncate my-0.5">৳ {qardAvailableFund?.toLocaleString('bn-BD')}</h3>
-                    <span className="text-[6.5px] sm:text-[8px] text-emerald-600 font-extrabold block truncate leading-none flex items-center justify-center gap-0.5">অবশিষ্ট ফান্ড <ChevronRight className="w-2 h-2 inline" /></span>
+                    <span className="text-[9px] sm:text-[10.5px] font-black text-emerald-950 block truncate leading-tight">টাকা নিতে আবেদন</span>
+                    <span className="text-[7px] sm:text-[8.5px] text-emerald-700 font-bold block truncate leading-none mt-0.5">সুদমুক্ত ঋণ</span>
                   </div>
                 </button>
 
-                {/* Card 2: ঋণ দেওয়া আছে */}
+                {/* 2. টাকা পরিশোধ */}
                 <button 
                   type="button"
-                  onClick={() => setShowBorrowersModal(true)}
-                  className="bg-[#FFF9FB] hover:bg-rose-50 border border-rose-100/80 rounded-2xl p-1.5 sm:p-2.5 text-center shadow-4xs flex flex-col items-center justify-between min-w-0 cursor-pointer transition active:scale-95 group"
-                  title="ঋণগ্রহীতা সকল সদস্যদের তালিকা ও কিস্তির হিসাব দেখতে ক্লিক করুন"
+                  onClick={() => {
+                    setRepaySubTab('my_loan');
+                    setShowRepayModal(true);
+                  }}
+                  className="bg-amber-50/60 hover:bg-amber-100/80 border border-amber-200/80 rounded-2xl p-2 sm:p-2.5 text-center shadow-4xs flex flex-col items-center justify-between min-w-0 cursor-pointer transition active:scale-95 group"
                 >
-                  <div className="w-7 h-7 sm:w-10 sm:h-10 bg-rose-100 group-hover:bg-rose-200 text-rose-600 rounded-xl sm:rounded-2xl flex items-center justify-center shrink-0 transition mb-1">
-                    <Coins className="w-3.5 h-3.5 sm:w-5 sm:h-5" />
+                  <div className="w-8.5 h-8.5 sm:w-10 sm:h-10 rounded-2xl bg-amber-500 text-white flex items-center justify-center shadow-2xs group-hover:scale-105 transition mb-1">
+                    <Zap className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
                   </div>
                   <div className="space-y-0.5 min-w-0 w-full">
-                    <span className="text-[7.5px] sm:text-[9px] text-slate-400 group-hover:text-rose-700 font-extrabold block truncate leading-none">ঋণ দেওয়া আছে</span>
-                    <h3 className="text-[9.5px] sm:text-xs md:text-sm font-black text-rose-600 group-hover:text-rose-800 font-sans tracking-tight leading-none truncate my-0.5">৳ {qardActiveLoansAmount?.toLocaleString('bn-BD')}</h3>
-                    <span className="text-[6.5px] sm:text-[8px] text-rose-600 font-extrabold block truncate leading-none flex items-center justify-center gap-0.5">মোট {beneficiaryCount} জনকে <ChevronRight className="w-2 h-2 inline" /></span>
+                    <span className="text-[9px] sm:text-[10.5px] font-black text-amber-950 block truncate leading-tight">টাকা পরিশোধ</span>
+                    <span className="text-[7px] sm:text-[8.5px] text-amber-700 font-bold block truncate leading-none mt-0.5">কিস্তি বা ফেরত</span>
                   </div>
                 </button>
 
-                {/* Card 3: ফান্ডে কে টাকা দিয়েছে */}
+                {/* 3. আমার আবেদন */}
                 <button 
                   type="button"
-                  onClick={() => setShowDonorsModal(true)}
-                  className="bg-[#FAFCFF] hover:bg-sky-50 border border-sky-100/80 rounded-2xl p-1.5 sm:p-2.5 text-center shadow-4xs flex flex-col items-center justify-between min-w-0 cursor-pointer transition active:scale-95 group"
-                  title="ফান্ডে অনুদান প্রদানকারী সকল দাতা সদস্যদের তালিকা দেখতে ক্লিক করুন"
+                  onClick={() => setActiveTab('dashboard')}
+                  className="bg-blue-50/60 hover:bg-blue-100/80 border border-blue-200/80 rounded-2xl p-2 sm:p-2.5 text-center shadow-4xs flex flex-col items-center justify-between min-w-0 cursor-pointer transition active:scale-95 group"
                 >
-                  <div className="w-7 h-7 sm:w-10 sm:h-10 bg-sky-100 text-sky-650 rounded-xl sm:rounded-2xl flex items-center justify-center shrink-0 mb-1">
-                    <Users className="w-3.5 h-3.5 sm:w-5 sm:h-5" />
+                  <div className="w-8.5 h-8.5 sm:w-10 sm:h-10 rounded-2xl bg-blue-600 text-white flex items-center justify-center shadow-2xs group-hover:scale-105 transition mb-1">
+                    <FileText className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
                   </div>
                   <div className="space-y-0.5 min-w-0 w-full">
-                    <span className="text-[7.5px] sm:text-[9px] text-slate-400 font-extrabold block truncate leading-none">কে টাকা দিয়েছে</span>
-                    <h3 className="text-[9.5px] sm:text-xs md:text-sm font-black text-sky-600 font-sans tracking-tight leading-none truncate my-0.5">{displayDonors.length.toLocaleString('bn-BD', { minimumFractionDigits: 0, maximumFractionDigits: 0 })} জন</h3>
-                    <span className="text-[6.5px] sm:text-[8px] text-teal-600 font-extrabold block truncate leading-none">মোট দাতা সদস্য</span>
+                    <span className="text-[9px] sm:text-[10.5px] font-black text-slate-900 block truncate leading-tight">আমার আবেদন</span>
+                    <span className="text-[7px] sm:text-[8.5px] text-blue-700 font-bold block truncate leading-none mt-0.5">আবেদন স্ট্যাটাস</span>
                   </div>
                 </button>
 
-                {/* Card 4: স্বর্ণ রেখে লোন */}
+                {/* 4. স্বর্ণ রেখে লোন (Last) */}
                 <button 
                   type="button"
                   onClick={() => {
@@ -2200,72 +2607,15 @@ AMB Business Co-operative Welfare Fund
                     setGoldSuccessMsg('');
                     setGoldErrorMsg('');
                   }}
-                  className="bg-gradient-to-br from-amber-50/90 to-yellow-50/70 hover:from-amber-100 hover:to-yellow-100 border border-amber-200/90 rounded-2xl p-1.5 sm:p-2.5 text-center shadow-4xs flex flex-col items-center justify-between min-w-0 cursor-pointer transition active:scale-95 group relative overflow-hidden"
-                  title="স্বর্ণ রেখে জরুরি লোন ও 0% সুদে ক্যাশ সুবিধা দেখতে ক্লিক করুন"
+                  className="bg-gradient-to-b from-amber-50 to-yellow-50 hover:bg-amber-100 border border-amber-200 rounded-2xl p-2 sm:p-2.5 text-center shadow-4xs flex flex-col items-center justify-between min-w-0 cursor-pointer transition active:scale-95 group"
                 >
-                  <div className="w-7 h-7 sm:w-10 sm:h-10 bg-gradient-to-tr from-amber-500 via-amber-600 to-yellow-500 text-white rounded-xl sm:rounded-2xl flex items-center justify-center shrink-0 shadow-xs group-hover:scale-105 transition mb-1">
-                    <Gem className="w-3.5 h-3.5 sm:w-5 sm:h-5 text-white" />
+                  <div className="w-8.5 h-8.5 sm:w-10 sm:h-10 bg-gradient-to-tr from-amber-500 via-amber-600 to-yellow-500 text-white rounded-2xl flex items-center justify-center shrink-0 shadow-2xs group-hover:scale-105 transition mb-1">
+                    <Gem className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
                   </div>
                   <div className="space-y-0.5 min-w-0 w-full">
-                    <span className="text-[7.5px] sm:text-[9px] text-amber-800 font-extrabold block truncate leading-none">স্বর্ণ রেখে লোন</span>
-                    <h3 className="text-[9.5px] sm:text-xs md:text-sm font-black text-amber-950 font-sans tracking-tight leading-none truncate my-0.5">দরকার টাকা</h3>
-                    <span className="text-[6.5px] sm:text-[8px] text-amber-700 font-extrabold block truncate leading-none flex items-center justify-center gap-0.5">100% বাজারদর <ChevronRight className="w-2 h-2 inline" /></span>
+                    <span className="text-[9px] sm:text-[10.5px] font-black text-amber-950 block truncate leading-tight">স্বর্ণ রেখে লোন</span>
+                    <span className="text-[7px] sm:text-[8.5px] text-amber-700 font-bold block truncate leading-none mt-0.5">১০০% সমপরিমাণ</span>
                   </div>
-                </button>
-              </div>
-
-              {/* Active Loan Repayment Component if user has active due loan */}
-              {renderActiveLoanRepaymentCard()}
-
-              {/* 4 Action Buttons Grid inside standard Box - Single Horizontal Row (1 Line) */}
-              <div className="bg-white border border-slate-100 rounded-3xl p-2 sm:p-4 shadow-xs grid grid-cols-4 gap-1 sm:gap-2.5 text-center my-3 relative overflow-hidden">
-                {/* Btn 1: টাকা জমা ও দান */}
-                <button 
-                  onClick={() => setActiveTab('donate')}
-                  className="flex flex-col items-center justify-center p-1 sm:p-2 rounded-2xl hover:bg-rose-50/50 focus:outline-none group active:scale-95 transition-all duration-150 cursor-pointer text-center border border-transparent hover:border-rose-100"
-                >
-                  <div className="w-9 h-9 sm:w-11 sm:h-11 rounded-full bg-rose-500 hover:bg-rose-600 text-white flex items-center justify-center shadow-md shadow-rose-200 transition-all duration-200 mb-1">
-                    <Heart className="w-4.5 h-4.5 sm:w-5 sm:h-5 text-white" />
-                  </div>
-                  <span className="text-[9.5px] sm:text-[11px] font-black text-slate-800 leading-tight block whitespace-nowrap">টাকা জমা ও দান</span>
-                  <span className="text-[7.5px] sm:text-[8.5px] text-slate-400 font-extrabold block leading-none font-sans mt-0.5 whitespace-nowrap">আমানত বা অনুদান</span>
-                </button>
-
-                {/* Btn 2: টাকা নিতে আবেদন */}
-                <button 
-                  onClick={() => setActiveTab('apply')}
-                  className="flex flex-col items-center justify-center p-1 sm:p-2 rounded-2xl hover:bg-emerald-50/50 focus:outline-none group active:scale-95 transition-all duration-150 cursor-pointer text-center border border-transparent hover:border-emerald-100"
-                >
-                  <div className="w-9 h-9 sm:w-11 sm:h-11 rounded-full bg-emerald-500 hover:bg-emerald-600 text-white flex items-center justify-center shadow-md shadow-emerald-200 transition-all duration-200 mb-1">
-                    <Coins className="w-4.5 h-4.5 sm:w-5.5 sm:h-5.5 text-white" />
-                  </div>
-                  <span className="text-[9.5px] sm:text-[11px] font-black text-slate-800 leading-tight block whitespace-nowrap">টাকা নিতে আবেদন</span>
-                  <span className="text-[7.5px] sm:text-[8.5px] text-slate-400 font-extrabold block leading-none mt-0.5 whitespace-nowrap">সুদ মুক্ত ঋণ নিন</span>
-                </button>
-
-                {/* Btn 3: টাকা পরিশোধ (1 দিন / 1 সপ্তাহ বা অগ্রিম) */}
-                <button 
-                  onClick={() => setShowRepayModal(true)}
-                  className="flex flex-col items-center justify-center p-1 sm:p-2 rounded-2xl bg-amber-50/70 hover:bg-amber-100/80 border border-amber-200/90 focus:outline-none group active:scale-95 transition-all duration-150 cursor-pointer text-center relative"
-                >
-                  
-                  <div className="w-9 h-9 sm:w-11 sm:h-11 rounded-full bg-amber-500 hover:bg-amber-600 text-white flex items-center justify-center shadow-md shadow-amber-200 transition-all duration-200 mb-1">
-                    <Zap className="w-4.5 h-4.5 sm:w-5.5 sm:h-5.5 text-white" />
-                  </div>
-                  <span className="text-[9.5px] sm:text-[11px] font-black text-amber-950 leading-tight block whitespace-nowrap">টাকা পরিশোধ</span>
-                  <span className="text-[7.5px] sm:text-[8.5px] text-amber-700 font-extrabold block leading-none mt-0.5 whitespace-nowrap">1 দিন/1 সপ্তাহ অগ্রিম</span>
-                </button>
-
-                {/* Btn 4: আমার আবেদন */}
-                <button 
-                  onClick={() => setActiveTab('dashboard')}
-                  className="flex flex-col items-center justify-center p-1 sm:p-2 rounded-2xl hover:bg-blue-50/50 focus:outline-none group active:scale-95 transition-all duration-150 cursor-pointer text-center border border-transparent hover:border-blue-100"
-                >
-                  <div className="w-9 h-9 sm:w-11 sm:h-11 rounded-full bg-blue-500 hover:bg-blue-600 text-white flex items-center justify-center shadow-md shadow-blue-200 transition-all duration-200 mb-1">
-                    <FileText className="w-4.5 h-4.5 sm:w-5.5 sm:h-5.5 text-white" />
-                  </div>
-                  <span className="text-[9.5px] sm:text-[11px] font-black text-slate-800 leading-tight block whitespace-nowrap">আমার আবেদন</span>
-                  <span className="text-[7.5px] sm:text-[8.5px] text-slate-400 font-extrabold block leading-none font-sans mt-0.5 whitespace-nowrap">আবেদন তালিকা</span>
                 </button>
               </div>
 
@@ -2320,130 +2670,10 @@ AMB Business Co-operative Welfare Fund
                 </button>
               </div>
 
-              {/* LIST 1: কে কত নিয়েছে */}
-              <div className="space-y-2.5 my-3">
+              {/* LIST 2: কে ফান্ডে টাকা দিয়েছে (একক দাতা সর্বমোট দান খতিয়ান তালিকা) */}
+              <div className="space-y-2.5 my-3 font-sans">
                 <div className="flex justify-between items-center px-1">
-                  <h3 className="text-xs font-black text-emerald-800 font-sans border-l-4 border-emerald-500 pl-2">কে কত নিয়েছে</h3>
-                  <span 
-                    onClick={() => setShowBorrowersModal(true)}
-                    className="text-[10.5px] font-black text-[#0D9488] hover:underline cursor-pointer flex items-center gap-0.5 shrink-0"
-                  >
-                    সব দেখুন <ChevronRight className="w-3.5 h-3.5 inline" />
-                  </span>
-                </div>
-
-                <div className="space-y-2 col-span-full">
-                  {displayLoans.length === 0 ? (
-                    <div className="p-6 text-center text-slate-400 bg-white border border-slate-100/80 rounded-2.5xl text-xs font-bold shadow-4xs select-none">
-                      কোনো ঋণগ্রহীতা পাওয়া যায়নি। মেম্বারদের ঋণ অনুমোদন হয়ে রিয়েল টাইম ডেটা আসলে এখানে দেখাবে।
-                    </div>
-                  ) : (
-                    <>
-                      {displayLoans.map((item, idx) => (
-                        <div 
-                          key={idx} 
-                          onClick={() => setActiveTab('transparency')}
-                          className="flex items-center justify-between p-3 bg-white border border-slate-100 rounded-2.5xl hover:bg-slate-50 transition duration-150 shadow-3xs gap-2 cursor-pointer"
-                        >
-                          {/* Avatar & relationship details */}
-                          <div className="flex items-center gap-2.5 w-[27%] min-w-0">
-                            {item.image ? (
-                              <img 
-                                src={item.image} 
-                                alt={item.name}
-                                className="w-10 h-10 rounded-full object-cover border-2 border-emerald-500 shrink-0 shadow-3xs" 
-                                referrerPolicy="no-referrer" 
-                                onError={(e) => {
-                                  (e.currentTarget as HTMLElement).style.display = 'none';
-                                  const fallback = (e.currentTarget as HTMLElement).nextElementSibling as HTMLElement;
-                                  if (fallback) fallback.style.display = 'flex';
-                                }}
-                              />
-                            ) : null}
-                            <div 
-                              className={`w-10 h-10 rounded-full bg-gradient-to-tr from-emerald-600 to-teal-500 text-white flex items-center justify-center font-black text-sm shrink-0 border-2 border-emerald-400 shadow-3xs ${item.image ? 'hidden' : 'flex'}`}
-                            >
-                              {item.initialLetter || (item.name ? item.name.trim().charAt(0).toUpperCase() : 'স')}
-                            </div>
-                            <div className="min-w-0">
-                              <h4 className="text-xs font-black text-slate-800 truncate leading-tight mt-0.5">{item.name}</h4>
-                              <span className="text-[9px] text-[#22C55E] bg-[#E6F4EA] px-1.5 py-0.5 rounded-md font-bold inline-block mt-0.5 truncate max-w-full scale-90 origin-left">{item.role}</span>
-                            </div>
-                          </div>
-
-                          {/* নেয়া টাকা */}
-                          <div className="w-[18%] text-left">
-                            <span className="text-[8px] text-slate-400 block font-black leading-none">নেয়া টাকা</span>
-                            <span className="text-xs font-black text-slate-800 font-sans mt-1.5 block">৳ {item.amount}</span>
-                          </div>
-
-                          {/* কিস্তি */}
-                          <div className="w-[12%] text-center">
-                            <span className="text-[8px] text-slate-400 block font-black leading-none mb-1">কিস্তি</span>
-                            <span className={`text-[9.5px] font-extrabold px-2 py-0.5 rounded-full inline-block leading-none ${item.isComplete ? 'bg-emerald-50 text-emerald-800 border border-emerald-200' : 'bg-emerald-50 text-emerald-700 border border-emerald-100 font-mono'}`}>
-                              {item.installments}
-                            </span>
-                          </div>
-
-                          {/* পরিশোধ বাকি */}
-                          <div className="w-[18%] text-left">
-                            <span className="text-[8px] text-slate-400 block font-black leading-none">পরিশোধ বাকি</span>
-                            <span className={`text-xs font-black font-sans mt-1.5 block ${item.isComplete ? 'text-[#137333]' : 'text-rose-600'}`}>
-                              ৳ {item.dueAmount}
-                            </span>
-                          </div>
-
-                          {/* পরবর্তী কিস্তি / সম্পন্ন status */}
-                          <div className="w-[20%] text-left flex flex-col justify-center">
-                            <span className="text-[8px] text-slate-400 block font-black leading-none mb-1">পরবর্তী কিস্তি</span>
-                            {item.isComplete ? (
-                              <span className="text-[9px] font-black text-emerald-600 bg-emerald-100/60 px-2 py-0.5 rounded-md flex items-center gap-1 border border-emerald-200 self-start">
-                                ✓ সম্পন্ন
-                              </span>
-                            ) : (
-                              <span className="text-[9.5px] font-extrabold text-slate-600 flex items-center gap-1 leading-normal">
-                                <Calendar className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                                {item.nextInstallment}
-                              </span>
-                            )}
-                          </div>
-
-                          {/* Arrow icon */}
-                          <ChevronRight className="w-4 h-4 text-slate-300 shrink-0" />
-                        </div>
-                      ))}
-
-                      {/* আরো দেখুন বাটন (কে কত নিয়েছে) */}
-                      {liveLoansList.length > 5 ? (
-                        <button
-                          type="button"
-                          onClick={() => setShowBorrowersModal(true)}
-                          className="w-full py-2.5 px-4 bg-emerald-50/90 hover:bg-emerald-100/90 text-emerald-800 border border-emerald-200/90 rounded-2xl text-xs font-black transition flex items-center justify-center gap-1.5 cursor-pointer shadow-3xs active:scale-98 mt-1"
-                        >
-                          <span>আরো দেখুন (মোট {liveLoansList.length.toLocaleString('bn-BD')} জন ঋণগ্রহীতা সদস্য)</span>
-                          <ChevronRight className="w-4 h-4 text-emerald-700" />
-                        </button>
-                      ) : (
-                        liveLoansList.length > 0 && (
-                          <button
-                            type="button"
-                            onClick={() => setShowBorrowersModal(true)}
-                            className="w-full py-2 px-4 bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200/80 rounded-2xl text-[11px] font-black transition flex items-center justify-center gap-1 cursor-pointer shadow-4xs active:scale-98 mt-1"
-                          >
-                            <span>আরো দেখুন (সকল ঋণগ্রহীতা ও কিস্তি খতিয়ান)</span>
-                            <ChevronRight className="w-3.5 h-3.5 text-slate-500" />
-                          </button>
-                        )
-                      )}
-                    </>
-                  )}
-                </div>
-              </div>
-
-              {/* LIST 2: কে ফান্ডে টাকা দিয়েছে */}
-              <div className="space-y-2.5 my-3">
-                <div className="flex justify-between items-center px-1">
-                  <h3 className="text-xs font-black text-sky-850 font-sans border-l-4 border-sky-500 pl-2">কে ফান্ডে টাকা দিয়েছে</h3>
+                  <h3 className="text-xs font-black text-sky-850 font-sans border-l-4 border-sky-500 pl-2">কে ফান্ডে টাকা দিয়েছে (সর্বমোট দান খতিয়ান)</h3>
                   <span 
                     onClick={() => setShowDonorsModal(true)}
                     className="text-[10.5px] font-black text-[#0D9488] hover:underline cursor-pointer flex items-center gap-0.5 shrink-0"
@@ -2462,16 +2692,16 @@ AMB Business Co-operative Welfare Fund
                       {displayDonors.map((item, idx) => (
                         <div 
                           key={idx} 
-                          onClick={() => setActiveTab('transparency')}
-                          className="flex items-center justify-between p-3 bg-white border border-slate-100 rounded-2.5xl hover:bg-slate-50 transition duration-150 shadow-3xs gap-2 cursor-pointer"
+                          onClick={() => setSelectedDonorForDetails(item)}
+                          className="flex items-center justify-between p-3 bg-white border border-slate-100 rounded-2.5xl hover:bg-emerald-50/40 hover:border-emerald-200 transition duration-150 shadow-3xs gap-2 sm:gap-3 cursor-pointer group"
                         >
-                          {/* Avatar Initials & relationship */}
-                          <div className="flex items-center gap-2.5 w-[28%] min-w-0">
+                          {/* Avatar Initials & Full Name */}
+                          <div className="flex items-center gap-2.5 min-w-0 flex-1">
                             {item.image ? (
                               <img 
                                 src={item.image} 
                                 alt={item.name}
-                                className="w-10 h-10 rounded-full object-cover border-2 border-emerald-500 shrink-0 shadow-3xs" 
+                                className="w-10.5 h-10.5 sm:w-11 sm:h-11 rounded-full object-cover border-2 border-emerald-500 shrink-0 shadow-xs group-hover:scale-105 transition" 
                                 referrerPolicy="no-referrer" 
                                 onError={(e) => {
                                   (e.currentTarget as HTMLElement).style.display = 'none';
@@ -2480,55 +2710,57 @@ AMB Business Co-operative Welfare Fund
                                 }}
                               />
                             ) : null}
-                            <div className={`w-10 h-10 rounded-full flex items-center justify-center text-white text-xs font-black shrink-0 shadow-3xs ${item.bgColorClass || 'bg-[#7D5BE2]'} ${item.image ? 'hidden' : 'flex'}`}>
-                              {item.initialLetter || (item.name ? item.name.trim().charAt(0).toUpperCase() : 'দ')}
+                            <div className={`w-10.5 h-10.5 sm:w-11 sm:h-11 rounded-full bg-gradient-to-tr from-emerald-600 to-teal-500 text-white flex items-center justify-center text-xs sm:text-sm font-black shrink-0 border-2 border-emerald-400 shadow-xs group-hover:scale-105 transition ${item.image ? 'hidden' : 'flex'}`}>
+                              {item.initialLetter}
                             </div>
-                            <div className="min-w-0 mt-0.5">
-                              <h4 className="text-xs font-black text-slate-800 truncate leading-tight">{item.name}</h4>
-                              <span className="text-[8.5px] text-slate-450 font-extrabold block mt-0.5 truncate">{item.relationship}</span>
+                            <div className="min-w-0 flex-1 pr-1">
+                              <h4 className="text-xs sm:text-sm font-black text-slate-800 leading-snug group-hover:text-emerald-800 transition whitespace-normal break-words">
+                                {item.name}
+                              </h4>
+                              <span className="text-[8.5px] text-emerald-700 bg-emerald-50 border border-emerald-150 px-1.5 py-0.2 rounded font-extrabold inline-block mt-0.5">
+                                {item.donationCount > 1 ? `মোট ${item.donationCount} টি অনুদান` : '১ টি অনুদান'}
+                              </span>
                             </div>
                           </div>
 
-                          {/* দেওয়া টাকা */}
-                          <div className="w-[18%] text-left">
-                            <span className="text-[8px] text-slate-400 block font-black leading-none">দেওয়া টাকা</span>
-                            <span className="text-xs font-black text-[#137333] font-sans mt-1.5 block">৳ {item.amount}</span>
+                          {/* সর্বমোট দেওয়া টাকা */}
+                          <div className="shrink-0 text-right sm:text-left sm:w-[22%]">
+                            <span className="text-[8px] text-slate-400 block font-black uppercase leading-none">সর্বমোট দান</span>
+                            <span className="text-xs sm:text-sm font-black text-emerald-700 font-mono mt-1 block">
+                              ৳ {item.totalAmount.toLocaleString('en-US')}
+                            </span>
                           </div>
 
-                          {/* তারিখ */}
-                          <div className="w-[28%] text-left">
-                            <span className="text-[8px] text-slate-400 block font-black leading-none mb-1">তারিখ</span>
+                          {/* সর্বশেষ দানের তারিখ */}
+                          <div className="hidden sm:block sm:w-[24%] text-left shrink-0">
+                            <span className="text-[8px] text-slate-400 block font-black uppercase leading-none mb-1">সর্বশেষ দান</span>
                             <span className="text-[9.5px] font-extrabold text-slate-600 flex items-center gap-1">
                               <Calendar className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                              {item.date}
+                              {item.latestDate}
                             </span>
                           </div>
 
-                          {/* ধরন */}
-                          <div className="w-[18%] text-left">
-                            <span className="text-[8px] text-slate-400 block font-black leading-none mb-1">ধরন</span>
-                            <span className={`text-[9.5px] font-black px-2 py-0.5 rounded-full inline-block leading-none ${item.type === 'donation' ? 'bg-[#EBF5FF] text-blue-700 border border-blue-150' : 'bg-[#E6F4EA] text-[#137333] border border-emerald-100'}`}>
-                              {item.typeLabel}
+                          {/* Details CTA button */}
+                          <div className="shrink-0 text-right flex items-center justify-end">
+                            <span className="text-[9.5px] font-black text-teal-800 bg-teal-50 border border-teal-200 px-2 py-1 rounded-xl group-hover:bg-teal-600 group-hover:text-white transition flex items-center gap-0.5 shadow-4xs">
+                              হিস্ট্রি <ChevronRight className="w-3 h-3" />
                             </span>
                           </div>
-
-                          {/* Arrow Icon */}
-                          <ChevronRight className="w-4 h-4 text-slate-300 shrink-0" />
                         </div>
                       ))}
 
                       {/* আরো দেখুন বাটন (কে ফান্ডে টাকা দিয়েছে) */}
-                      {liveDonationsList.length > 5 ? (
+                      {aggregatedDonorsList.length > 5 ? (
                         <button
                           type="button"
                           onClick={() => setShowDonorsModal(true)}
                           className="w-full py-2.5 px-4 bg-sky-50/90 hover:bg-sky-100/90 text-sky-800 border border-sky-200/90 rounded-2xl text-xs font-black transition flex items-center justify-center gap-1.5 cursor-pointer shadow-3xs active:scale-98 mt-1"
                         >
-                          <span>আরো দেখুন (মোট {liveDonationsList.length.toLocaleString('bn-BD')} জন দাতা সদস্য)</span>
+                          <span>আরো দেখুন (মোট {aggregatedDonorsList.length.toLocaleString('en-US')} জন দাতা সদস্য)</span>
                           <ChevronRight className="w-4 h-4 text-sky-700" />
                         </button>
                       ) : (
-                        liveDonationsList.length > 0 && (
+                        aggregatedDonorsList.length > 0 && (
                           <button
                             type="button"
                             onClick={() => setShowDonorsModal(true)}
@@ -2547,175 +2779,121 @@ AMB Business Co-operative Welfare Fund
           );
         })()}
 
-        {/* ==================== TAB 1: DONATE FORM (Compact Sleek Form) ==================== */}
+        {/* ==================== TAB 1: DONATE FORM (Compact Sleek Single Purpose Form) ==================== */}
         {activeTab === 'donate' && (
-          <div className="space-y-2 max-w-lg mx-auto animate-fade-in text-center">
-            {/* Short compact header info */}
-            <div className="bg-gradient-to-r from-rose-50/80 via-amber-50/60 to-rose-50/80 border border-rose-150/80 p-2 sm:p-2.5 rounded-xl flex items-center gap-2 text-left shadow-2xs">
-              <span className="p-1.5 bg-rose-500 text-white rounded-lg text-xs shrink-0 shadow-xs">💝</span>
-              <div className="min-w-0 flex-1">
-                <h4 className="text-[11px] font-black text-rose-955 leading-tight truncate">কল্যাণ তহবিলে অনুদান ও স্থায়ী আমানত</h4>
-                <p className="text-[8px] text-slate-500 font-bold leading-tight mt-0.5">সম্পূর্ণ সুদমুক্ত সেবামূলক কাজে ব্যবহৃত হবে। 1 বছর পর চাইলে উত্তোলনযোগ্য।</p>
+          <div className="space-y-3 max-w-lg mx-auto animate-fade-in text-center font-sans">
+            
+            {/* Islamic Hadith Card encouraging Qard Hasana */}
+            <div className="bg-gradient-to-br from-emerald-950 via-teal-900 to-emerald-900 text-white border-2 border-emerald-600/80 p-4 sm:p-5 rounded-2xl text-left space-y-3.5 shadow-lg relative overflow-hidden">
+              {/* Header Badge */}
+              <div className="flex items-center justify-between pb-2.5 border-b border-emerald-600/60">
+                <div className="flex items-center gap-2">
+                  <span className="p-1.5 bg-amber-400 text-emerald-950 rounded-xl text-sm font-black shrink-0 shadow-xs">📖</span>
+                  <h3 className="text-sm sm:text-base md:text-lg font-black text-amber-300 font-sans tracking-tight leading-tight">
+                    করযে হাসানার বিশেষ ফজিলত ও সওয়াব
+                  </h3>
+                </div>
+                <span className="text-xs sm:text-sm font-black uppercase bg-amber-400 text-emerald-950 px-2.5 py-1 rounded-full shadow-xs leading-none">
+                  ১৮ গুণ সওয়াব
+                </span>
+              </div>
+
+              {/* Hadith 1 */}
+              <div className="bg-emerald-900/80 p-3 sm:p-3.5 rounded-xl border border-emerald-600/60 space-y-1.5">
+                <div className="flex items-center gap-1.5 text-amber-300 font-black text-xs sm:text-sm">
+                  <span>✨ সুনান ইবনে মাজাহ (হাদিস: ২৪৩১/১৮৪৪)</span>
+                </div>
+                <p className="text-xs sm:text-sm text-emerald-50 font-normal leading-relaxed">
+                  রাসূলুল্লাহ (সাল্লাল্লাহু আলাইহি ওয়া সাল্লাম) বলেছেনঃ <span className="text-amber-200 font-black text-xs sm:text-sm md:text-base block sm:inline my-1 sm:my-0">"মিরাজের রাতে আমি জান্নাতের দরজায় লিখিত দেখেছি— 'দানের সওয়াব ১০ গুণ এবং করযে হাসানার (সুদমুক্ত ঋণের) সওয়াব ১৮ গুণ।'"</span> আমি জিবরীল (আঃ)-কে জিজ্ঞেস করলাম, করযে হাসানার সওয়াব দানের চেয়ে বেশি কেন? তিনি বললেন, <span className="text-amber-100 italic font-semibold">'কারণ সাহায্যপ্রার্থী প্রয়োজন না থাকলেও চাইতে পারে, কিন্তু ঋণগ্রহীতা ব্যক্তি একমাত্র চরম প্রয়োজনেই ঋণ চায়।'</span>
+                </p>
+              </div>
+
+              {/* Hadith 2 */}
+              <div className="bg-emerald-900/80 p-3 sm:p-3.5 rounded-xl border border-emerald-600/60 space-y-1.5">
+                <div className="flex items-center gap-1.5 text-amber-300 font-black text-xs sm:text-sm">
+                  <span>✨ সহীহ মুসলিম (হাদিস: ২৬৯৯)</span>
+                </div>
+                <p className="text-xs sm:text-sm text-emerald-50 font-normal leading-relaxed">
+                  রাসূলুল্লাহ (সাল্লাল্লাহু আলাইহি ওয়া সাল্লাম) বলেছেনঃ <span className="text-amber-200 font-black text-xs sm:text-sm md:text-base block sm:inline my-1 sm:my-0">"যে ব্যক্তি কোনো মুসলিমের পার্থিব বিপদ-আপদ দূর করবে, কেয়ামতের দিন আল্লাহ তাআলা তার একটি কঠিন বিপদ দূর করে দেবেন।"</span>
+                </p>
+              </div>
+
+              {/* Virtues summary */}
+              <div className="bg-amber-400/20 p-2.5 sm:p-3 rounded-xl border border-amber-400/40 text-xs sm:text-sm text-amber-100 font-bold leading-relaxed flex items-start gap-2">
+                <span className="text-base shrink-0">💡</span>
+                <span><strong>সংক্ষিপ্ত সুবিধাঃ</strong> সাধারণ দান অপেক্ষা ১.৮ গুণ (১৮ গুণ) বেশি সওয়াব, মানুষের আত্মসম্মান রক্ষা করে অসচ্ছলদের সেবা এবং সমাজে সুদমুক্ত অর্থনীতির প্রসার।</span>
               </div>
             </div>
 
-            <form onSubmit={handleDonateSubmit} className="space-y-2 font-sans">
+            <form onSubmit={handleDonateSubmit} className="space-y-2.5 font-sans">
               
-              {/* Step 1: Donation Purpose Selection */}
-              <div className="bg-white border border-slate-200/90 p-2 sm:p-2.5 rounded-xl space-y-1.5 shadow-2xs text-left">
-                <div className="flex items-center justify-between pb-1 border-b border-slate-100">
-                  <div className="flex items-center gap-1">
-                    <span className="p-0.5 bg-rose-50 rounded-md text-rose-700 shrink-0">
-                      <HeartHandshake className="w-3 h-3" />
+              {/* Single Purpose Card: কর্জে হাসানা */}
+              <div className="bg-white border border-slate-200/90 p-2.5 sm:p-3 rounded-xl space-y-1.5 shadow-2xs text-left">
+                <div className="flex items-center justify-between pb-1.5 border-b border-slate-100">
+                  <div className="flex items-center gap-1.5">
+                    <span className="p-1 bg-rose-50 rounded-md text-rose-700 shrink-0">
+                      <HeartHandshake className="w-3.5 h-3.5" />
                     </span>
-                    <span className="text-[9.5px] font-black text-slate-800">1. দানের উদ্দেশ্য বা খাত বেছে নিনঃ</span>
+                    <span className="text-[10.5px] font-black text-slate-800">১. খাতের নামঃ কর্জে হাসানা</span>
                   </div>
-                  {donationPurpose && (
-                    <span className="text-[7.5px] font-black text-emerald-700 bg-emerald-50 px-1.5 py-0.2 rounded-full border border-emerald-200">
-                      ✓ খাত নির্বাচিত
-                    </span>
-                  )}
+                  <span className="text-[8px] font-black text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+                    ✓ খাত নির্ধারিত
+                  </span>
                 </div>
 
-                {(() => {
-                  const purposes = [
-                    { id: 'general', emoji: '🤝', title: 'সাধারণ করযে হাসানা ফান্ড', desc: 'অসহায়দের বিনা সুদে ঋণ বিতরণের জন্য', tag: 'GENERAL', color: 'emerald' },
-                    { id: 'medical', emoji: '🩺', title: 'চিকিৎসা সহায়তা খাতের দান', desc: 'মুমূর্ষু ও অসহায় রোগীদের জরুরি ওষুধ ক্রয়ে', tag: 'MEDICINE', color: 'rose' },
-                    { id: 'education', emoji: '🎓', title: 'দরিদ্র শিক্ষার্থীদের শিক্ষা', desc: 'শিক্ষা উপকরণ ও মেধা বিকাশের তহবিলে', tag: 'EDUCATION', color: 'indigo' },
-                    { id: 'micro', emoji: '🚜', title: 'ক্ষুদ্র স্বনির্ভর ব্যবসা', desc: 'স্বাবলম্বী হতে ভ্যান/সেলাই মেশিন অনুদান', tag: 'MICRO BIZ', color: 'teal' },
-                    { id: 'emergency', emoji: '🚨', title: 'জরুরি মানবিক ও ত্রাণ সহায়তা', desc: 'বন্যা, দুর্যোগ বা আকস্মিক বিপর্যয়ে পাশে দাঁড়াতে', tag: 'EMERGENCY', color: 'amber' }
-                  ];
-                  const selectedItem = purposes.find(p => p.id === donationPurpose);
-
-                  return (
-                    <div className="space-y-1">
-                      {!selectedItem ? (
-                        <div 
-                          onClick={() => setIsPurposeMenuOpen(!isPurposeMenuOpen)}
-                          className="flex items-center justify-between p-2 bg-rose-50/40 hover:bg-rose-50 border border-rose-200 rounded-lg cursor-pointer transition active:scale-[0.99] select-none"
-                        >
-                          <div className="flex items-center gap-2">
-                            <span className="text-xs p-1 bg-white border border-rose-200 rounded-md shrink-0">💝</span>
-                            <div className="text-left">
-                              <span className="text-[10px] font-black text-rose-955 block">উদ্দেশ্য বা খাত বেছে নিতে এখানে ক্লিক করুন</span>
-                            </div>
-                          </div>
-                          <ChevronDown className={`w-3.5 h-3.5 text-rose-500 shrink-0 transition-transform duration-200 ${isPurposeMenuOpen ? 'rotate-180' : ''}`} />
-                        </div>
-                      ) : (
-                        <div 
-                          onClick={() => setIsPurposeMenuOpen(!isPurposeMenuOpen)}
-                          className="flex items-center justify-between p-1.5 bg-rose-50/50 hover:bg-rose-50 border border-rose-250 rounded-lg cursor-pointer transition active:scale-[0.99] select-none"
-                        >
-                          <div className="flex items-center gap-1.5 min-w-0">
-                            <span className="text-xs p-1 bg-white border border-rose-200 rounded-md shrink-0">
-                              {selectedItem.emoji}
-                            </span>
-                            <div className="text-left min-w-0">
-                              <span className="text-[10px] font-black text-rose-955 block leading-tight truncate">{selectedItem.title}</span>
-                              <span className="text-[7.5px] block text-slate-500 font-bold leading-tight mt-0.5 truncate">{selectedItem.desc}</span>
-                            </div>
-                          </div>
-                          <div className="flex items-center gap-1 shrink-0 ml-1.5">
-                            <span className="text-[7.5px] font-black text-rose-700 bg-white border border-rose-200 px-1.5 py-0.2 rounded-md">পরিবর্তন</span>
-                            <ChevronDown className={`w-3 h-3 text-rose-600 shrink-0 transition-transform duration-200 ${isPurposeMenuOpen ? 'rotate-180' : ''}`} />
-                          </div>
-                        </div>
-                      )}
-
-                      <AnimatePresence>
-                        {isPurposeMenuOpen && (
-                          <motion.div
-                            initial={{ opacity: 0, height: 0 }}
-                            animate={{ opacity: 1, height: 'auto' }}
-                            exit={{ opacity: 0, height: 0 }}
-                            transition={{ duration: 0.15 }}
-                            className="overflow-hidden"
-                          >
-                            <div className="border border-slate-200 rounded-lg overflow-hidden divide-y divide-slate-100 bg-white shadow-xs mt-1">
-                              {purposes.map((p, idx) => (
-                                <button
-                                  type="button"
-                                  key={`${p.id}-${idx}`}
-                                  onClick={() => {
-                                    setDonationPurpose(p.id);
-                                    setIsPurposeMenuOpen(false);
-                                  }}
-                                  className={`w-full p-1.5 text-left flex items-center justify-between gap-1.5 transition-all cursor-pointer active:bg-slate-100 select-none ${
-                                    donationPurpose === p.id 
-                                      ? 'bg-rose-50 text-rose-955 font-black' 
-                                      : 'bg-white text-slate-700 hover:bg-slate-50'
-                                  }`}
-                                >
-                                  <div className="flex items-center gap-1.5 min-w-0">
-                                    <span className="text-xs p-1 bg-slate-50 border border-slate-150 rounded-md shrink-0">
-                                      {p.emoji}
-                                    </span>
-                                    <div className="min-w-0">
-                                      <span className="text-[9.5px] font-black block leading-tight truncate">{p.title}</span>
-                                      <span className="text-[7.5px] block text-slate-450 font-semibold leading-tight truncate mt-0.5">{p.desc}</span>
-                                    </div>
-                                  </div>
-                                  <div className="shrink-0 flex items-center justify-center">
-                                    <div className={`w-3.5 h-3.5 rounded-full border flex items-center justify-center transition-all ${
-                                      donationPurpose === p.id 
-                                        ? 'bg-rose-600 border-rose-600 text-white' 
-                                        : 'border-slate-300 bg-white'
-                                    }`}>
-                                      {donationPurpose === p.id && (
-                                        <Check className="w-2.5 h-2.5 stroke-[3]" />
-                                      )}
-                                    </div>
-                                  </div>
-                                </button>
-                              ))}
-                            </div>
-                          </motion.div>
-                        )}
-                      </AnimatePresence>
-                    </div>
-                  );
-                })()}
+                <div className="flex items-center gap-2 p-2 bg-gradient-to-r from-rose-50/70 to-emerald-50/70 border border-rose-200/80 rounded-lg">
+                  <span className="text-sm p-1.5 bg-white border border-rose-200 rounded-md shrink-0 shadow-2xs">🤝</span>
+                  <div className="text-left min-w-0">
+                    <span className="text-xs font-black text-slate-850 block leading-tight">কর্জে হাসানা কল্যাণ ফান্ড</span>
+                    <span className="text-[8.5px] block text-slate-500 font-bold leading-tight mt-0.5">অসহায় ও অভাবগ্রস্তদের সুদমুক্ত আর্থিক ঋণ সহায়তা দেওয়ার উদ্দেশ্যে তৈরি বিশেষ ফান্ড।</span>
+                  </div>
+                </div>
               </div>
 
               {/* Step 2: Donation Amount selection */}
-              <div className="bg-white border border-slate-200/90 p-2 sm:p-2.5 rounded-xl space-y-1.5 shadow-2xs text-left">
-                <div className="flex items-center gap-1 pb-1 border-b border-slate-100">
-                  <span className="p-0.5 bg-rose-50 rounded-md text-rose-700 shrink-0">
-                    <Coins className="w-3 h-3" />
+              <div className="bg-white border border-slate-200/90 p-2.5 sm:p-3 rounded-xl space-y-2 shadow-2xs text-left">
+                <div className="flex items-center justify-between pb-1 border-b border-slate-100">
+                  <div className="flex items-center gap-1.5">
+                    <span className="p-1 bg-rose-50 rounded-md text-rose-700 shrink-0">
+                      <Coins className="w-3.5 h-3.5" />
+                    </span>
+                    <span className="text-[10.5px] font-black text-slate-800">২. কর্জে হাসানাতে দান করুন (টাকা):</span>
+                  </div>
+                  <span className="text-[8.5px] font-bold text-rose-600 bg-rose-50 px-2 py-0.5 rounded-md">
+                    ন্যূনতম 5 ৳
                   </span>
-                  <span className="text-[9.5px] font-black text-slate-800">2. জমা বা অনুদানের পরিমাণ (টাকা):</span>
                 </div>
 
-                <div className="space-y-1.5">
+                <div className="space-y-2">
                   <div className="relative">
-                    <div className="absolute inset-y-0 left-2.5 flex items-center text-rose-600 font-black text-xs pointer-events-none">
+                    <div className="absolute inset-y-0 left-3 flex items-center text-rose-600 font-black text-sm pointer-events-none">
                       ৳
                     </div>
                     <input
                       type="number"
                       value={donationAmount}
                       onChange={(e) => setDonationAmount(e.target.value)}
-                      placeholder={donationPurpose ? "কত টাকা দান করতে চান লিখুন..." : "প্রথমে খাতের তালিকায় ট্যাপ করে বেছে নিন..."}
-                      className="w-full bg-slate-50 border border-slate-250 rounded-lg py-1.5 pl-6 pr-2.5 text-xs font-black font-mono focus:bg-white focus:outline-none focus:border-rose-500 focus:ring-1 focus:ring-rose-500 text-slate-850"
+                      placeholder="কত টাকা দান করতে চান লিখুন..."
+                      className="w-full bg-slate-50 border border-slate-250 rounded-xl py-2 pl-7 pr-3 text-sm font-black font-mono focus:bg-white focus:outline-none focus:border-rose-500 focus:ring-1 focus:ring-rose-500 text-slate-850"
                       required
                     />
                   </div>
 
-                  {/* Quick Preset Buttons: 5, 10, 20, 50, 100 */}
-                  <div className="grid grid-cols-5 gap-1">
+                  {/* Quick Preset Buttons */}
+                  <div className="grid grid-cols-6 gap-1">
                     {[
                       { val: '5', label: '5 ৳' },
                       { val: '10', label: '10 ৳' },
                       { val: '20', label: '20 ৳' },
                       { val: '50', label: '50 ৳' },
-                      { val: '100', label: '100 ৳' }
+                      { val: '100', label: '100 ৳' },
+                      { val: '500', label: '500 ৳' }
                     ].map((item) => (
                       <button
                         type="button"
                         key={item.val}
                         onClick={() => setDonationAmount(item.val)}
-                        className={`py-1 rounded-md text-[10px] font-black transition cursor-pointer active:scale-95 text-center ${
+                        className={`py-1 rounded-lg text-[10.5px] font-black transition cursor-pointer active:scale-95 text-center ${
                           donationAmount === item.val
                             ? 'bg-rose-600 border border-rose-600 text-white shadow-xs'
                             : 'bg-slate-50 border border-slate-200 text-slate-700 hover:bg-rose-50/50 hover:border-rose-200'
@@ -2729,23 +2907,23 @@ AMB Business Co-operative Welfare Fund
               </div>
 
               {/* Step 3: Privacy & Security PIN Confirmation */}
-              <div className="bg-white border border-slate-200/90 p-2 sm:p-2.5 rounded-xl space-y-1.5 shadow-2xs text-left">
-                <div className="flex items-center gap-1 pb-1 border-b border-slate-100">
-                  <span className="p-0.5 bg-rose-50 rounded-md text-rose-700 shrink-0">
-                    <Lock className="w-3 h-3" />
+              <div className="bg-white border border-slate-200/90 p-2.5 sm:p-3 rounded-xl space-y-2 shadow-2xs text-left">
+                <div className="flex items-center gap-1.5 pb-1 border-b border-slate-100">
+                  <span className="p-1 bg-rose-50 rounded-md text-rose-700 shrink-0">
+                    <Lock className="w-3.5 h-3.5" />
                   </span>
-                  <span className="text-[9.5px] font-black text-slate-800">3. সুরক্ষা ও অন্যান্য সেটিংসঃ</span>
+                  <span className="text-[10.5px] font-black text-slate-800">৩. সুরক্ষা ও গোপনীয়তা সেটিংসঃ</span>
                 </div>
 
-                <div className="grid grid-cols-2 gap-1.5">
+                <div className="grid grid-cols-2 gap-2">
                   {/* Anonymous Donation Option */}
-                  <div className="bg-slate-50 border border-slate-200 p-1.5 rounded-lg flex items-center justify-between">
-                    <div className="flex items-center gap-1 text-left min-w-0">
-                      <EyeOff className="w-3 h-3 text-rose-500 shrink-0" />
+                  <div className="bg-slate-50 border border-slate-200 p-2 rounded-xl flex items-center justify-between">
+                    <div className="flex items-center gap-1.5 text-left min-w-0">
+                      <EyeOff className="w-3.5 h-3.5 text-rose-500 shrink-0" />
                       <div className="min-w-0">
-                        <span className="text-[9px] text-slate-850 font-black block leading-none">গোপন দাতা</span>
-                        <span className="text-[7px] text-slate-450 block leading-none font-bold mt-0.5 truncate">
-                          নাম গোপন থাকবে
+                        <span className="text-[9.5px] text-slate-850 font-black block leading-none">গোপন দাতা</span>
+                        <span className="text-[7.5px] text-slate-450 block leading-none font-bold mt-0.5 truncate">
+                          নাম প্রকাশ গোপন থাকবে
                         </span>
                       </div>
                     </div>
@@ -2761,10 +2939,10 @@ AMB Business Co-operative Welfare Fund
                   </div>
 
                   {/* Security PIN input */}
-                  <div className="bg-slate-50 border border-slate-200 p-1.5 rounded-lg flex items-center justify-between gap-1">
+                  <div className="bg-slate-50 border border-slate-200 p-2 rounded-xl flex items-center justify-between gap-1">
                     <div className="text-left min-w-0">
-                      <span className="text-[9px] text-slate-850 font-black block leading-none">সিকিউরিটি পিন *</span>
-                      <span className="text-[7px] text-slate-450 block leading-none font-bold mt-0.5">
+                      <span className="text-[9.5px] text-slate-850 font-black block leading-none">সিকিউরিটি পিন *</span>
+                      <span className="text-[7.5px] text-slate-450 block leading-none font-bold mt-0.5">
                         4-সংখ্যার পিন
                       </span>
                     </div>
@@ -2774,7 +2952,7 @@ AMB Business Co-operative Welfare Fund
                       value={securityPin}
                       onChange={(e) => setSecurityPin(e.target.value.replace(/\D/g, ''))}
                       placeholder="••••"
-                      className="w-11 bg-white border border-slate-300 rounded-md px-1 py-0.5 text-center font-mono text-xs tracking-widest text-slate-800 font-black focus:outline-none focus:border-rose-500"
+                      className="w-12 bg-white border border-slate-300 rounded-lg px-1 py-1 text-center font-mono text-xs tracking-widest text-slate-800 font-black focus:outline-none focus:border-rose-500"
                       required
                     />
                   </div>
@@ -2782,14 +2960,14 @@ AMB Business Co-operative Welfare Fund
               </div>
 
               {/* Submit CTA */}
-              <div className="pt-0.5">
+              <div className="pt-1">
                 <button
                   type="submit"
                   disabled={loading}
-                  className="w-full py-2 bg-emerald-600 hover:bg-emerald-700 active:scale-98 text-white font-black text-xs rounded-xl transition flex items-center justify-center gap-1.5 cursor-pointer shadow-xs"
+                  className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-700 active:scale-98 text-white font-black text-xs rounded-xl transition flex items-center justify-center gap-1.5 cursor-pointer shadow-xs"
                 >
-                  {loading ? 'প্রসেসিং হচ্ছে...' : 'স্বেচ্ছাদান সুনিশ্চিত করুন'}
-                  <Heart className="w-3.5 h-3.5 fill-current animate-pulse text-white" />
+                  {loading ? 'প্রসেসিং হচ্ছে...' : 'কর্জযে হাসানাতে দান সম্পন্ন করুন'}
+                  <Heart className="w-4 h-4 fill-current animate-pulse text-white" />
                 </button>
               </div>
             </form>
@@ -2907,7 +3085,7 @@ AMB Business Co-operative Welfare Fund
                         </div>
                         <div className="text-right space-y-1 font-mono">
                           <span className={"font-black text-[11.5px] block " + ((isDonation || isRepayment) ? 'text-emerald-600' : 'text-rose-600')}>
-                            {isDonation || isRepayment ? '+' : '-'}৳ {tx.amount?.toLocaleString('bn-BD')}
+                            {isDonation || isRepayment ? '+' : '-'}৳ {tx.amount?.toLocaleString('en-US')}
                           </span>
                           <div className="text-[8.5px] text-slate-450 font-sans tracking-wide">
                             {tx.status === 'success' ? (
@@ -2969,7 +3147,7 @@ AMB Business Co-operative Welfare Fund
                           <div className="flex justify-between items-center">
                             <div>
                               <span className="text-[8.5px] font-mono text-slate-450 font-bold block">আইডিঃ #{tx.id?.slice(-6).toUpperCase() || 'REQUEST'}</span>
-                              <strong className="text-xs font-extrabold text-slate-800">৳ {tx.amount?.toLocaleString('bn-BD')} BDT ঋণ আবেদন</strong>
+                              <strong className="text-xs font-extrabold text-slate-800">৳ {tx.amount?.toLocaleString('en-US')} BDT ঋণ আবেদন</strong>
                             </div>
                             <div>
                               {isPending && (
@@ -3038,12 +3216,12 @@ AMB Business Co-operative Welfare Fund
                           {tx.type === 'qard_loan_request' ? '⏳ সুদমুক্ত ঋণ আবেদন' : tx.type === 'qard_loan_disbursment' ? '💸 ঋণ বিতরণ লাভ' : '✅ ঋণ পরিশোধ'}
                         </strong>
                         <p className="text-[9px] text-slate-450 font-sans mt-0.5">
-                          {new Date(tx.createdAt).toLocaleString('bn-BD')} • {tx.paymentMethod || 'Wallet'}
+                          {new Date(tx.createdAt).toLocaleString('en-US')} • {tx.paymentMethod || 'Wallet'}
                         </p>
                       </div>
                       <div className="text-right space-y-1">
                         <span className={"font-mono font-black text-[11px] block " + (tx.type === 'qard_loan_repayment' ? 'text-emerald-600' : 'text-rose-600')}>
-                          {tx.type === 'qard_loan_repayment' ? '+' : '-'}৳ {tx.amount?.toLocaleString('bn-BD')}
+                          {tx.type === 'qard_loan_repayment' ? '+' : '-'}৳ {tx.amount?.toLocaleString('en-US')}
                         </span>
                         <button
                           onClick={() => showReceiptForTx(tx)}
@@ -3063,11 +3241,13 @@ AMB Business Co-operative Welfare Fund
         {/* ==================== TAB 4: QARD LOAN APPLY ==================== */}
         {activeTab === 'apply' && (() => {
           const qardCfg = appConfig?.qardConfig || DEFAULT_QARD_CONFIG;
-          const rules = qardCfg.rulesList || DEFAULT_QARD_CONFIG.rulesList;
+          const rules = (qardCfg.rulesList && qardCfg.rulesList.length > 0 && qardCfg.rulesList.length <= 3)
+            ? qardCfg.rulesList
+            : DEFAULT_QARD_CONFIG.rulesList;
           const vNotice = qardCfg.verificationNotice || DEFAULT_QARD_CONFIG.verificationNotice;
           const eligCfg = qardCfg.eligibilityConfig || DEFAULT_QARD_CONFIG.eligibilityConfig;
           const reqDays = eligCfg.requiredActiveDays ?? 60;
-          const reqVol = eligCfg.requiredAmbTxVolume ?? 20000;
+          const reqVol = eligCfg.requiredBNBTxVolume ?? 20000;
 
           const isSamityInvestor = user.samityStatus === 'approved' || user.samityApproved === true || user.isSamityMember === true || user.samitySchemeActive || user.role === 'admin' || user.isDemo;
 
@@ -3077,110 +3257,95 @@ AMB Business Co-operative Welfare Fund
 
           return (
           <div className="space-y-4 font-sans text-left animate-fade-in">
-            {/* Policy & category limit info box */}
-            <div className="bg-gradient-to-br from-rose-50 to-amber-50/30 border border-rose-100 p-5 rounded-3xl space-y-4">
-              <span className="text-[9px] bg-rose-50 text-rose-700 border border-rose-150 px-2.5 py-0.5 rounded-full font-black uppercase inline-block">
-                {qardCfg.rulesSubtitle || 'করযে হাসানা শর্তাবলি (সংক্ষেপে)'}
-              </span>
-              <h3 className="text-base font-black text-slate-850">
-                {qardCfg.rulesTitle || 'কল্যাণমুখী করজে হাসানা (সুদমুক্ত ঋণ) নীতিমালা'}
-              </h3>
-              
-              <div className="space-y-3.5 text-xs font-bold text-slate-750 leading-relaxed">
-                {rules.map((rule, idx) => (
-                  <div key={rule.id || idx} className={`flex items-start gap-2.5 ${idx > 0 ? 'border-t border-rose-100/50 pt-2.5' : ''}`}>
-                    <span className="text-rose-600 text-sm mt-0.5">{rule.icon || '📌'}</span>
-                    <p className={`text-slate-700 font-bold ${rule.isWarning ? 'text-rose-900 bg-rose-50/50 p-2.5 rounded-xl border border-rose-100/60 w-full' : ''}`}>
-                      <strong className="text-rose-950 font-black">{rule.title}: </strong>
-                      {rule.description}
-                    </p>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Eligibility Tracker Box */}
-            <div className="bg-white border border-slate-150 p-5 rounded-3xl space-y-4 shadow-3xs text-left">
-              <h4 className="text-sm font-black text-slate-850 flex items-center gap-1.5">
-                <ShieldCheck className="w-4.5 h-4.5 text-emerald-650" />
-                {eligCfg.trackerTitle || 'আপনার করযে হাসানা যোগ্যতা ট্র্যাকার'}
-              </h4>
-              <p className="text-[10.5px] text-slate-500 font-bold">
-                {eligCfg.trackerSubtitle || 'ঋণের আবেদন করার জন্য নিম্নলিখিত শর্তাবলী পূরণ করা আবশ্যকঃ'}
-              </p>
-
-              {isSamityInvestor && (
-                <div className="bg-emerald-50 border border-emerald-200 p-3.5 rounded-2xl text-[11px] text-emerald-950 font-bold flex items-start gap-2.5 shadow-2xs">
-                  <span className="text-base leading-none">🏢</span>
-                  <div className="space-y-0.5">
-                    <p className="font-black text-emerald-900">AMB কোম্পানি ম্যানেজমেন্ট ইনভেস্টার / সমবায় সমিতি সদস্য</p>
-                    <p className="text-[10px] text-emerald-800 font-bold leading-relaxed">
-                      আপনার সমবায় সমিতিতে সঞ্চয় জমা থাকায় 2 মাস সক্রিয় থাকা বা 20,000 টাকা লেনদেনের শর্ত প্রযোজ্য নয়! আপনি যেকোনো সময় আপনার জমা সঞ্চয়ের 50% টাকা ইনস্ট্যান্ট অটো-ঋণ হিসেবে গ্রহণ করতে পারবেন।
-                    </p>
-                  </div>
-                </div>
-              )}
-
-              <div className="space-y-2.5">
-                {/* Condition 1: Active Days */}
-                <div className="p-3 bg-slate-50 rounded-2xl border border-slate-100 flex items-start gap-3">
-                  <div className={`w-5 h-5 rounded-full flex items-center justify-center shrink-0 mt-0.5 ${
-                    isDaysEligible ? 'bg-emerald-100 text-emerald-600' : 'bg-amber-100 text-amber-600'
-                  }`}>
-                    {isDaysEligible ? <Check className="w-3.5 h-3.5" /> : <Clock className="w-3.5 h-3.5" />}
-                  </div>
-                  <div className="space-y-0.5">
-                    <p className="text-[11px] font-black text-slate-750">
-                      অ্যাপে {Math.round(reqDays / 30)} মাস ({reqDays} দিন) সক্রিয় থাকা
-                    </p>
-                    <p className="text-[10px] text-slate-500 font-bold">
-                      {isSamityInvestor
-                        ? `অব্যাহতিপ্রাপ্ত! সমবায় সমিতি ইনভেস্টার সদস্যদের জন্য এই শর্ত প্রযোজ্য নয় (অটো-অনুমোদিত)।`
-                        : isDaysEligible
-                          ? `পূরণ হয়েছে! আপনি ${activeDays} দিন ধরে আমাদের সাথে সক্রিয় আছেন।`
-                          : `পূরণ হয়নি! (শুধুমাত্র সাধারণ সদস্যদের জন্যঃ আপনার সক্রিয় মেয়াদ ${activeDays} দিন, কমপক্ষে ${reqDays} দিন প্রয়োজন)`}
-                    </p>
+            {selectedQardSection === 'none' && (
+              <div className="space-y-4 animate-fade-in">
+                {/* Policy & category limit info box */}
+                <div className="bg-gradient-to-br from-rose-50 to-amber-50/30 border border-rose-100 p-5 rounded-3xl space-y-4">
+                  <span className="text-[9px] bg-rose-50 text-rose-700 border border-rose-150 px-2.5 py-0.5 rounded-full font-black uppercase inline-block">
+                    {qardCfg.rulesSubtitle || 'করযে হাসানা শর্তাবলি (সংক্ষেপে)'}
+                  </span>
+                  <h3 className="text-base font-black text-slate-850">
+                    {qardCfg.rulesTitle || 'কল্যাণমুখী করজে হাসানা (সুদমুক্ত ঋণ) নীতিমালা'}
+                  </h3>
+                  
+                  <div className="space-y-3.5 text-xs font-bold text-slate-750 leading-relaxed">
+                    {rules.map((rule, idx) => (
+                      <div key={rule.id || idx} className={`flex items-start gap-2.5 ${idx > 0 ? 'border-t border-rose-100/50 pt-2.5' : ''}`}>
+                        <span className="text-rose-600 text-sm mt-0.5">{rule.icon || '📌'}</span>
+                        <p className={`text-slate-700 font-bold ${(rule as any).isWarning ? 'text-rose-900 bg-rose-50/50 p-2.5 rounded-xl border border-rose-100/60 w-full' : ''}`}>
+                          <strong className="text-rose-950 font-black">{rule.title}: </strong>
+                          {rule.description}
+                        </p>
+                      </div>
+                    ))}
                   </div>
                 </div>
 
-                {/* Condition 2: AMB to AMB Tx Volume */}
-                <div className="p-3 bg-slate-50 rounded-2xl border border-slate-100 flex items-start gap-3">
-                  <div className={`w-5 h-5 rounded-full flex items-center justify-center shrink-0 mt-0.5 ${
-                    isVolEligible ? 'bg-emerald-100 text-emerald-600' : 'bg-amber-100 text-amber-600'
-                  }`}>
-                    {isVolEligible ? <Check className="w-3.5 h-3.5" /> : <AlertCircle className="w-3.5 h-3.5" />}
-                  </div>
-                  <div className="space-y-0.5">
-                    <p className="text-[11px] font-black text-slate-750">AMB টু BNB লেনদেন (৳{reqVol.toLocaleString('bn-BD')})</p>
-                    <p className="text-[10px] text-slate-500 font-bold">
-                      {isSamityInvestor
-                        ? `অব্যাহতিপ্রাপ্ত! সমবায় সমিতি ইনভেস্টার সদস্যদের জন্য 20,000 টাকা লেনদেনের বাধ্যবাধকতা নেই (অটো-অনুমোদিত)।`
-                        : isVolEligible
-                          ? `পূরণ হয়েছে! আপনার AMB টু BNB লেনদেন ৳${ambTxVolume.toLocaleString('bn-BD')} BDT`
-                          : `পূরণ হয়নি! (শুধুমাত্র সাধারণ সদস্যদের জন্যঃ আপনার লেনদেন ৳${ambTxVolume.toLocaleString('bn-BD')} BDT, ন্যূনতম ${reqVol.toLocaleString('bn-BD')} টাকা প্রয়োজন)`}
-                    </p>
-                  </div>
+                <div className="p-3.5 bg-emerald-50 border border-emerald-200 text-emerald-950 rounded-2xl text-xs font-bold flex items-center gap-2">
+                  <span className="text-base">💡</span>
+                  <span>ঋণ গ্রহণের জন্য নিচের যেকোনো একটি সেকশনে ট্যাপ করে পরবর্তী ধাপে (সেকেন্ড পেজ) প্রবেশ করুনঃ</span>
+                </div>
+
+                {/* Two Main Selection Cards (Side by side in 1 row) */}
+                <div className="grid grid-cols-2 gap-2.5 sm:gap-3.5 pt-1">
+                  <button
+                    type="button"
+                    onClick={() => setSelectedQardSection('investor')}
+                    className="p-3.5 sm:p-5 rounded-3xl text-left border bg-gradient-to-br from-emerald-600 to-emerald-800 hover:from-emerald-700 hover:to-emerald-900 text-white shadow-md transition cursor-pointer flex flex-col justify-between group active:scale-98"
+                  >
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-[8px] sm:text-[9px] bg-white/20 text-white px-2 py-0.5 rounded-full font-black uppercase tracking-wider">
+                        অটো অনুমোদন (২৪/৭)
+                      </span>
+                      <span className="text-xl sm:text-2xl group-hover:scale-110 transition">🏢</span>
+                    </div>
+                    <div className="space-y-1">
+                      <strong className="text-xs sm:text-sm font-black block leading-snug">
+                        ১. BNB ইনভেস্টর
+                      </strong>
+                      <p className="text-[9px] sm:text-[10px] text-emerald-100 font-bold leading-tight">
+                        অনার, শেয়ারহোল্ডার ও ইনভেস্টর অটো-ঋণ (প্রবেশ করুন →)
+                      </p>
+                    </div>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setSelectedQardSection('general')}
+                    className="p-5 rounded-3xl text-left border bg-gradient-to-br from-teal-600 to-emerald-800 hover:from-teal-700 hover:to-emerald-900 text-white shadow-md transition cursor-pointer flex flex-col justify-between group active:scale-98"
+                  >
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-[8px] sm:text-[9px] bg-white/20 text-white px-2 py-0.5 rounded-full font-black uppercase tracking-wider">
+                        ম্যানুয়াল আবেদন
+                      </span>
+                      <span className="text-xl sm:text-2xl group-hover:scale-110 transition">📝</span>
+                    </div>
+                    <div className="space-y-1">
+                      <strong className="text-xs sm:text-sm font-black block leading-snug">
+                        ২. সাধারণ সদস্য
+                      </strong>
+                      <p className="text-[9px] sm:text-[10px] text-teal-100 font-bold leading-tight">
+                        সাধারণ সদস্যদের ম্যানুয়াল আবেদন ও এডমিন যাচাই (প্রবেশ করুন →)
+                      </p>
+                    </div>
+                  </button>
                 </div>
               </div>
+            )}
 
-              {/* Status overall */}
-              {isSamityInvestor ? (
-                <div className="p-3 bg-emerald-50 border border-emerald-200 text-emerald-900 rounded-2xl text-[10.5px] font-bold flex items-center gap-2">
-                  <span className="text-xs">✅</span>
-                  <span>অভিনন্দন! আপনি সমবায় সমিতি ইনভেস্টার হিসেবে যেকোনো সময় জমা সঞ্চয়ের 50% ঋণ নিতে পারবেন।</span>
+            {selectedQardSection === 'investor' && (
+              <div className="space-y-4 animate-fade-in">
+                {/* Back to selection header */}
+                <div className="flex items-center justify-between bg-emerald-50 border border-emerald-200 p-3.5 rounded-2xl">
+                  <button
+                    type="button"
+                    onClick={() => setSelectedQardSection('none')}
+                    className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black rounded-xl transition cursor-pointer flex items-center gap-1.5 shadow-2xs"
+                  >
+                    ← ব্যাক (সেকশন নির্বাচন)
+                  </button>
+                  <span className="text-xs font-black text-emerald-950">🏢 ১. ইনভেস্টর অটো-ঋণ সেকশন (সেকেন্ড পেজ)</span>
                 </div>
-              ) : isOverallEligible ? (
-                <div className="p-3 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-2xl text-[10.5px] font-bold flex items-center gap-2">
-                  <span className="text-xs">✅</span>
-                  <span>অভিনন্দন! আপনি সুদমুক্ত করজে হাসানা ঋণ পাওয়ার জন্য যোগ্য। নিচে ফর্মটি পূরণ করে আবেদন করুন।</span>
-                </div>
-              ) : (
-                <div className="p-3 bg-rose-50 border border-rose-200 text-rose-800 rounded-2xl text-[10.5px] font-bold flex items-start gap-2">
-                  <span className="text-xs mt-0.5">⚠️</span>
-                  <span>দুঃখিত, সাধারণ সদস্য হিসেবে আপনি এখনো ঋণের যোগ্যতা অর্জন করেননি। শর্তাবলী সম্পূর্ণ পূরণ হলে স্বয়ংক্রিয়ভাবে আবেদন সক্রিয় হবে।</span>
-                </div>
-              )}
-            </div>
 
             {/* Active Loan tracking repayment panel if user has outstanding debt */}
             {renderActiveLoanRepaymentCard()}
@@ -3246,18 +3411,18 @@ AMB Business Co-operative Welfare Fund
                         <div className="bg-slate-850/80 p-3.5 rounded-2xl border border-slate-800 space-y-2 text-[11.5px] font-sans font-semibold">
                           <div className="flex justify-between">
                             <span className="text-slate-400">নির্ধারিত মাসিক কিস্তিঃ</span>
-                            <span className="font-bold text-white">৳ {instAmount.toLocaleString('bn-BD')} BDT</span>
+                            <span className="font-bold text-white">৳ {instAmount.toLocaleString('en-US')} BDT</span>
                           </div>
                           <div className="flex justify-between">
                             <span className="text-slate-400">বিলম্ব জরিমানা (31তম দিন থেকে প্রতি হাজারে প্রতিদিন ৳10)：</span>
                             <span className={`font-bold ${daysLateVal > 0 ? 'text-rose-400 animate-pulse' : 'text-emerald-400'}`}>
-                              ৳ {penAmountVal.toLocaleString('bn-BD')} BDT
+                              ৳ {penAmountVal.toLocaleString('en-US')} BDT
                             </span>
                           </div>
                           <div className="flex justify-between border-t border-slate-850 pt-2 text-xs font-black">
                             <span className="text-rose-400">মোট প্রদেয় কিস্তি (কিস্তি + জরিমানা)：</span>
                             <span className="text-emerald-400">
-                              ৳ {totalVal.toLocaleString('bn-BD')} BDT
+                              ৳ {totalVal.toLocaleString('en-US')} BDT
                             </span>
                           </div>
                         </div>
@@ -3293,20 +3458,21 @@ AMB Business Co-operative Welfare Fund
               );
             })()}
 
-            {/* Coop 1% - 50% Instant Auto-Loan Section (Auto-Disbursement without Admin Approval) */}
+            {/* Coop Instant Auto-Loan Section (Auto-Disbursement without Admin Approval) */}
             {(() => {
               const coopInstantCfg = qardCfg.coopInstantLoanConfig || DEFAULT_QARD_CONFIG.coopInstantLoanConfig;
               if (coopInstantCfg?.enabled === false) return null;
 
-              const percent = coopInstantCfg?.percentage ?? 50;
+              const catMeta = getMembershipCategory(user);
+              const cat = catMeta.key === 'owner' ? 'owner' : catMeta.key === 'shareholder' ? 'shareholder' : 'investor';
+              const catLabel = cat === 'owner' ? 'অনার (৪,০০০৳/মাস - ৭০%)' : cat === 'shareholder' ? 'শেয়ারহোল্ডার (২,০০০৳/মাস - ৬০%)' : 'ইনভেস্টর (১,০০০৳/মাস - ৫০%)';
+              const maxPercent = cat === 'owner' ? 70 : cat === 'shareholder' ? 60 : 50;
+
               const userSavings = user.savings || 0;
               const minInstantLimit = Math.max(1, Math.floor(userSavings * 0.01));
-              const maxInstantLimit = Math.floor(userSavings * (percent / 100));
+              const maxInstantLimit = Math.floor(userSavings * (maxPercent / 100));
 
-              const lastLoanAmt = user.lastCoopInstantLoanAmount || 0;
-              const calcPercent = userSavings > 0 ? (lastLoanAmt / userSavings) * 100 : 50;
-              const effectivePercent = user.lastCoopLoanPercentage ?? calcPercent;
-              const effectiveCooldownDays = effectivePercent <= 25 ? 30 : 90;
+              const effectiveCooldownDays = 60;
               const hasActiveDue = (user.dueLoan || 0) > 0;
 
               let isCooldownActive = false;
@@ -3325,89 +3491,99 @@ AMB Business Co-operative Welfare Fund
               }
 
               return (
-                <div className="bg-gradient-to-br from-amber-500/10 via-amber-500/5 to-orange-500/10 border border-amber-300/80 p-5 rounded-3xl space-y-4 shadow-sm text-left">
-                  <div className="flex items-center justify-between border-b border-amber-200/60 pb-3">
+                <div className="bg-gradient-to-br from-amber-500/10 via-amber-500/5 to-orange-500/10 border border-amber-300/80 p-4 sm:p-5 rounded-3xl space-y-3.5 shadow-sm text-left">
+                  <div className="flex items-center justify-between border-b border-amber-200/60 pb-2.5">
                     <div>
                       <span className="text-[9px] bg-amber-600 text-white px-2.5 py-0.5 rounded-full font-black uppercase tracking-wider inline-flex items-center gap-1 shadow-2xs">
                         <Zap className="w-3 h-3 text-amber-200" /> অটো অনুমোদন (No Admin Needed)
                       </span>
-                      <h4 className="text-sm font-black text-amber-950 mt-1.5 flex items-center gap-1.5">
-                        {coopInstantCfg?.title || '🏢 সমবায় আমানতের 1% - 50% ইনস্ট্যান্ট অটো-ঋণ'}
+                      <h4 className="text-sm font-black text-amber-950 mt-1 flex items-center gap-1.5">
+                        ⚡ সমবায় ইনস্ট্যান্ট অটো-ঋণ (২৪/৭)
                       </h4>
                     </div>
                     <div className="text-right">
-                      <span className="text-[10px] text-amber-800 font-extrabold block">ঋণের সীমা (1% - 50%)</span>
-                      <strong className="text-sm font-mono font-black text-amber-700">৳{minInstantLimit.toLocaleString('bn-BD')} - ৳{maxInstantLimit.toLocaleString('bn-BD')} BDT</strong>
+                      <span className="text-[9.5px] text-amber-800 font-black block">আপনার সীমা ({catLabel})</span>
+                      <strong className="text-xs sm:text-sm font-mono font-black text-amber-800">৳{minInstantLimit.toLocaleString('en-US')} - ৳{maxInstantLimit.toLocaleString('en-US')} BDT</strong>
                     </div>
                   </div>
 
-                  <p className="text-[11px] text-amber-900 font-bold leading-relaxed">
-                    {coopInstantCfg?.description || `সমিতিতে যাদের সঞ্চয় রয়েছে, তারা জমানো সঞ্চয়ের 1% থেকে 50% টাকা যেকোনো সময় এডমিন অনুমোদন ছাড়াই 1-3 মাস মেয়াদের ইনস্ট্যান্ট অটো-ঋণ নিতে পারবেন। 1% - 25% ঋণ পরিশোধ করলে 1 মাস (30 দিন) এবং 25% - 50% ঋণ পরিশোধ করলে 3 মাস (90 দিন) পর পুনরায় ঋণ নেওয়ার সুযোগ মিলবে।`}
-                  </p>
+                  <div className="p-3 bg-amber-100/80 border border-amber-300/70 rounded-2xl text-[10.5px] text-amber-950 font-bold space-y-1">
+                    <p className="font-black text-amber-900">📌 সমবায় সমিতি সঞ্চয় জমা প্রদানকারীদের ক্যাটাগরি ও ইনস্ট্যান্ট ঋণ সুবিধাঃ</p>
+                    <ul className="list-disc pl-4 space-y-0.5 text-[10px] text-amber-900 font-bold">
+                      <li><strong>ইনভেস্টর (মাসে ১,০০০৳ সমবায় জমা):</strong> জমা সঞ্চয়ের ৫০% অটো-ঋণ</li>
+                      <li><strong>শেয়ারহোল্ডার (মাসে ২,০০০৳ সমবায় জমা):</strong> জমা সঞ্চয়ের ৬০% অটো-ঋণ</li>
+                      <li><strong>অনার (মাসে ৪,০০০৳ সমবায় জমা):</strong> জমা সঞ্চয়ের ৭০% অটো-ঋণ</li>
+                    </ul>
+                  </div>
 
-                  <div className="grid grid-cols-2 gap-2.5 bg-white/80 p-3 rounded-2xl border border-amber-200/60">
+                  <div className="grid grid-cols-2 gap-2 bg-white/90 p-2.5 rounded-2xl border border-amber-200/60">
                     <div className="space-y-0.5">
-                      <span className="text-[10px] text-slate-500 font-extrabold">আপনার বর্তমান সঞ্চয়ঃ</span>
-                      <p className="text-xs font-black font-mono text-emerald-700">৳{userSavings.toLocaleString('bn-BD')} BDT</p>
+                      <span className="text-[9.5px] text-slate-500 font-extrabold">আপনার বর্তমান সঞ্চয়ঃ</span>
+                      <p className="text-xs font-black font-mono text-emerald-700">৳{userSavings.toLocaleString('en-US')} BDT</p>
                     </div>
                     <div className="space-y-0.5">
-                      <span className="text-[10px] text-slate-500 font-extrabold">সুদমুক্ত ঋণের নিয়মঃ</span>
-                      <p className="text-xs font-black text-amber-900">বিনাসুদে 1-3 মাস মেয়াদে গ্রহণযোগ্য</p>
+                      <span className="text-[9.5px] text-slate-500 font-extrabold">আপনার ক্যাটাগরিঃ</span>
+                      <p className="text-xs font-black text-amber-900">{catLabel}</p>
                     </div>
                   </div>
 
-                  {/* Date Windows & Rules Information Badges */}
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 p-2.5 bg-gradient-to-r from-amber-100/90 via-amber-50 to-orange-50 border border-amber-300/90 rounded-2xl text-[10px] font-bold text-amber-950 shadow-2xs">
-                    <div className="flex items-center gap-1.5 bg-white/80 px-2.5 py-1.5 rounded-xl border border-amber-200/60">
-                      <span className="text-xs">🗓️</span>
-                      <span>ঋণ নেওয়ার সময়ঃ <strong className="text-emerald-800 font-black">যেকোনো সময় (24/7)</strong></span>
+                  {/* Concise Rules Badges */}
+                  <div className="grid grid-cols-3 gap-1.5 p-2 bg-gradient-to-r from-amber-100/90 via-amber-50 to-orange-50 border border-amber-300/90 rounded-2xl text-[9.5px] font-bold text-amber-950 shadow-2xs">
+                    <div className="flex items-center gap-1 bg-white/80 px-2 py-1 rounded-xl border border-amber-200/60">
+                      <span>⚡</span>
+                      <span>অনুমোদন: <strong className="text-emerald-800 font-black">অটোমেটিক</strong></span>
                     </div>
-                    <div className="flex items-center gap-1.5 bg-white/80 px-2.5 py-1.5 rounded-xl border border-amber-200/60">
-                      <span className="text-xs">⏳</span>
-                      <span>পরিশোধ মেয়াদঃ <strong className="text-amber-900 font-black">1 মাস (30 দিন) / 3 মাস</strong></span>
+                    <div className="flex items-center gap-1 bg-white/80 px-2 py-1 rounded-xl border border-amber-200/60">
+                      <span>⏳</span>
+                      <span>মেয়াদ: <strong className="text-amber-900 font-black">১ মাস (৩০ দিন)</strong></span>
                     </div>
-                    <div className="flex items-center gap-1.5 bg-white/80 px-2.5 py-1.5 rounded-xl border border-rose-200/70">
-                      <span className="text-xs">⚠️</span>
-                      <span>বিলম্ব জরিমানাঃ <strong className="text-rose-700 font-black">হাজারে 10৳ / দিন</strong></span>
+                    <div className="flex items-center gap-1 bg-white/80 px-2 py-1 rounded-xl border border-rose-200/70">
+                      <span>⚠️</span>
+                      <span>জরিমানা: <strong className="text-rose-700 font-black">১,০০০৳ এ ১০৳/দিন</strong></span>
                     </div>
                   </div>
 
                   {userSavings <= 0 ? (
-                    <div className="p-3 bg-rose-50 border border-rose-200 text-rose-800 rounded-2xl text-[10.5px] font-bold flex items-center gap-2">
-                      <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
-                      <span>আপনার সমিতিতে সঞ্চয় জমা নেই। 1% - 50% অটো-ঋণ নিতে আগে সমিতিতে সঞ্চয় জমা প্রদান করুন।</span>
+                    <div className="p-2.5 bg-amber-50/90 border border-amber-300 text-amber-950 rounded-2xl text-[10px] font-bold flex items-start gap-2">
+                      <AlertCircle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                      <div>
+                        <p className="font-black text-amber-950">ℹ️ অটো-ঋণ শুধুমাত্র সমবায় সমিতি সদস্যদের জন্য</p>
+                        <p className="text-[9.5px] font-medium text-amber-900 mt-0.5">
+                          সমবায় সমিতিতে একাউন্ট বা সঞ্চয় থাকলে আপনি অটো-ঋণ (অনার ৭০%, শেয়ারহোল্ডার ৬০%, ইনভেস্টর ৫০%) পাবেন। সমবায় বহির্ভূত সাধারণ সদস্যরা ১ টাকা থেকে ২,০০০ টাকা ম্যানুয়ালি আবেদন করতে পারেন (যা এডমিন ম্যানুয়ালি বিবেচনা করে এপ্রুভ করবেন)।
+                        </p>
+                      </div>
                     </div>
                   ) : hasActiveDue ? (
-                    <div className="p-3 bg-rose-50 border border-rose-200 text-rose-900 rounded-2xl text-[10.5px] font-bold flex items-start gap-2">
+                    <div className="p-2.5 bg-rose-50 border border-rose-200 text-rose-900 rounded-2xl text-[10px] font-bold flex items-start gap-2">
                       <AlertCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
                       <div>
                         <p className="font-black text-rose-950">⚠️ পূর্বের বকেয়া ঋণ বিদ্যমান!</p>
-                        <p className="text-[10px] mt-0.5 font-semibold text-rose-800">
-                          আপনার নিকট বর্তমানে ৳{(user.dueLoan || 0).toLocaleString('bn-BD')} BDT বকেয়া ঋণ রয়েছে। ইনস্ট্যান্ট অটো-ঋণ নিতে প্রথমে বর্তমান বকেয়া ঋণ সম্পূর্ণ পরিশোধ করুন।
+                        <p className="text-[9.5px] mt-0.5 font-semibold text-rose-800">
+                          আপনার নিকট বর্তমানে ৳{(user.dueLoan || 0).toLocaleString('en-US')} BDT বকেয়া ঋণ রয়েছে। অটো-ঋণ নিতে প্রথমে বর্তমান বকেয়া ঋণ সম্পূর্ণ পরিশোধ করুন।
                         </p>
                       </div>
                     </div>
                   ) : isCooldownActive ? (
-                    <div className="p-3 bg-amber-100/90 border border-amber-300 text-amber-900 rounded-2xl text-[10.5px] font-bold flex items-start gap-2">
+                    <div className="p-2.5 bg-amber-100/90 border border-amber-300 text-amber-900 rounded-2xl text-[10px] font-bold flex items-start gap-2">
                       <Clock className="w-4 h-4 text-amber-700 shrink-0 mt-0.5" />
                       <div>
-                        <p className="font-black text-amber-950">⏳ ইনস্ট্যান্ট ঋণ পুনরায় গ্রহণের সময় বাকী রয়েছে!</p>
-                        <p className="text-[10px] mt-0.5 font-bold">
-                          আপনি গত {new Date(user.lastCoopInstantLoanRepaidAt!).toLocaleDateString('bn-BD')}-এ ({daysSinceRepaid} দিন আগে) পূর্বের {lastLoanAmt > 0 ? `৳${lastLoanAmt.toLocaleString('bn-BD')} (${effectivePercent.toFixed(1)}%) ` : ''}ঋণ সম্পূর্ণ পরিশোধ করেছেন। নিয়ম অনুযায়ী {effectivePercent <= 25 ? '1% - 25%' : '25% - 50%'} ঋণ পরিশোধের পর {effectivePercent <= 25 ? '1 মাস (30 দিন)' : '3 মাস (90 দিন)'} পর ({nextEligibleDateStr}) পুনরায় 1% - 50% ইনস্ট্যান্ট ঋণ নেওয়া যাবে। (আর {daysRemaining} দিন বাকি)
+                        <p className="font-black text-amber-950">⏳ বিরতি সময় বাকী রয়েছে!</p>
+                        <p className="text-[9.5px] mt-0.5 font-bold">
+                          পূর্বের ঋণ সম্পূর্ণ পরিশোধ করেছেন। নিয়ম অনুযায়ী পরিশোধের ৬০ দিন পর ({nextEligibleDateStr}) পুনরায় অটো-ঋণ নেওয়া যাবে। (আর {daysRemaining} দিন বাকি)
                         </p>
                       </div>
                     </div>
                   ) : (
-                    <form onSubmit={handleCoopInstantLoanSubmit} className="space-y-3 bg-white p-4 rounded-2xl border border-amber-200 shadow-2xs">
+                    <form onSubmit={handleCoopInstantLoanSubmit} className="space-y-2.5 bg-white p-3.5 rounded-2xl border border-amber-200 shadow-2xs">
                       <div className="space-y-1">
                         <div className="flex justify-between items-center">
-                          <label className="text-[10px] font-black text-amber-950 uppercase">ঋণের পরিমাণ (1% - 50%):</label>
-                          <span className="text-[10px] font-bold text-amber-700">
-                            সীমাঃ ৳{minInstantLimit.toLocaleString('bn-BD')} - ৳{maxInstantLimit.toLocaleString('bn-BD')}
+                          <label className="text-[10px] font-black text-amber-950 uppercase">ঋণের পরিমাণ ({catLabel}):</label>
+                          <span className="text-[9.5px] font-bold text-amber-700">
+                            সীমাঃ ৳{minInstantLimit.toLocaleString('en-US')} - ৳{maxInstantLimit.toLocaleString('en-US')}
                           </span>
                         </div>
                         <div className="relative">
-                          <span className="absolute left-3 top-2.5 text-xs font-bold text-amber-700">৳</span>
+                          <span className="absolute left-3 top-2 text-xs font-bold text-amber-700">৳</span>
                           <input
                             type="number"
                             value={instantLoanAmtInput}
@@ -3420,44 +3596,39 @@ AMB Business Co-operative Welfare Fund
                           />
                         </div>
                         {/* Quick selector buttons */}
-                        <div className="flex items-center gap-1.5 pt-1">
+                        <div className="flex items-center gap-1.5 pt-0.5">
                           <button
                             type="button"
                             onClick={() => setInstantLoanAmtInput(String(minInstantLimit))}
-                            className="px-2.5 py-1 bg-amber-100/80 hover:bg-amber-200 text-amber-900 text-[9.5px] font-black rounded-lg border border-amber-300/70 cursor-pointer"
+                            className="px-2 py-0.5 bg-amber-100/80 hover:bg-amber-200 text-amber-900 text-[9px] font-black rounded-lg border border-amber-300/70 cursor-pointer"
                           >
-                            1% (৳{minInstantLimit.toLocaleString('bn-BD')})
+                            ১% (৳{minInstantLimit.toLocaleString('en-US')})
                           </button>
                           {maxInstantLimit > minInstantLimit * 2 && (
                             <button
                               type="button"
                               onClick={() => setInstantLoanAmtInput(String(Math.floor((minInstantLimit + maxInstantLimit) / 2)))}
-                              className="px-2.5 py-1 bg-amber-100/80 hover:bg-amber-200 text-amber-900 text-[9.5px] font-black rounded-lg border border-amber-300/70 cursor-pointer"
+                              className="px-2 py-0.5 bg-amber-100/80 hover:bg-amber-200 text-amber-900 text-[9px] font-black rounded-lg border border-amber-300/70 cursor-pointer"
                             >
-                              25% (৳{Math.floor((minInstantLimit + maxInstantLimit) / 2).toLocaleString('bn-BD')})
+                              ৫০% সীমা (৳{Math.floor((minInstantLimit + maxInstantLimit) / 2).toLocaleString('en-US')})
                             </button>
                           )}
                           <button
                             type="button"
                             onClick={() => setInstantLoanAmtInput(String(maxInstantLimit))}
-                            className="px-2.5 py-1 bg-amber-600 hover:bg-amber-700 text-white text-[9.5px] font-black rounded-lg cursor-pointer"
+                            className="px-2 py-0.5 bg-amber-600 hover:bg-amber-700 text-white text-[9px] font-black rounded-lg shadow-2xs cursor-pointer ml-auto"
                           >
-                            50% (৳{maxInstantLimit.toLocaleString('bn-BD')})
+                            সর্বোচ্চ (৳{maxInstantLimit.toLocaleString('en-US')})
                           </button>
                         </div>
                       </div>
 
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <div className="space-y-1">
-                          <label className="text-[10px] font-black text-slate-700 uppercase">পরিশোধ মেয়াদ ও কিস্তি অপশন:</label>
-                          <select
-                            value={instantLoanDurationInput}
-                            onChange={(e) => setInstantLoanDurationInput(Number(e.target.value))}
-                            className="w-full bg-amber-50/50 border border-amber-200 rounded-xl py-2 px-3 text-xs font-bold text-slate-800 focus:outline-none focus:ring-1 focus:ring-amber-500"
-                          >
-                            <option value={1}>1 মাস (30 দিন) — এককালীন সম্পূর্ণ পরিশোধ</option>
-                            <option value={3}>3 মাস (90 দিন) — 3টি কিস্তিতে পরিশোধ</option>
-                          </select>
+                          <label className="text-[10px] font-black text-slate-700 uppercase">পরিশোধ মেয়াদ ও নিয়ম:</label>
+                          <div className="w-full bg-amber-50/50 border border-amber-200 rounded-xl py-2 px-3 text-xs font-bold text-amber-950">
+                            1 মাস (30 দিন) — একবারে সম্পূর্ণ পরিশোধযোগ্য
+                          </div>
                         </div>
 
                         <div className="space-y-1">
@@ -3474,56 +3645,21 @@ AMB Business Co-operative Welfare Fund
                         </div>
                       </div>
 
-                      {/* Live Installment Breakdown Box */}
+                      {/* Live 1-Month Fixed Repayment Info Box */}
                       {(() => {
                         const curAmt = parseFloat(instantLoanAmtInput || String(maxInstantLimit)) || 0;
-
-                        if (instantLoanDurationInput === 3) {
-                          const m1 = Math.round(curAmt / 3);
-                          const m2 = Math.round(curAmt / 3);
-                          const m3 = curAmt - (m1 + m2);
-                          return (
-                            <div className="p-3.5 bg-slate-900 text-white rounded-2xl text-[10.5px] space-y-2.5 shadow-sm">
-                              <div className="flex items-center justify-between">
-                                <span className="font-black text-amber-300">📊 3 মাসের 3-কিস্তি পরিশোধ শিডিউল (90 দিন):</span>
-                                <span className="text-[9px] bg-emerald-500/20 text-emerald-300 font-bold px-2 py-0.5 rounded-full border border-emerald-400/30">0% সুদ</span>
-                              </div>
-                              <div className="grid grid-cols-3 gap-1.5 text-center font-mono font-bold">
-                                <div className="bg-slate-800/90 p-2 rounded-xl border border-slate-700">
-                                  <span className="text-[8.5px] text-slate-400 block font-sans">1ম কিস্তি (30 দিন)</span>
-                                  <span className="text-amber-400 text-xs">৳{m1.toLocaleString('bn-BD')}</span>
-                                  <span className="text-[8px] text-slate-400 block font-sans mt-0.5">পরের মাসের একই তারিখ</span>
-                                </div>
-                                <div className="bg-slate-800/90 p-2 rounded-xl border border-slate-700">
-                                  <span className="text-[8.5px] text-slate-400 block font-sans">2য় কিস্তি (60 দিন)</span>
-                                  <span className="text-amber-400 text-xs">৳{m2.toLocaleString('bn-BD')}</span>
-                                  <span className="text-[8px] text-slate-400 block font-sans mt-0.5">2য় মাসের একই তারিখ</span>
-                                </div>
-                                <div className="bg-slate-800/90 p-2 rounded-xl border border-slate-700">
-                                  <span className="text-[8.5px] text-slate-400 block font-sans">3য় কিস্তি (90 দিন)</span>
-                                  <span className="text-amber-400 text-xs">৳{m3.toLocaleString('bn-BD')}</span>
-                                  <span className="text-[8px] text-slate-400 block font-sans mt-0.5">3য় মাসের একই তারিখ</span>
-                                </div>
-                              </div>
-                              <p className="text-[9.5px] text-slate-400 leading-tight">
-                                🔔 প্রতি কিস্তির মেয়াদ শেষ হওয়ার 2 দিন আগে নোটিফিকেশন যাবে। 30 দিনের মধ্যে পরিশোধ না করলে প্রতিদিন প্রতি 1,000 টাকায় 10 টাকা বিলম্ব জরিমানা কার্যকর হবে।
-                              </p>
+                        return (
+                          <div className="p-3 bg-slate-900 text-white rounded-2xl text-[10.5px] space-y-1.5 shadow-sm">
+                            <div className="flex items-center justify-between">
+                              <span className="font-bold text-slate-300">📊 ১ মাস (৩০ দিন) মেয়াদে একবারে সম্পূর্ণ পরিশোধযোগ্যঃ</span>
+                              <strong className="font-mono text-amber-400 font-black text-xs">৳{curAmt.toLocaleString('en-US')} BDT</strong>
                             </div>
-                          );
-                        } else {
-                          return (
-                            <div className="p-3 bg-slate-900 text-white rounded-2xl text-[10.5px] space-y-1.5 shadow-sm">
-                              <div className="flex items-center justify-between">
-                                <span className="font-bold text-slate-300">📊 1 মাস (30 দিন / পরের মাসের একই তারিখ) মেয়াদে সম্পূর্ণ পরিশোধযোগ্যঃ</span>
-                                <strong className="font-mono text-amber-400 font-black text-xs">৳{curAmt.toLocaleString('bn-BD')} BDT</strong>
-                              </div>
-                              <div className="p-2 bg-slate-800/80 rounded-xl text-[9.5px] text-slate-300 space-y-0.5">
-                                <p className="text-amber-300 font-bold">🔔 মেয়াদ শেষ হওয়ার 2 দিন পূর্বে অটো নোটিফিকেশন রিমাইন্ডার যাবে।</p>
-                                <p className="text-rose-400 font-bold">⚠️ 30 দিন পার হলে প্রতিদিন প্রতি 1,000 টাকায় 10 টাকা হারে বিলম্ব জরিমানা প্রযোজ্য হবে।</p>
-                              </div>
+                            <div className="p-2 bg-slate-800/80 rounded-xl text-[9.5px] text-slate-300 space-y-0.5">
+                              <p className="text-amber-300 font-bold">🔔 মেয়াদ শেষ হওয়ার ২ দিন পূর্বে অটো নোটিফিকেশন রিমাইন্ডার যাবে।</p>
+                              <p className="text-rose-400 font-bold">⚠️ ৩০ দিন পার হলে প্রতিদিন প্রতি ১,০০০ টাকায় ১০ টাকা হারে বিলম্ব জরিমানা প্রযোজ্য হবে।</p>
                             </div>
-                          );
-                        }
+                          </div>
+                        );
                       })()}
 
                       <button
@@ -3534,16 +3670,32 @@ AMB Business Co-operative Welfare Fund
                         <Zap className="w-4 h-4 text-amber-200 fill-amber-200" />
                         {instantLoanLoading
                           ? 'প্রক্রিয়াকরণ হচ্ছে...'
-                          : `৳ ${parseFloat(instantLoanAmtInput || String(maxInstantLimit)).toLocaleString('bn-BD')} ইনস্ট্যান্ট অটো-ঋণ গ্রহণ করুন (অটো-অনুমোদন)`}
+                          : `৳ ${parseFloat(instantLoanAmtInput || String(maxInstantLimit)).toLocaleString('en-US')} ইনস্ট্যান্ট অটো-ঋণ গ্রহণ করুন (অটো-অনুমোদন)`}
                       </button>
                     </form>
                   )}
                 </div>
               );
             })()}
+              </div>
+            )}
 
-            {/* Apply Application Form block */}
-            <form onSubmit={handleLoanApply} className="bg-white border border-slate-150 p-5 rounded-3xl space-y-4 shadow-3xs">
+            {selectedQardSection === 'general' && (
+              <div className="space-y-4 animate-fade-in">
+                {/* Back to selection header */}
+                <div className="flex items-center justify-between bg-emerald-50 border border-emerald-200 p-3.5 rounded-2xl">
+                  <button
+                    type="button"
+                    onClick={() => setSelectedQardSection('none')}
+                    className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black rounded-xl transition cursor-pointer flex items-center gap-1.5 shadow-2xs"
+                  >
+                    ← ব্যাক (সেকশন নির্বাচন)
+                  </button>
+                  <span className="text-xs font-black text-emerald-950">📝 ২. সাধারণ সদস্য ম্যানুয়াল আবেদন (সেকেন্ড পেজ)</span>
+                </div>
+
+                {/* Apply Application Form block */}
+                <form onSubmit={handleLoanApply} className="bg-white border border-slate-150 p-5 rounded-3xl space-y-4 shadow-3xs text-left">
               <h4 className="text-sm font-black text-slate-850 border-b border-slate-100 pb-2">নতুন সুদমুক্ত করযে হাসানা ঋণ রিকোয়েস্ট</h4>
 
               {/* Profile Completion Checklist Banner */}
@@ -3634,47 +3786,23 @@ AMB Business Co-operative Welfare Fund
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-[10px] text-slate-650 font-extrabold uppercase tracking-wide block">3. ঋণ পরিশোধের মেয়াদ ও কিস্তি অপশন：</label>
-                <div className="grid grid-cols-2 gap-2">
-                  {[
-                    { m: 1, label: '1 মাস (30 দিন)', sub: 'এককালীন পরিশোধ' },
-                    { m: 3, label: '3 মাস (90 দিন)', sub: '3টি কিস্তিতে পরিশোধ' }
-                  ].map(({ m, label, sub }) => (
-                    <button
-                      key={m}
-                      type="button"
-                      onClick={() => setLoanDuration(m)}
-                      className={`py-2 px-3 rounded-2xl text-xs font-black border transition cursor-pointer text-center ${loanDuration === m ? 'bg-rose-50 border-rose-500 text-rose-700 font-sans' : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'}`}
-                    >
-                      <span className="block">{label}</span>
-                      <span className="text-[9px] opacity-75 font-normal block font-sans">{sub}</span>
-                    </button>
-                  ))}
-                </div>
-                <p className="text-[9.5px] text-slate-500">
-                  🔔 মেয়াদ শেষ হওয়ার 2 দিন পূর্বে রিমাইন্ডার নোটিফিকেশন পাঠানো হবে। 30 দিন পর থেকে দিন প্রতি হাজারে 10 টাকা বিলম্ব জরিমানা প্রযোজ্য হবে।
-                </p>
-              </div>
-
-              <div className="space-y-1">
-                <label className="text-[10px] text-slate-650 font-extrabold uppercase tracking-wide block">4. প্রতি মাসে কত টাকা পরিশোধ করতে পারবেন? (repayment per month):</label>
-                <div className="relative">
-                  <div className="absolute inset-y-0 left-4 flex items-center text-rose-600 font-bold">
-                    ৳
+                <label className="text-[10px] text-slate-650 font-extrabold uppercase tracking-wide block">3. ঋণ পরিশোধের মেয়াদ ও নিয়মাবলি：</label>
+                <div className="bg-rose-50/70 border border-rose-200/80 rounded-2xl p-3 text-left space-y-1">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-black text-rose-900">🗓️ ঋণের সর্বোচ্চ মেয়াদঃ 30 দিন (1 মাস)</span>
+                    <span className="text-[9px] bg-rose-600 text-white font-bold px-2 py-0.5 rounded-full">30 দিন ফিক্সড</span>
                   </div>
-                  <input
-                    type="number"
-                    value={loanMonthlyRepay}
-                    onChange={(e) => setLoanMonthlyRepay(e.target.value)}
-                    placeholder="যেমনঃ 1000"
-                    className="w-full bg-slate-50 border border-slate-200 rounded-2xl py-3 pl-9 pr-4 text-xs font-bold font-mono focus:outline-none focus:ring-1 focus:ring-rose-500 text-slate-800"
-                    required
-                  />
+                  <p className="text-[10.5px] text-slate-700 font-bold leading-relaxed">
+                    যেই তারিখে টাকা গ্রহণ করবেন, ঠিক পরের মাসের একই তারিখে সম্পূর্ণ টাকা ফেরত দিতে হবে (যেমনঃ 10 অক্টোবর টাকা নিলে 10 নভেম্বরের মধ্যে ফেরত দিতে হবে)।
+                  </p>
+                  <p className="text-[9.5px] text-rose-800 font-black pt-0.5">
+                    🔔 মেয়াদ শেষ হওয়ার 2 দিন পূর্বে রিমাইন্ডার যাবে। 30 দিন পার হলে 31তম দিন থেকে প্রতিদিন প্রতি 1,000 টাকায় 10 টাকা বিলম্ব ফি যুক্ত হবে।
+                  </p>
                 </div>
               </div>
 
               <div className="space-y-1">
-                <label className="text-[10px] text-slate-650 font-extrabold uppercase tracking-wide block">5. ঋণের সুনির্দিষ্ট উদ্দেশ্য ও কারণঃ</label>
+                <label className="text-[10px] text-slate-650 font-extrabold uppercase tracking-wide block">4. ঋণের সুনির্দিষ্ট উদ্দেশ্য ও কারণঃ</label>
                 <textarea
                   rows={3}
                   value={loanPurpose}
@@ -3686,7 +3814,7 @@ AMB Business Co-operative Welfare Fund
               </div>
 
               <div className="space-y-1">
-                <label className="text-[10px] text-slate-650 font-extrabold uppercase tracking-wide block">6. 4-ডিজিট সিকিউরিটি পিন নাম্বারঃ</label>
+                <label className="text-[10px] text-slate-650 font-extrabold uppercase tracking-wide block">5. 4-ডিজিট সিকিউরিটি পিন নাম্বারঃ</label>
                 <input
                   type="password"
                   maxLength={4}
@@ -3706,6 +3834,8 @@ AMB Business Co-operative Welfare Fund
                 {loading ? 'আবেদন পাঠানো হচ্ছে...' : 'ঋণ সহায়তা রিকোয়েস্ট পাঠান'}
               </button>
             </form>
+              </div>
+            )}
           </div>
           );
         })()}
@@ -3796,7 +3926,7 @@ AMB Business Co-operative Welfare Fund
                               {tx.type === 'qard_donation' ? 'উদার অনুদান' : tx.type === 'qard_withdrawal' ? 'টাকা উত্তোলন আবেদন' : 'ঋণ সহায়তা রিকোয়েস্ট'}
                             </span>
                             <h5 className="text-[11px] font-black text-slate-800 mt-1.5">সদস্যঃ {tx.userName} ({tx.memberId})</h5>
-                            <p className="text-[9px] text-slate-400 mt-0.5">{new Date(tx.createdAt).toLocaleString('bn-BD')}</p>
+                            <p className="text-[9px] text-slate-400 mt-0.5">{new Date(tx.createdAt).toLocaleString('en-US')}</p>
                           </div>
                           <span className="font-mono text-xs font-black text-rose-600">৳ {tx.amount}</span>
                         </div>
@@ -3903,7 +4033,7 @@ AMB Business Co-operative Welfare Fund
                         const totalContribution = donorTxs.reduce((sum, t) => sum + t.amount, 0);
                         const firstTx = donorTxs[0];
                         const donorName = firstTx ? firstTx.userName : 'গোপন দাতা';
-                        const donorId = firstTx ? firstTx.memberId : 'AMB00000000';
+                        const donorId = firstTx ? firstTx.memberId : 'BNB00000000';
                         const donorTier = getDonorTier(totalContribution);
 
                         return (
@@ -3915,7 +4045,7 @@ AMB Business Co-operative Welfare Fund
                                 {donorTier.name}
                               </span>
                             </div>
-                            <span className="font-mono font-black text-emerald-600 text-xs">+৳ {totalContribution?.toLocaleString('bn-BD')}</span>
+                            <span className="font-mono font-black text-emerald-600 text-xs">+৳ {totalContribution?.toLocaleString('en-US')}</span>
                           </div>
                         );
                       })}
@@ -3930,7 +4060,7 @@ AMB Business Co-operative Welfare Fund
               <div className="space-y-3 text-left animate-fade-in">
                 <h4 className="text-xs font-black text-slate-500">অডিট পর্যালোচনা ও কার্যক্রম লগঃ</h4>
                 <div className="bg-white border border-slate-150 rounded-3xl p-4 font-mono text-[9px] text-slate-655 space-y-2 max-h-[300px] overflow-y-auto shadow-3xs animate-fade-in">
-                  <p className="text-slate-450 border-b border-slate-100 pb-1.5">{new Date().toLocaleString('bn-BD')} • অ্যান্ডমিন প্যানেল সচল করা হয়েছে</p>
+                  <p className="text-slate-450 border-b border-slate-100 pb-1.5">{new Date().toLocaleString('en-US')} • অ্যান্ডমিন প্যানেল সচল করা হয়েছে</p>
                   {qardHistory.filter(t => t.status === 'success').map((tx, idx) => (
                     <p key={`${tx.id || "tx"}-${idx}`} className="border-b border-slate-100 pb-1.5 leading-relaxed text-slate-600">
                       ⏳ {new Date(tx.createdAt).toLocaleDateString('bn-BD')} • {tx.userName} ({tx.memberId}) কর্তৃক ৳{tx.amount} এর {tx.type === 'qard_donation' ? 'অনুদান সফলভাবে বরাদ্দ ও রেকর্ডভুক্ত' : tx.type === 'qard_loan_repayment' ? 'ঋণ পরিশোধ রসিদ জেনারেট' : 'সুদমুক্ত ঋণ বিতরণ অনুমোদন সম্পন্ন'}
@@ -3951,8 +4081,8 @@ AMB Business Co-operative Welfare Fund
           const totalMarketVal = activeGoldLoans.reduce((sum, item) => sum + (Number(item.marketValue) || 0), 0);
           const parsedCalcMarket = Number(calcMarketValue) || 0;
           const calcCash = parsedCalcMarket > 0 ? parsedCalcMarket : 0;
-          const protMonths = goldCfg?.protectionMonths ?? 3;
-          const protDays = goldCfg?.protectionDays ?? 90;
+          const protMonths = goldCfg?.protectionMonths ?? 1;
+          const protDays = goldCfg?.protectionDays ?? 30;
 
           const rates = goldCfg?.rates || {
             k24: 125000,
@@ -3962,14 +4092,9 @@ AMB Business Co-operative Welfare Fund
             traditional: 80000
           };
 
-          const guidelinesList = (goldCfg?.guidelines && goldCfg.guidelines.length > 0) ? goldCfg.guidelines : [
-            { id: '1', icon: '👑', title: 'সমবায় সদস্যদের 100% সমপরিমাণ লোন সুবিধা', description: `BNB সমবায় সমিতির সদস্যরা ${protMonths} মাসের (${protDays} দিন) জন্য স্বর্ণের সমপরিমাণ (100% বাজারদর) পুরো টাকা ইমার্জেন্সি লোন নিতে পারবেন এবং ${protMonths} মাসের মধ্যে সমপরিমাণ মূল টাকা পরিশোধ করে স্বর্ণ ছাড়িয়ে নিতে পারবেন।` },
-            { id: '2', icon: '👥', title: 'সাধারণ নাগরিকদের জন্য বাজারদর নীতি', description: 'যাঁরা সমবায় সমিতির সদস্য নন, তাঁরা প্রচলিত বাজার নীতি ও সাধারণ মূল্যায়নের ভিত্তিতে স্বর্ণ রেখে জরুরি আর্থিক সুবিধা গ্রহণ করতে পারবেন।' },
-            { id: '3', icon: '💎', title: '0% সুদ ও সুদমুক্ত কল্যাণ সেবা', description: 'করযে হাসানা তহবিলের অধীনে সমবায় সদস্যদের জন্য কোনো প্রকার সুদ, অতিরিক্ত ফি বা হিডেন চার্জ কাটা হবে না।' },
-            { id: '4', icon: '🔒', title: `${protMonths} মাসের সুরক্ষিত ভল্ট হেফাজত`, description: `নির্দিষ্ট সময়সীমার (${protMonths} মাস / ${protDays} দিন) পূর্বে আপনার সংরক্ষিত স্বর্ণ কোনো অবস্থাতেই বিক্রি বা হস্তান্তর করা হবে না।` },
-            { id: '5', icon: '🤝', title: 'টাকা পরিশোধে অক্ষত স্বর্ণ ফেরত', description: 'গৃহীত মূল টাকা পরিশোধ করার সাথে সাথে আপনার গচ্ছিত স্বর্ণ শতভাগ অক্ষত অবস্থায় ফিরিয়ে দেওয়া হবে।' },
-            { id: '6', icon: '🏛️', title: 'সিদ্ধান্তের পূর্বে নোটিশ ও ভল্ট ডায়েরি', description: 'মেয়াদ শেষ হলে যেকোনো পদক্ষেপ নেওয়ার পূর্বে সদস্যের সাথে যোগাযোগ করা হবে এবং প্রতিটি অলংকার অফিশিয়াল সিলযুক্ত ভল্টে সংরক্ষিত থাকে।' }
-          ];
+          const guidelinesList = (goldCfg?.guidelines && goldCfg.guidelines.length > 0 && goldCfg.guidelines.length <= 3)
+            ? goldCfg.guidelines
+            : DEFAULT_QARD_CONFIG.goldLoanConfig.guidelines;
 
           const handleGoldLoanSubmit = async (e: React.FormEvent) => {
             e.preventDefault();
@@ -4001,7 +4126,7 @@ AMB Business Co-operative Welfare Fund
               
               addDoc(collection(db, 'admin_notifications'), {
                 title: '👑 স্বর্ণ রেখে জরুরি টাকার নতুন আবেদন',
-                message: `${user.name || 'সদস্য'} (${user.memberId || 'N/A'}) ${goldJewelryType} (${goldCarat}) জমা রেখে ৳${cashReceived.toLocaleString('bn-BD')} জরুরি ঋণের আবেদন করেছেন।`,
+                message: `${user.name || 'সদস্য'} (${user.memberId || 'N/A'}) ${goldJewelryType} (${goldCarat}) জমা রেখে ৳${cashReceived.toLocaleString('en-US')} জরুরি ঋণের আবেদন করেছেন।`,
                 userId: user.uid,
                 userName: user.name || '',
                 memberId: user.memberId || '',
@@ -4040,14 +4165,14 @@ AMB Business Co-operative Welfare Fund
               await addDoc(collection(db, 'user_notifications'), {
                 userId: user.uid,
                 title: '🏦 স্বর্ণ রেখে জরুরি টাকার আবেদন গৃহীত হয়েছে',
-                message: `আপনার ${goldJewelryType} (${goldCarat}) স্বর্ণ জমার বিপরীতে ৳${cashReceived.toLocaleString('bn-BD')} জরুরি সহায়তার আবেদন জমা হয়েছে। 100% সমান বাজারমূল্যে 0% সুদে স্বর্ণ ভল্ট হেফাজতে থাকবে।`,
+                message: `আপনার ${goldJewelryType} (${goldCarat}) স্বর্ণ জমার বিপরীতে ৳${cashReceived.toLocaleString('en-US')} জরুরি সহায়তার আবেদন জমা হয়েছে। 100% সমান বাজারমূল্যে 0% সুদে স্বর্ণ ভল্ট হেফাজতে থাকবে।`,
                 type: 'gold_loan',
                 read: false,
                 createdAt: serverTimestamp()
               });
 
-              setGoldSuccessMsg(`অভিনন্দন! আপনার স্বর্ণ রেখে জরুরি টাকার আবেদনটি সফলভাবে গৃহীত হয়েছে। মোট অনুমোদিত ক্যাশ: ৳${cashReceived.toLocaleString('bn-BD')} (100% বাজারদর • 0% সুদ)।`);
-              setGoldJewelryType('স্বর্ণের চেইন ও গহনা');
+              setGoldSuccessMsg(`অভিনন্দন! আপনার স্বর্ণ রেখে জরুরি টাকার আবেদনটি সফলভাবে গৃহীত হয়েছে। মোট অনুমোদিত ক্যাশ: ৳${cashReceived.toLocaleString('en-US')} (100% বাজারদর • 0% সুদ)।`);
+              setGoldJewelryType('');
               setGoldWeightVori('');
               setGoldWeightGrams('');
               setGoldMarketValue('');
@@ -4102,85 +4227,85 @@ AMB Business Co-operative Welfare Fund
                 </div>
               </div>
 
-              {/* 1. Official Terms & Rules Box (Admin-Controlled & Read-Only for Members) */}
-              <div className="bg-gradient-to-br from-amber-50/80 via-white to-amber-50/40 border-2 border-amber-200/90 rounded-2xl p-3.5 shadow-sm space-y-3">
-                <div className="flex items-center gap-2 pb-2 border-b border-amber-200/70">
-                  <div className="w-8 h-8 rounded-xl bg-amber-600 text-white flex items-center justify-center shadow-xs shrink-0">
-                    <Landmark className="w-4 h-4" />
+              {/* Concise, Professional & Elegant Terms Box */}
+              <div className="bg-gradient-to-br from-amber-50/90 via-white to-amber-50/50 border-2 border-amber-300/80 rounded-2xl p-3.5 sm:p-4 shadow-sm space-y-3">
+                {/* Header */}
+                <div className="flex items-start gap-2.5 pb-2.5 border-b border-amber-200/80">
+                  <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-amber-600 to-yellow-600 text-white flex items-center justify-center shadow-xs shrink-0 mt-0.5">
+                    <Gem className="w-5 h-5 text-amber-100" />
                   </div>
                   <div>
-                    <h4 className="text-[12.5px] font-black text-amber-950 font-sans leading-tight">
-                      🏦 স্বর্ণ রেখে জরুরি টাকা গ্রহণের নিয়মাবলী
+                    <h4 className="text-sm font-black text-amber-950 font-sans leading-tight">
+                      স্বর্ণ রেখে ১ মাসের সুদমুক্ত জরুরি হাওলাত
                     </h4>
-                    <p className="text-[9.5px] text-amber-800 font-bold mt-0.5">
-                      কারও হঠাৎ টাকার প্রয়োজন হলে, সে তার স্বর্ণ আমাদের কাছে রেখে জরুরি টাকা নিতে পারবে।
+                    <p className="text-[10.5px] text-amber-900 font-bold mt-1 leading-relaxed">
+                      বাংলাদেশের যেকোনো নাগরিক বিপদের মুহূর্তে নিজের মূল্যবান স্বর্ণ বিক্রি না করে তা আমাদের কাছে গচ্ছিত রেখে বর্তমান বাজারদর অনুযায়ী ১০০% সমপরিমাণ টাকা ১ মাসের জন্য সুদমুক্ত হাওলাত গ্রহণ করতে পারবেন। ১ মাস পর আসল টাকা ফেরত দিয়ে গচ্ছিত স্বর্ণ শতভাগ অক্ষত অবস্থায় বুঝে নিন।
                     </p>
                   </div>
                 </div>
 
-                {/* 🌟 সমবায় সদস্য বনাম সাধারণ নাগরিক বিশেষ সুবিধা ও নীতিমালা কার্ড */}
-                <div className="bg-white border-2 border-amber-300/80 rounded-2xl p-3 shadow-xs space-y-2.5">
-                  <div className="flex items-center gap-1.5 pb-1 border-b border-amber-100">
-                    <Crown className="w-4 h-4 text-amber-600" />
-                    <span className="text-[11px] font-black text-amber-950 uppercase tracking-wide">
-                      সদস্য বনাম সাধারণ মানুষের সুবিধা ও নীতিমালা
-                    </span>
+                {/* Clean Bullet Cards Grid */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs font-sans">
+                  {/* Card 1 */}
+                  <div className="bg-white p-2.5 rounded-xl border border-amber-200/80 flex items-start gap-2 shadow-3xs">
+                    <span className="text-base leading-none p-1 bg-amber-100/80 rounded-lg shrink-0">🪙</span>
+                    <div>
+                      <strong className="text-[11px] font-black text-amber-950 block">১০০% সমপরিমাণ ক্যাশ</strong>
+                      <p className="text-[10px] text-slate-600 font-medium leading-tight mt-0.5">
+                        স্বর্ণের তৎকালীন বাজারমূল্যের সমপরিমাণ (১০০% টাকা) ক্যাশ পাবেন।
+                      </p>
+                    </div>
                   </div>
 
-                  {/* 👑 সমবায় সদস্যদের জন্য বিশেষ সুবিধা */}
-                  <div className="bg-gradient-to-r from-emerald-50 to-teal-50/70 border border-emerald-200 rounded-xl p-2.5 space-y-1">
-                    <div className="flex items-center gap-1.5">
-                      <span className="px-1.5 py-0.5 rounded-md bg-emerald-600 text-white text-[9px] font-black uppercase">
-                        👑 সমবায় সমিতির সদস্য
-                      </span>
-                      <strong className="text-[10.5px] font-black text-emerald-950">3 মাসের 100% জরুরি লোন সুবিধা</strong>
+                  {/* Card 2 */}
+                  <div className="bg-white p-2.5 rounded-xl border border-amber-200/80 flex items-start gap-2 shadow-3xs">
+                    <span className="text-base leading-none p-1 bg-amber-100/80 rounded-lg shrink-0">⏳</span>
+                    <div>
+                      <strong className="text-[11px] font-black text-amber-950 block">১ মাসের সুদমুক্ত মেয়াদ</strong>
+                      <p className="text-[10px] text-slate-600 font-medium leading-tight mt-0.5">
+                        সম্পূর্ণ ০% সুদ বা কোনো লাভ/হিডেন চার্জ ছাড়াই ১ মাস (৩০ দিন) ব্যবহারের সুযোগ।
+                      </p>
                     </div>
-                    <p className="text-[10px] text-emerald-900 leading-relaxed font-medium">
-                      BNB সমবায় সমিতির সদস্যরা <strong>3 মাসের জন্য স্বর্ণের যত টাকা (সমপরিমাণ 100% পুরো টাকা)</strong> জরুরি লোন নিতে পারবেন। পরবর্তীতে <strong>3 মাসের মধ্যে সমপরিমাণ মূল টাকা পরিশোধ করে</strong> নিরাপদে ও অক্ষত অবস্থায় নিজের স্বর্ণ ফেরত নিতে পারবেন (0% সুদ, কোনো অতিরিক্ত চার্জ নেই)।
-                    </p>
                   </div>
 
-                  {/* 👥 সাধারণ নাগরিকদের জন্য নিয়ম */}
-                  <div className="bg-gradient-to-r from-slate-50 to-amber-50/40 border border-slate-200 rounded-xl p-2.5 space-y-1">
-                    <div className="flex items-center gap-1.5">
-                      <span className="px-1.5 py-0.5 rounded-md bg-slate-700 text-white text-[9px] font-black uppercase">
-                        👥 সাধারণ মানুষ (অ-সদস্য)
-                      </span>
-                      <strong className="text-[10.5px] font-black text-slate-800">বাজার নিয়ম প্রযোজ্য</strong>
+                  {/* Card 3 */}
+                  <div className="bg-white p-2.5 rounded-xl border border-amber-200/80 flex items-start gap-2 shadow-3xs">
+                    <span className="text-base leading-none p-1 bg-amber-100/80 rounded-lg shrink-0">🔒</span>
+                    <div>
+                      <strong className="text-[11px] font-black text-amber-950 block">ভল্টে নিরাপদ হেফাজত</strong>
+                      <p className="text-[10px] text-slate-600 font-medium leading-tight mt-0.5">
+                        আপনার গচ্ছিত স্বর্ণ অফিশিয়াল সিলযুক্ত সিকিউর ভল্টে শতভাগ অক্ষত সংরক্ষিত থাকবে।
+                      </p>
                     </div>
-                    <p className="text-[10px] text-slate-700 leading-relaxed font-medium">
-                      যাঁরা সমবায় সমিতির সদস্য নন, সাধারণ মানুষ হিসেবে তাঁদের ক্ষেত্রে প্রচলিত বাজার নিয়মাবলী ও নির্ধারিত মানসম্মত মূল্যায়নের ভিত্তিতে স্বর্ণ রেখে জরুরি ঋণ সুবিধা প্রদান করা হবে।
-                    </p>
+                  </div>
+
+                  {/* Card 4 */}
+                  <div className="bg-white p-2.5 rounded-xl border border-amber-200/80 flex items-start gap-2 shadow-3xs">
+                    <span className="text-base leading-none p-1 bg-amber-100/80 rounded-lg shrink-0">🔄</span>
+                    <div>
+                      <strong className="text-[11px] font-black text-amber-950 block">মূল টাকা ফেরত ও স্বর্ণ গ্রহণ</strong>
+                      <p className="text-[10px] text-slate-600 font-medium leading-tight mt-0.5">
+                        ১ মাসের (৩০ দিন) মধ্যে গৃহীত মূল টাকা জমা দিয়ে সঙ্গে সঙ্গে নিজের স্বর্ণ বুঝে নিন।
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Card 5 - Overdue Fine Rule */}
+                  <div className="bg-amber-100/70 p-2.5 rounded-xl border border-amber-300/90 flex items-start gap-2 shadow-3xs col-span-1 sm:col-span-2">
+                    <span className="text-base leading-none p-1 bg-amber-200/90 rounded-lg shrink-0">⚠️</span>
+                    <div>
+                      <strong className="text-[11px] font-black text-amber-950 block">৩০ দিন পর বিলম্ব ফি/জরিমানা</strong>
+                      <p className="text-[10px] text-amber-900 font-bold leading-tight mt-0.5">
+                        ৩০ দিনের (১ মাস) মধ্যে টাকা ফেরত না দিলে, পরবর্তীতে প্রতি দিনের বিলম্বের জন্য প্রতি ১,০০০ টাকায় ১০ টাকা করে জরিমানা/বিলম্ব ফি প্রযোজ্য হবে।
+                      </p>
+                    </div>
                   </div>
                 </div>
 
-                {/* Live Rules & Guidelines List */}
-                <div className="space-y-2 text-[10.5px] text-slate-800 font-sans leading-relaxed">
-                  {guidelinesList.map((g, idx) => (
-                    <div key={g.id || idx} className="flex items-start gap-2 bg-white/90 p-2 rounded-xl border border-amber-150">
-                      <span className="w-4 h-4 rounded-full bg-amber-500 text-white flex items-center justify-center text-[9px] font-black shrink-0 mt-0.5">
-                        {idx + 1}
-                      </span>
-                      <div className="space-y-0.5">
-                        <strong className="text-slate-900 block font-bold">{g.title}</strong>
-                        <p className="text-[10px] text-slate-600 font-medium">{g.description}</p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-
-                {/* 🤝 আমাদের উদ্দেশ্য Box */}
-                <div className="bg-gradient-to-r from-teal-900 via-emerald-900 to-teal-950 text-white p-3 rounded-xl shadow-xs space-y-1">
-                  <div className="flex items-center gap-1.5">
-                    <span className="text-sm">🤝</span>
-                    <h5 className="text-[11px] font-black text-emerald-300 uppercase tracking-wide">আমাদের উদ্দেশ্য</h5>
-                  </div>
-                  <p className="text-[10px] text-teal-100 font-medium leading-relaxed">
-                    বাংলাদেশের যেকোনো মানুষ বিপদে পড়লে সহজে স্বর্ণের নিরাপত্তার মাধ্যমে সমান সমান বাজারমূল্যে জরুরি আর্থিক সহায়তা পেতে পারে।
-                  </p>
-                  <p className="text-[10.5px] text-amber-300 font-black italic pt-0.5 border-t border-teal-800">
-                    “বিপদের সময় পাশে থাকাই আমাদের মূল উদ্দেশ্য।”
-                  </p>
+                {/* Footer Tagline */}
+                <div className="bg-gradient-to-r from-amber-700 via-amber-800 to-yellow-800 text-amber-100 px-3 py-1.5 rounded-xl text-[10px] font-bold text-center flex items-center justify-center gap-1.5 shadow-3xs">
+                  <span>🤝</span>
+                  <span>"বাংলাদেশের যেকোনো নাগরিক বিপদের সময় স্বর্ণ বিক্রি না করে সুরক্ষিত রেখে সুদমুক্ত আর্থিক সেবা নিতে পারবেন।"</span>
                 </div>
               </div>
 
@@ -4203,10 +4328,10 @@ AMB Business Co-operative Welfare Fund
                   <div className="bg-amber-50/70 border border-amber-200/70 p-2.5 rounded-xl">
                     <span className="text-[8.5px] font-black text-amber-900 block uppercase">গৃহীত মোট জরুরি টাকা</span>
                     <h3 className="text-base font-black text-amber-950 font-mono mt-0.5">
-                      ৳{totalGoldCash.toLocaleString('bn-BD')}
+                      ৳{totalGoldCash.toLocaleString('en-US')}
                     </h3>
                     <span className="text-[7.5px] font-extrabold text-amber-700 block mt-0.5">
-                      (সমান সমান বাজারমূল্য: ৳{totalMarketVal.toLocaleString('bn-BD')})
+                      (সমান সমান বাজারমূল্য: ৳{totalMarketVal.toLocaleString('en-US')})
                     </span>
                   </div>
 
@@ -4246,11 +4371,11 @@ AMB Business Co-operative Welfare Fund
                           </div>
                           <div>
                             <span>বাজারদর: </span>
-                            <strong className="text-slate-900 font-mono">৳{(Number(loan.marketValue) || 0).toLocaleString('bn-BD')}</strong>
+                            <strong className="text-slate-900 font-mono">৳{(Number(loan.marketValue) || 0).toLocaleString('en-US')}</strong>
                           </div>
                           <div className="col-span-2">
                             <span>প্রাপ্ত জরুরি ক্যাশ: </span>
-                            <strong className="text-emerald-700 font-mono font-bold">৳{(Number(loan.cashAmount) || 0).toLocaleString('bn-BD')} (100% বাজারমূল্য)</strong>
+                            <strong className="text-emerald-700 font-mono font-bold">৳{(Number(loan.cashAmount) || 0).toLocaleString('en-US')} (100% বাজারমূল্য)</strong>
                           </div>
                         </div>
 
@@ -4288,7 +4413,7 @@ AMB Business Co-operative Welfare Fund
                       type="number"
                       value={calcMarketValue}
                       onChange={(e) => setCalcMarketValue(e.target.value)}
-                      placeholder="যেমন: 200000"
+                      placeholder="স্বর্ণের বাজার বিক্রয়মূল্য লিখুন (৳)"
                       className="w-full bg-white border border-amber-300 rounded-xl px-3 py-2 text-xs font-mono font-black text-slate-900 focus:outline-none focus:ring-1 focus:ring-amber-500"
                     />
                     <span className="absolute right-3 top-2 text-xs font-black text-amber-700">৳</span>
@@ -4299,7 +4424,7 @@ AMB Business Co-operative Welfare Fund
                 <div className="bg-gradient-to-r from-amber-500 via-amber-600 to-yellow-600 text-white p-2.5 rounded-xl space-y-1 shadow-xs">
                   <div className="flex items-center justify-between text-[10px] font-bold border-b border-white/20 pb-1">
                     <span>স্বর্ণের বাজারদর (100%):</span>
-                    <span className="font-mono">৳{parsedCalcMarket.toLocaleString('bn-BD')}</span>
+                    <span className="font-mono">৳{parsedCalcMarket.toLocaleString('en-US')}</span>
                   </div>
                   <div className="flex items-center justify-between text-[10px] font-black text-yellow-200 border-b border-white/20 pb-1">
                     <span>প্রদেয় অনুপাত ও সুদ:</span>
@@ -4308,7 +4433,7 @@ AMB Business Co-operative Welfare Fund
                   <div className="flex items-center justify-between text-xs font-black pt-0.5">
                     <span>আপনি তাৎক্ষণিক পাবেন:</span>
                     <span className="text-sm font-mono text-white bg-white/20 px-2 py-0.5 rounded-lg">
-                      ৳{calcCash.toLocaleString('bn-BD')}
+                      ৳{calcCash.toLocaleString('en-US')}
                     </span>
                   </div>
                   <div className="text-[8px] text-amber-100 font-bold text-center pt-0.5">
@@ -4354,7 +4479,7 @@ AMB Business Co-operative Welfare Fund
                         type="text"
                         value={goldJewelryType}
                         onChange={(e) => setGoldJewelryType(e.target.value)}
-                        placeholder="যেমন: গলার চেইন, বালা, আংটি"
+                        placeholder="উদাঃ স্বর্ণের আংটি, চেইন, বালা, হার বা গহনা লিখুন"
                         className="w-full bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5 text-xs font-bold text-slate-900 focus:outline-none focus:ring-1 focus:ring-amber-500"
                         required
                       />
@@ -4422,7 +4547,7 @@ AMB Business Co-operative Welfare Fund
                       <div className="bg-amber-50 border border-amber-200/80 p-2 rounded-lg text-[9.5px] text-amber-950 font-bold flex items-center justify-between">
                         <span>বাজারদর অনুযায়ী আপনার প্রাপ্য জরুরি ক্যাশ (100%):</span>
                         <strong className="text-emerald-700 font-mono text-[11px]">
-                          ৳{(Number(goldMarketValue)).toLocaleString('bn-BD')}
+                          ৳{(Number(goldMarketValue)).toLocaleString('en-US')}
                         </strong>
                       </div>
                     )}
@@ -4475,7 +4600,7 @@ AMB Business Co-operative Welfare Fund
                       className="w-4 h-4 mt-0.5 rounded text-amber-600 focus:ring-amber-500 cursor-pointer"
                     />
                     <label htmlFor="goldAgreeCheck" className="text-[9.5px] text-slate-800 font-semibold cursor-pointer">
-                      আমি নিশ্চিত করছি যে স্বর্ণটি আমার নিজস্ব এবং আমি স্বর্ণ রেখে জরুরি টাকার সব নিয়মাবলী ও {protMonths} মাসের ({protDays} দিন) সুরক্ষা শর্তসমূহ পড়েছি ও সম্মতি প্রদান করছি।
+                      আমি নিশ্চিত করছি যে স্বর্ণটি আমার নিজস্ব এবং আমি স্বর্ণ রেখে জরুরি টাকার নিয়মাবলী, ১ মাসের (৩০ দিন) সময়সীমা ও ৩০ দিন অতিবাহিত হলে প্রতিদিন প্রতি ১,০০০ টাকায় ১০ টাকা বিলম্ব ফি সংক্রান্ত শর্তাবলীতে সম্পূর্ণ সম্মত প্রকাশ করছি।
                     </label>
                   </div>
 
@@ -4512,9 +4637,171 @@ AMB Business Co-operative Welfare Fund
         })()}
       </main>
 
+      {/* ==================== PAY FOR OTHER MEMBER LOAN MODAL ==================== */}
+      <AnimatePresence>
+        {showPayForMemberModal && selectedTargetUser && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[11000] bg-slate-950/80 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 overflow-y-auto font-sans text-slate-800"
+            onClick={() => setShowPayForMemberModal(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0, y: 15 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.95, opacity: 0, y: 15 }}
+              onClick={(e) => e.stopPropagation()}
+              className="bg-white rounded-3xl w-full max-w-md overflow-hidden shadow-2xl border border-slate-200 flex flex-col text-left"
+            >
+              {/* Modal Header */}
+              <div className="bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-700 text-white p-4 flex items-center justify-between shrink-0 shadow-xs">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-9 h-9 rounded-2xl bg-white/20 flex items-center justify-center text-white shrink-0">
+                    <Coins className="w-5 h-5 text-amber-300" />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-black text-white">অন্য সদস্যের কিস্তি পরিশোধ করুন</h3>
+                    <p className="text-[10.5px] text-emerald-100 font-semibold">আপনার ওয়ালেট থেকে কিস্তি কেটে নেওয়া হবে</p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowPayForMemberModal(false)}
+                  className="w-7 h-7 rounded-full bg-white/20 hover:bg-white/30 text-white flex items-center justify-center text-xs font-bold transition cursor-pointer"
+                >
+                  ✕
+                </button>
+              </div>
+
+              {/* Target Member Details Card */}
+              <div className="p-4 bg-emerald-50/80 border-b border-emerald-100 space-y-2">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <span className="text-[9px] text-emerald-800 font-extrabold uppercase block">ঋণ গ্রহীতা সদস্যঃ</span>
+                    <h4 className="text-xs font-black text-slate-900">{selectedTargetUser.name || selectedTargetUser.userName || 'সম্মানিত সদস্য'}</h4>
+                    <p className="text-[10px] text-slate-500 font-mono font-bold mt-0.5">ফোনঃ {selectedTargetUser.phone || selectedTargetUser.userPhone || 'N/A'}</p>
+                  </div>
+                  <div className="text-right">
+                    <span className="text-[9px] text-rose-700 font-black uppercase block">বকেয়া ঋণঃ</span>
+                    <strong className="text-sm font-mono font-black text-rose-700">
+                      ৳{(selectedTargetUser.dueAmount !== undefined ? selectedTargetUser.dueAmount : (selectedTargetUser.rawDueAmount !== undefined ? selectedTargetUser.rawDueAmount : selectedTargetUser.dueLoan || 0)).toLocaleString('en-US')} BDT
+                    </strong>
+                  </div>
+                </div>
+
+                <div className="p-2 bg-white rounded-xl border border-emerald-200 flex items-center justify-between text-[11px] font-bold text-slate-700">
+                  <span>আপনার ওয়ালেট ব্যালেন্স:</span>
+                  <span className="text-emerald-700 font-mono font-black">৳{(user.balance || 0).toLocaleString('en-US')} BDT</span>
+                </div>
+              </div>
+
+              {/* Modal Form */}
+              <form onSubmit={handlePayForMemberSubmit} className="p-4 sm:p-5 space-y-4">
+                {payMemberError && (
+                  <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-xs font-bold text-rose-800 flex items-start gap-2">
+                    <AlertCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
+                    <span>{payMemberError}</span>
+                  </div>
+                )}
+
+                {/* Amount selection */}
+                <div className="space-y-1.5">
+                  <label className="block text-xs font-black text-slate-800">
+                    পরিশোধের পরিমাণ লিখুন (৳):
+                  </label>
+
+                  {/* Quick Amount Buttons */}
+                  {(() => {
+                    const due = selectedTargetUser.dueAmount !== undefined ? selectedTargetUser.dueAmount : (selectedTargetUser.rawDueAmount !== undefined ? selectedTargetUser.rawDueAmount : selectedTargetUser.dueLoan || 0);
+                    const instAmt = Math.min(due, Math.ceil(due / 3));
+                    return (
+                      <div className="grid grid-cols-2 gap-2 mb-2">
+                        <button
+                          type="button"
+                          onClick={() => setPayMemberAmountInput(String(instAmt))}
+                          className={`py-2 px-3 rounded-xl border text-[11px] font-bold transition cursor-pointer ${
+                            payMemberAmountInput === String(instAmt)
+                              ? 'bg-emerald-600 text-white border-emerald-600 shadow-xs'
+                              : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
+                          }`}
+                        >
+                          ১ কিস্তি (৳{instAmt.toLocaleString('en-US')})
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setPayMemberAmountInput(String(due))}
+                          className={`py-2 px-3 rounded-xl border text-[11px] font-bold transition cursor-pointer ${
+                            payMemberAmountInput === String(due)
+                              ? 'bg-emerald-600 text-white border-emerald-600 shadow-xs'
+                              : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
+                          }`}
+                        >
+                          সম্পূর্ণ ঋণ (৳{due.toLocaleString('en-US')})
+                        </button>
+                      </div>
+                    );
+                  })()}
+
+                  <div className="relative">
+                    <span className="absolute left-3.5 top-2.5 text-slate-400 font-bold text-xs">৳</span>
+                    <input
+                      type="number"
+                      value={payMemberAmountInput}
+                      onChange={(e) => setPayMemberAmountInput(e.target.value)}
+                      placeholder="টাকার পরিমাণ লিখুন"
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-8 pr-4 py-2.5 text-xs font-mono font-bold text-slate-900 focus:outline-none focus:border-emerald-500 focus:bg-white"
+                      required
+                    />
+                  </div>
+                </div>
+
+                {/* 4-Digit Security PIN Input */}
+                <div className="space-y-1.5">
+                  <label className="block text-xs font-black text-slate-800">
+                    আপনার ৪ সংখ্যার সিকিউরিটি পিন কোড দিন:
+                  </label>
+                  <div className="relative">
+                    <Lock className="w-4 h-4 text-slate-400 absolute left-3.5 top-3" />
+                    <input
+                      type="password"
+                      maxLength={4}
+                      value={payMemberPinInput}
+                      onChange={(e) => setPayMemberPinInput(e.target.value)}
+                      placeholder="৪ সংখ্যার পিন কোড লিখুন"
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-10 pr-4 py-2.5 text-xs font-mono font-bold tracking-widest text-slate-900 focus:outline-none focus:border-emerald-500 focus:bg-white"
+                      required
+                    />
+                  </div>
+                </div>
+
+                {/* Action Button */}
+                <button
+                  type="submit"
+                  disabled={payMemberLoading}
+                  className="w-full py-3 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 active:scale-95 text-white font-black text-xs rounded-2xl transition cursor-pointer shadow-md flex items-center justify-center gap-2"
+                >
+                  {payMemberLoading ? (
+                    <>
+                      <RefreshCw className="w-4 h-4 animate-spin text-white" />
+                      <span>পরিশোধ হচ্ছে...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Coins className="w-4 h-4 text-white" />
+                      <span>ওয়ালেট থেকে ৳{(parseFloat(payMemberAmountInput) || 0).toLocaleString('en-US')} কিস্তি পরিশোধ নিশ্চিত করুন</span>
+                    </>
+                  )}
+                </button>
+              </form>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* ==================== DIGITAL RECEIPT MODAL POPUP ==================== */}
       {showReceiptModal && receiptData && (
-        <AmbPaymentReceiptModal
+        <BNBPaymentReceiptModal
           isOpen={showReceiptModal}
           onClose={() => {
             setShowReceiptModal(false);
@@ -4527,10 +4814,10 @@ AMB Business Co-operative Welfare Fund
             fee: 0,
             totalAmount: receiptData.amount || 0,
             status: 'success',
-            beneficiaryName: receiptData.userName || user.name || 'AMB সদস্য',
+            beneficiaryName: receiptData.userName || user.name || 'BNB সদস্য',
             beneficiaryAccount: receiptData.memberId || user.memberId || user.phone,
             senderPhone: user.phone,
-            transactionDate: receiptData.createdAt ? new Date(receiptData.createdAt).toLocaleString('bn-BD') : new Date().toLocaleString('bn-BD')
+            transactionDate: receiptData.createdAt ? new Date(receiptData.createdAt).toLocaleString('en-US') : new Date().toLocaleString('en-US')
           }}
           onNewTransaction={() => {
             setShowReceiptModal(false);
@@ -4556,7 +4843,7 @@ AMB Business Co-operative Welfare Fund
               <div className="space-y-1">
                 <span className="text-[8px] tracking-widest font-sans font-black text-amber-700/80 uppercase">Certificate of Appreciation</span>
                 <h3 className="text-xl md:text-2xl font-black text-amber-800 font-serif tracking-tight">উদারতা ও কন্ট্রিবিউশন সম্মাননাপত্র</h3>
-                <p className="text-[8px] font-sans text-stone-500 font-extrabold uppercase mt-1">AMB Business Cooperative Co. Welfare Fund</p>
+                <p className="text-[8px] font-sans text-stone-500 font-extrabold uppercase mt-1">BNB Business Cooperative Co. Welfare Fund</p>
               </div>
 
               <div className="space-y-2 pt-2">
@@ -4574,18 +4861,18 @@ AMB Business Co-operative Welfare Fund
                 <div className="px-5 py-2 bg-gradient-to-br from-amber-50 to-amber-100 border border-amber-400 rounded-2xl shadow-sm text-center">
                   <span className="text-[8px] font-sans font-black text-amber-800 uppercase block tracking-wider">দাতা ক্যাটাগরিঃ</span>
                   <strong className="text-sm font-black font-sans text-amber-900 uppercase tracking-tight block mt-0.5">
-                    {userTier.name.split(' (')[0]}
+                    {((user as any).tierName || 'সম্মানিত দাতা (Donor)').split(' (')[0]}
                   </strong>
                 </div>
               </div>
 
               <div className="flex justify-between items-end pt-4 text-[9px] font-sans text-stone-500 text-left">
                 <div className="space-y-0.5">
-                  <p>সার্টিফিকেট আইডিঃ AMB/QRD-{user.memberId?.slice(-5)}</p>
+                  <p>সার্টিফিকেট আইডিঃ BNB/QRD-{user.memberId?.slice(-5)}</p>
                   <p>প্রদানের তারিখঃ {new Date().toLocaleDateString('bn-BD')}</p>
                 </div>
                 <div className="border-t border-stone-300 pt-1 text-center pr-2">
-                  <p className="font-serif font-black text-amber-900 italic">AMB Board of Directors</p>
+                  <p className="font-serif font-black text-amber-900 italic">BNB Board of Directors</p>
                   <p className="text-[8px] text-stone-400 tracking-wide mt-0.5">অফিসিয়াল প্রধান পরিচালক</p>
                 </div>
               </div>
@@ -4725,7 +5012,7 @@ AMB Business Co-operative Welfare Fund
                         </div>
                         <div className="text-right shrink-0 space-y-1">
                           <span className={`text-xs font-black font-mono block ${isDonation ? 'text-rose-600' : 'text-emerald-600'}`}>
-                            {isDonation ? '-' : '+'} ৳{tx.amount.toLocaleString('bn-BD')}
+                            {isDonation ? '-' : '+'} ৳{tx.amount.toLocaleString('en-US')}
                           </span>
                           <span className={`inline-block text-[8.5px] font-extrabold px-1.5 py-0.2 rounded-md uppercase block ${
                             tx.status === 'success' || tx.status === 'approved' ? 'bg-emerald-50 text-emerald-700 border border-emerald-100' :
@@ -4748,47 +5035,96 @@ AMB Business Co-operative Welfare Fund
 
               {/* Footer */}
               <div className="p-4 bg-slate-50 border-t border-slate-100 text-center">
-                <span className="text-[10px] text-slate-400 font-bold">© BUSINESS NETWORK BANGLADESH (AMB)</span>
+                <span className="text-[10px] text-slate-400 font-bold">© BUSINESS NETWORK BANGLADESH (BNB)</span>
               </div>
             </motion.div>
           </motion.div>
         )}
       </AnimatePresence>
 
-      {/* ==================== DONORS & CONTRIBUTORS MODAL (কে টাকা দিয়েছে) ==================== */}
+      {/* ==================== DONORS & CONTRIBUTORS MODAL (কে টাকা দিয়েছে - সর্বমোট দান খতিয়ান) ==================== */}
       <AnimatePresence>
         {showDonorsModal && (() => {
-          const liveDonationsList = qardHistory
-            .filter(t => t.type === 'qard_donation' && t.status === 'success')
-            .map((t, idx) => {
-              const uInfo = usersMap[t.userId] || (t.userPhone ? usersMap[t.userPhone] : null) || (t.memberId ? usersMap[t.memberId] : null);
-              const memberName = uInfo?.name || t.userName || 'দানশীল সদস্য';
-              const memberPhoto = uInfo?.photoURL || uInfo?.photo || t.userPhoto || t.photoURL || '';
-              const initialLetter = (memberName || 'দ').trim().charAt(0).toUpperCase();
+          const allDonationsTxs = qardHistory.filter(t => t.type === 'qard_donation' && t.status === 'success');
+          const donorMap: Record<string, {
+            userId: string;
+            name: string;
+            phone: string;
+            image: string;
+            initialLetter: string;
+            totalAmount: number;
+            donationCount: number;
+            latestDate: string;
+            latestTimestamp: number;
+            history: Array<{
+              id: string;
+              amount: number;
+              date: string;
+              typeLabel: string;
+              description: string;
+              receiptNo?: string;
+              transactionId?: string;
+            }>;
+          }> = {};
 
-              return {
+          allDonationsTxs.forEach((t) => {
+            const key = t.userId || t.userPhone || t.userName || 'anonymous';
+            const donateAmt = Number(t.amount) || 0;
+            const uInfo = usersMap[t.userId] || (t.userPhone ? usersMap[t.userPhone] : null) || (t.memberId ? usersMap[t.memberId] : null);
+            const memberName = t.userName === 'গোপন দাতা' ? 'গোপন দাতা' : (uInfo?.name || t.userName || 'দানশীল সদস্য');
+            const memberPhone = (uInfo as any)?.phone || t.userPhone || '';
+            const memberPhoto = t.userName === 'গোপন দাতা' ? '' : (uInfo?.photoURL || uInfo?.photo || t.userPhoto || t.photoURL || '');
+            const initialLetter = (memberName || 'দ').trim().charAt(0).toUpperCase();
+
+            const txDate = t.createdAt ? new Date(t.createdAt) : new Date();
+            const formattedDate = txDate.toLocaleDateString('bn-BD', { day: 'numeric', month: 'long', year: 'numeric' });
+            const typeLabel = t.description?.includes('মাসিক') ? 'মাসিক অনুদান' : (t.description?.includes('আমানত') ? 'কল্যাণ আমানত' : 'স্বেচ্ছা অনুদান');
+
+            if (!donorMap[key]) {
+              donorMap[key] = {
+                userId: key,
                 name: memberName,
-                relationship: 'সদস্য',
-                amount: t.amount?.toLocaleString('bn-BD') || '0',
-                rawAmount: t.amount || 0,
-                date: t.createdAt ? new Date(t.createdAt).toLocaleDateString('bn-BD', { day: 'numeric', month: 'long', year: 'numeric' }) : 'N/A',
-                type: 'donation',
-                typeLabel: t.description?.includes('মাসিক') ? 'মাসিক অনুদান' : (t.description?.includes('আমানত') ? 'কল্যাণ আমানত' : 'স্বেচ্ছা অনুদান'),
+                phone: memberPhone,
                 image: memberPhoto,
                 initialLetter,
-                phone: t.userPhone || ''
+                totalAmount: 0,
+                donationCount: 0,
+                latestDate: formattedDate,
+                latestTimestamp: txDate.getTime(),
+                history: []
               };
+            }
+
+            donorMap[key].totalAmount += donateAmt;
+            donorMap[key].donationCount += 1;
+            if (txDate.getTime() >= donorMap[key].latestTimestamp) {
+              donorMap[key].latestTimestamp = txDate.getTime();
+              donorMap[key].latestDate = formattedDate;
+            }
+
+            donorMap[key].history.push({
+              id: t.id || t.transactionId || String(Math.random()),
+              amount: donateAmt,
+              date: formattedDate,
+              typeLabel,
+              description: t.description || 'করযে হাসানা অনুদান',
+              receiptNo: t.receiptNo,
+              transactionId: t.transactionId
             });
+          });
 
-          // সর্বোচ্চ থেকে সর্বনিম্ন ক্রমানুসারে সাজানো (Descending Sort: Highest to Lowest)
-          liveDonationsList.sort((a, b) => b.rawAmount - a.rawAmount);
+          // Sort each donor's history descending by date
+          Object.values(donorMap).forEach((d) => {
+            d.history.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+          });
 
-          const filtered = liveDonationsList.filter(d => 
+          const aggregatedDonorsList = Object.values(donorMap).sort((a, b) => b.totalAmount - a.totalAmount);
+
+          const filtered = aggregatedDonorsList.filter(d => 
             !donorsSearchQuery.trim() || 
             d.name.toLowerCase().includes(donorsSearchQuery.toLowerCase()) ||
-            String(d.rawAmount).includes(donorsSearchQuery) ||
-            d.amount.includes(donorsSearchQuery) ||
-            d.typeLabel.toLowerCase().includes(donorsSearchQuery.toLowerCase())
+            d.phone.includes(donorsSearchQuery) ||
+            String(d.totalAmount).includes(donorsSearchQuery)
           );
 
           return (
@@ -4796,7 +5132,7 @@ AMB Business Co-operative Welfare Fund
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 overflow-y-auto"
+              className="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 overflow-y-auto font-sans"
               onClick={() => setShowDonorsModal(false)}
             >
               <motion.div
@@ -4813,7 +5149,7 @@ AMB Business Co-operative Welfare Fund
                       <Heart className="w-5 h-5 text-white" />
                     </div>
                     <div>
-                      <h3 className="text-sm font-black text-white">ফান্ডে দান ও আমানতকারী সদস্যবৃন্দ</h3>
+                      <h3 className="text-sm font-black text-white">ফান্ডে দান ও আমানতকারী সদস্যবৃন্দ (সর্বমোট দান)</h3>
                       <p className="text-[10px] text-emerald-100 font-semibold">কল্যাণমুখী সুদমুক্ত তহবিলের দাতা সদস্যদের তালিকা</p>
                     </div>
                   </div>
@@ -4830,12 +5166,12 @@ AMB Business Co-operative Welfare Fund
                 <div className="bg-emerald-50 border-b border-emerald-100 p-3.5 flex items-center justify-between shrink-0">
                   <div className="text-left">
                     <span className="text-[9px] text-emerald-800 font-extrabold uppercase block">মোট সংগৃহীত ফান্ড</span>
-                    <span className="text-base font-black text-emerald-900 font-mono">৳ {qardTotalFund?.toLocaleString('bn-BD')} BDT</span>
+                    <span className="text-base font-black text-emerald-900 font-mono">৳ {qardTotalFund?.toLocaleString('en-US')} BDT</span>
                   </div>
                   <div className="text-right">
                     <span className="text-[9px] text-emerald-800 font-extrabold uppercase block">মোট দাতা সদস্য</span>
                     <span className="text-xs font-black text-emerald-800 bg-emerald-100/90 border border-emerald-200 px-2.5 py-0.5 rounded-full inline-block">
-                      {liveDonationsList.length} জন
+                      {aggregatedDonorsList.length} জন
                     </span>
                   </div>
                 </div>
@@ -4873,13 +5209,17 @@ AMB Business Co-operative Welfare Fund
                     </div>
                   ) : (
                     filtered.map((item, idx) => (
-                      <div key={idx} className="pt-2.5 first:pt-0 flex items-center justify-between gap-2.5 hover:bg-slate-50/80 p-1.5 rounded-xl transition">
-                        <div className="flex items-center gap-2.5 min-w-0">
+                      <div 
+                        key={idx} 
+                        onClick={() => setSelectedDonorForDetails(item)}
+                        className="pt-2.5 first:pt-0 flex items-center justify-between gap-2.5 hover:bg-emerald-50/60 p-2.5 rounded-2xl transition cursor-pointer border border-transparent hover:border-emerald-200 group"
+                      >
+                        <div className="flex items-center gap-3 min-w-0 flex-1">
                           {item.image ? (
                             <img
                               src={item.image}
                               alt={item.name}
-                              className="w-9 h-9 rounded-full object-cover border-2 border-emerald-500 shrink-0 shadow-3xs"
+                              className="w-10.5 h-10.5 rounded-full object-cover border-2 border-emerald-500 shrink-0 shadow-xs group-hover:scale-105 transition"
                               referrerPolicy="no-referrer"
                               onError={(e) => {
                                 (e.currentTarget as HTMLElement).style.display = 'none';
@@ -4888,25 +5228,27 @@ AMB Business Co-operative Welfare Fund
                               }}
                             />
                           ) : null}
-                          <div className={`w-9 h-9 rounded-full bg-emerald-100 text-emerald-700 font-black text-sm flex items-center justify-center shrink-0 border border-emerald-300 shadow-3xs ${item.image ? 'hidden' : 'flex'}`}>
+                          <div className={`w-10.5 h-10.5 rounded-full bg-emerald-100 text-emerald-700 font-black text-sm flex items-center justify-center shrink-0 border border-emerald-300 shadow-xs group-hover:scale-105 transition ${item.image ? 'hidden' : 'flex'}`}>
                             {item.initialLetter}
                           </div>
-                          <div className="min-w-0">
-                            <h4 className="text-xs font-extrabold text-slate-800 truncate">{item.name}</h4>
-                            <div className="flex items-center gap-1.5 text-[9px] text-slate-400 font-semibold flex-wrap mt-0.5">
-                              <span className="text-emerald-700 font-bold bg-emerald-50 px-1.5 py-0.2 rounded border border-emerald-150">{item.relationship}</span>
-                              <span>•</span>
-                              <span>{item.date}</span>
+                          <div className="min-w-0 flex-1 pr-1">
+                            <h4 className="text-xs sm:text-sm font-extrabold text-slate-800 group-hover:text-emerald-800 leading-snug whitespace-normal break-words">{item.name}</h4>
+                            <div className="flex items-center gap-1.5 text-[9px] font-semibold flex-wrap mt-0.5">
+                              <span className="text-emerald-700 font-bold bg-emerald-50 px-1.5 py-0.2 rounded border border-emerald-150">
+                                {item.donationCount > 1 ? `মোট ${item.donationCount} বার দান` : '১ বার দান'}
+                              </span>
+                              <span className="text-slate-300">•</span>
+                              <span className="text-slate-500">সর্বশেষ: {item.latestDate}</span>
                             </div>
                           </div>
                         </div>
 
                         <div className="text-right shrink-0">
-                          <span className="text-xs font-black text-emerald-600 font-mono block">
-                            ৳ {item.amount}
+                          <span className="text-xs sm:text-sm font-black text-emerald-600 font-mono block">
+                            ৳ {item.totalAmount.toLocaleString('en-US')}
                           </span>
-                          <span className="text-[8.5px] font-bold text-teal-700 bg-teal-50 border border-teal-200 px-2 py-0.5 rounded-full inline-block mt-0.5">
-                            {item.typeLabel}
+                          <span className="text-[8.5px] font-bold text-teal-800 bg-teal-50 border border-teal-200 px-2 py-0.5 rounded-full inline-block mt-0.5 group-hover:bg-teal-600 group-hover:text-white transition">
+                            খতিয়ান দেখুন ➔
                           </span>
                         </div>
                       </div>
@@ -4934,6 +5276,140 @@ AMB Business Co-operative Welfare Fund
         })()}
       </AnimatePresence>
 
+      {/* ==================== DONOR DETAILED BREAKDOWN MODAL (কবে কয় টাকা দিয়েছিলো) ==================== */}
+      <AnimatePresence>
+        {selectedDonorForDetails && (
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[10000] bg-slate-950/70 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 overflow-y-auto font-sans"
+            onClick={() => setSelectedDonorForDetails(null)}
+          >
+            <motion.div 
+              initial={{ scale: 0.95, opacity: 0, y: 15 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.95, opacity: 0, y: 15 }}
+              onClick={(e) => e.stopPropagation()}
+              className="bg-white rounded-3xl w-full max-w-lg overflow-hidden shadow-2xl border border-slate-100 flex flex-col max-h-[85vh] text-left"
+            >
+              {/* Modal Top Header */}
+              <div className="bg-gradient-to-r from-emerald-700 via-teal-700 to-emerald-800 text-white p-4 flex items-center justify-between shrink-0 shadow-md">
+                <div className="flex items-center gap-3">
+                  {selectedDonorForDetails.image ? (
+                    <img 
+                      src={selectedDonorForDetails.image} 
+                      alt={selectedDonorForDetails.name}
+                      className="w-11 h-11 rounded-full object-cover border-2 border-amber-300 shadow-md shrink-0"
+                    />
+                  ) : (
+                    <div className="w-11 h-11 rounded-full bg-white/20 text-white font-black text-base flex items-center justify-center shrink-0 border border-white/30">
+                      {selectedDonorForDetails.initialLetter}
+                    </div>
+                  )}
+                  <div className="min-w-0">
+                    <h3 className="text-sm sm:text-base font-black text-white truncate leading-tight">
+                      {selectedDonorForDetails.name}
+                    </h3>
+                    <p className="text-[11px] text-emerald-100 font-semibold mt-0.5">
+                      পবিত্র করযে হাসানা দান খতিয়ান ও বিস্তারিত হিস্ট্রি
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setSelectedDonorForDetails(null)}
+                  className="w-8 h-8 rounded-full bg-white/20 hover:bg-white/30 text-white flex items-center justify-center text-xs font-bold transition cursor-pointer shrink-0"
+                >
+                  ✕
+                </button>
+              </div>
+
+              {/* Cumulative Donation Stats Summary Box */}
+              <div className="bg-gradient-to-br from-emerald-50 via-teal-50/60 to-emerald-100/50 p-4 border-b border-emerald-200/80 flex items-center justify-between gap-3 shrink-0">
+                <div className="space-y-0.5">
+                  <span className="text-[10px] text-emerald-800 font-extrabold uppercase block">
+                    সর্বমোট প্রদানকৃত দান
+                  </span>
+                  <strong className="text-xl font-mono font-black text-emerald-900 block">
+                    ৳ {selectedDonorForDetails.totalAmount?.toLocaleString('en-US')} BDT
+                  </strong>
+                </div>
+                <div className="text-right space-y-1">
+                  <span className="text-[10px] text-slate-500 font-extrabold uppercase block">
+                    মোট অনুদান সংখ্যা
+                  </span>
+                  <span className="text-xs font-black text-emerald-800 bg-emerald-100 border border-emerald-300 px-3 py-1 rounded-full inline-block shadow-3xs">
+                    {selectedDonorForDetails.donationCount} বার দান করেছেন
+                  </span>
+                </div>
+              </div>
+
+              {/* Scrollable Individual Transactions History Timeline */}
+              <div className="p-4 overflow-y-auto space-y-3 flex-1 bg-slate-50/50">
+                <h4 className="text-xs font-black text-slate-800 border-l-4 border-emerald-500 pl-2">
+                  দানের তারিখ ও পরিমাণ খতিয়ান (কবে কয় টাকা দিয়েছিলেন):
+                </h4>
+
+                <div className="space-y-2">
+                  {selectedDonorForDetails.history.map((entry: any, hIdx: number) => (
+                    <div 
+                      key={entry.id || hIdx}
+                      className="p-3.5 bg-white border border-slate-200/90 rounded-2xl shadow-4xs space-y-2 hover:border-emerald-300 transition"
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-2">
+                          <div className="w-7 h-7 rounded-lg bg-emerald-100 text-emerald-800 flex items-center justify-center font-bold text-xs shrink-0 font-mono">
+                            ৳
+                          </div>
+                          <div>
+                            <strong className="text-sm font-black font-mono text-emerald-700 block">
+                              ৳ {entry.amount?.toLocaleString('en-US')} BDT
+                            </strong>
+                            <span className="text-[9.5px] text-slate-400 font-semibold block mt-0.5">
+                              {entry.typeLabel}
+                            </span>
+                          </div>
+                        </div>
+
+                        <div className="text-right">
+                          <span className="text-[10px] font-extrabold text-slate-700 bg-slate-100 px-2.5 py-1 rounded-lg border border-slate-200 inline-flex items-center gap-1">
+                            <Calendar className="w-3 h-3 text-slate-400" />
+                            {entry.date}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-[10px] text-slate-500 font-semibold">
+                        <span className="truncate max-w-[240px]">
+                          {entry.description || 'কর্জে হাসানা কল্যাণ অনুদান'}
+                        </span>
+                        {entry.receiptNo && (
+                          <span className="font-mono font-bold text-slate-400 shrink-0">
+                            {entry.receiptNo}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Footer */}
+              <div className="p-3 bg-white border-t border-slate-200 shrink-0 text-center">
+                <button
+                  type="button"
+                  onClick={() => setSelectedDonorForDetails(null)}
+                  className="w-full py-2.5 bg-slate-800 hover:bg-slate-900 text-white font-black text-xs rounded-xl shadow-xs transition cursor-pointer"
+                >
+                  বন্ধ করুন
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* ==================== BORROWERS MODAL (কে ঋণ নিয়েছে / কিস্তি খতিয়ান) ==================== */}
       <AnimatePresence>
         {showBorrowersModal && (() => {
@@ -4954,10 +5430,10 @@ AMB Business Co-operative Welfare Fund
               return {
                 name: memberName,
                 role: 'সদস্য',
-                amount: t.amount?.toLocaleString('bn-BD') || '0',
+                amount: t.amount?.toLocaleString('en-US') || '0',
                 rawAmount: t.amount || 0,
                 installments: isComplete ? '3/3' : '1/3',
-                dueAmount: remaining?.toLocaleString('bn-BD') || '0',
+                dueAmount: remaining?.toLocaleString('en-US') || '0',
                 rawDueAmount: remaining,
                 nextInstallment: t.loanDuration ? (t.loanDuration + ' মাস') : 'চলতি মাস',
                 isComplete,
@@ -5016,7 +5492,7 @@ AMB Business Co-operative Welfare Fund
                 <div className="bg-rose-50 border-b border-rose-100 p-3.5 flex items-center justify-between shrink-0">
                   <div className="text-left">
                     <span className="text-[9px] text-rose-800 font-extrabold uppercase block">মোট ঋণ বিতরণ</span>
-                    <span className="text-base font-black text-rose-900 font-mono">৳ {qardActiveLoansAmount?.toLocaleString('bn-BD')} BDT</span>
+                    <span className="text-base font-black text-rose-900 font-mono">৳ {qardActiveLoansAmount?.toLocaleString('en-US')} BDT</span>
                   </div>
                   <div className="text-right">
                     <span className="text-[9px] text-rose-800 font-extrabold uppercase block">মোট গ্রহীতা</span>
@@ -5138,155 +5614,568 @@ AMB Business Co-operative Welfare Fund
         })()}
       </AnimatePresence>
 
-      {/* ==================== REPAYMENT MODAL (টাকা/ঋণ পরিশোধ ও অগ্রিম পরিশোধ) ==================== */}
+      {/* ==================== REPAYMENT FULL-SCREEN PORTAL (টাকা/ঋণ পরিশোধ ও অন্যের কিস্তি পরিশোধ) ==================== */}
       <AnimatePresence>
         {showRepayModal && (
           <motion.div 
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-slate-950/70 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto"
-            onClick={() => setShowRepayModal(false)}
+            className="fixed inset-0 bg-slate-900/90 z-[10000] flex flex-col w-full h-full min-h-screen overflow-hidden font-sans text-slate-800"
           >
             <motion.div 
-              initial={{ scale: 0.9, y: 20 }}
-              animate={{ scale: 1, y: 0 }}
-              exit={{ scale: 0.9, y: 20 }}
-              onClick={(e) => e.stopPropagation()}
-              className="bg-white rounded-3xl max-w-lg w-full p-5 sm:p-6 shadow-2xl border border-slate-100 space-y-4 text-left my-auto"
+              initial={{ y: 20 }}
+              animate={{ y: 0 }}
+              exit={{ y: 20 }}
+              className="bg-white w-full h-full flex flex-col overflow-hidden"
             >
-              {/* Header */}
-              <div className="flex justify-between items-center border-b border-slate-100 pb-3">
-                <div className="flex items-center gap-2">
-                  <div className="w-9 h-9 rounded-full bg-amber-100 text-amber-700 flex items-center justify-center font-black">
-                    <Zap className="w-5 h-5 text-amber-600" />
+              {/* Full-Screen Top Navigation Bar */}
+              <div className="bg-gradient-to-r from-emerald-700 via-teal-700 to-emerald-800 text-white px-4 py-3.5 flex items-center justify-between shrink-0 shadow-md">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-9 h-9 rounded-2xl bg-white/20 flex items-center justify-center text-white shrink-0">
+                    <Zap className="w-5 h-5 text-amber-300" />
                   </div>
                   <div>
-                    <h3 className="text-sm font-black text-slate-900 font-sans">
-                      করযে হাসানা টাকা/ঋণ পরিশোধ কেন্দ্র
-                    </h3>
-                    <p className="text-[10px] text-slate-400 font-bold">
-                      1 দিন, 1 সপ্তাহ বা যেকোনো সময় অগ্রিম পরিশোধ ব্যবস্থা
+                    <h2 className="text-sm sm:text-base font-black text-white leading-tight">
+                      করযে হাসানা টাকা / ঋণ পরিশোধ কেন্দ্র
+                    </h2>
+                    <p className="text-[10.5px] text-emerald-100 font-semibold">
+                      শুধুমাত্র করযে হাসানা সুদমুক্ত ঋণ ও কিস্তি পরিশোধের জন্য নিবেদিত
                     </p>
                   </div>
                 </div>
                 <button 
-                  onClick={() => setShowRepayModal(false)}
-                  className="p-1.5 bg-slate-100 hover:bg-slate-200 text-slate-500 rounded-full transition active:scale-90 cursor-pointer"
+                  onClick={() => {
+                    setRepaySubTab('my_loan');
+                    setShowRepayModal(false);
+                  }}
+                  className="px-3 py-1.5 bg-white/20 hover:bg-white/30 text-white rounded-xl text-xs font-black transition active:scale-95 cursor-pointer flex items-center gap-1"
                 >
-                  <X className="w-5 h-5" />
+                  <X className="w-4 h-4" />
+                  <span>বন্ধ করুন</span>
                 </button>
               </div>
 
-              {/* Status Info Card */}
-              <div className="bg-gradient-to-r from-amber-50 via-rose-50 to-pink-50 border border-amber-200/80 p-3.5 rounded-2xl flex items-center justify-between">
-                <div>
-                  <span className="text-[9px] text-amber-800 font-extrabold uppercase block">আপনার বর্তমান বকেয়া ঋণ</span>
-                  <strong className="text-base font-mono font-black text-rose-700">
-                    ৳ {(user.dueLoan || 0).toLocaleString('bn-BD')} BDT
-                  </strong>
-                </div>
-                <div className="text-right">
-                  <span className="text-[9px] text-slate-500 font-extrabold uppercase block">মেইন ব্যালেন্স</span>
-                  <strong className="text-sm font-mono font-black text-emerald-700">
-                    ৳ {(user.balance || 0).toLocaleString('bn-BD')} BDT
-                  </strong>
-                </div>
+              {/* Sub-Tab Navigation Header (4 Sections as requested) */}
+              <div className="bg-slate-100/90 border-b border-slate-200 p-2 shrink-0 grid grid-cols-2 sm:grid-cols-4 gap-1.5 font-sans">
+                <button
+                  type="button"
+                  onClick={() => setRepaySubTab('my_loan')}
+                  className={`py-2 px-2.5 rounded-xl text-[11px] font-black transition flex items-center justify-center gap-1 cursor-pointer whitespace-nowrap ${
+                    repaySubTab === 'my_loan'
+                      ? 'bg-emerald-600 text-white shadow-xs'
+                      : 'bg-white text-slate-700 hover:bg-slate-50 border border-slate-200'
+                  }`}
+                >
+                  <Coins className="w-3.5 h-3.5" />
+                  <span>১. আমার ঋণ পরিশোধ</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setRepaySubTab('borrowers_list')}
+                  className={`py-2 px-2.5 rounded-xl text-[11px] font-black transition flex items-center justify-center gap-1 cursor-pointer whitespace-nowrap ${
+                    repaySubTab === 'borrowers_list'
+                      ? 'bg-emerald-600 text-white shadow-xs'
+                      : 'bg-white text-slate-700 hover:bg-slate-50 border border-slate-200'
+                  }`}
+                >
+                  <ClipboardList className="w-3.5 h-3.5" />
+                  <span>২. ঋণ গ্রহীতা ও কিস্তি</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setRepaySubTab('all_beneficiaries')}
+                  className={`py-2 px-2.5 rounded-xl text-[11px] font-black transition flex items-center justify-center gap-1 cursor-pointer whitespace-nowrap ${
+                    repaySubTab === 'all_beneficiaries'
+                      ? 'bg-emerald-600 text-white shadow-xs'
+                      : 'bg-white text-slate-700 hover:bg-slate-50 border border-slate-200'
+                  }`}
+                >
+                  <Users className="w-3.5 h-3.5" />
+                  <span>৩. সর্বমোট সুবিধাভোগী</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setRepaySubTab('late_defaulters')}
+                  className={`py-2 px-2.5 rounded-xl text-[11px] font-black transition flex items-center justify-center gap-1 cursor-pointer whitespace-nowrap ${
+                    repaySubTab === 'late_defaulters'
+                      ? 'bg-rose-700 text-white shadow-xs'
+                      : 'bg-white text-slate-700 hover:bg-slate-50 border border-slate-200'
+                  }`}
+                >
+                  <BadgeAlert className="w-3.5 h-3.5" />
+                  <span>৪. বিলম্ব ও ব্ল্যাকলিস্ট</span>
+                </button>
               </div>
 
-              {/* Notice Banner */}
-              <div className="p-3 bg-emerald-500/10 border border-emerald-200/80 rounded-2xl text-[10.5px] text-emerald-950 font-bold leading-relaxed space-y-1">
-                <div className="flex items-center gap-1.5 text-emerald-800 font-black">
-                  <CheckCircle className="w-4 h-4 text-emerald-600 shrink-0" />
-                  <span>অগ্রিম ও যেকোনো সময় পরিশোধের সুবিধাঃ</span>
-                </div>
-                <p className="text-slate-700">
-                  করযে হাসানা থেকে 1 মাস অথবা 3 মাসের মেয়াদে হাওলাত নেওয়ার পর, আপনি চাইলে 1 মাস অপেক্ষা না করে **1 দিন পরে, 1 সপ্তাহ পরে অথবা যেকোনো দিন** একাউন্টের মেইন ওয়ালেট ব্যালেন্স থেকে সম্পূর্ণ বকেয়া অথবা আংশিক কিস্তি অগ্রিম পরিশোধ করতে পারবেন।
+              {/* Scrollable Main Content Body */}
+              <div className="flex-1 overflow-y-auto p-4 sm:p-6 max-w-3xl mx-auto w-full space-y-4 text-left">
+                
+                {/* SUB TAB 1: MY LOAN REPAYMENT */}
+                {repaySubTab === 'my_loan' && (
+                  <div className="space-y-4">
+                    {/* Notice Banner */}
+                    <div className="p-3.5 bg-amber-50 border border-amber-200 rounded-2xl text-[11px] text-amber-950 font-bold leading-relaxed space-y-1">
+                      <div className="flex items-center gap-1.5 text-amber-800 font-black text-xs">
+                        <CheckCircle className="w-4 h-4 text-amber-600 shrink-0" />
+                        <span>বিশেষ নির্দেশনাঃ</span>
+                      </div>
+                      <p className="text-slate-700">
+                        করযে হাসানা পরিশোধ শুধুমাত্র এই সেকশনে ঢুকে করতে হবে। অন্য জায়গা থেকে নেওয়া টাকা বা সাধারণ লেনদেন এখানে পরিশোধ করা যাবে না। আপনার করযে হাসানা ঋণের টাকা আপনি যেকোনো সময় (১ দিন, ১ সপ্তাহ বা মেয়াদ শেষে) অগ্রিম পরিশোধ করতে পারবেন।
+                      </p>
+                    </div>
+
+                    {/* Status Info Card */}
+                    <div className="bg-gradient-to-r from-emerald-50 via-teal-50 to-sky-50 border border-emerald-200 p-4 rounded-2.5xl flex items-center justify-between shadow-xs">
+                      <div>
+                        <span className="text-[10px] text-emerald-800 font-black uppercase block">আপনার বর্তমান বকেয়া ঋণ</span>
+                        <strong className="text-xl font-mono font-black text-rose-700 block mt-0.5">
+                          ৳ {(user.dueLoan || 0).toLocaleString('en-US')} BDT
+                        </strong>
+                      </div>
+                      <div className="text-right">
+                        <span className="text-[10px] text-slate-500 font-black uppercase block">মেইন ওয়ালেট ব্যালেন্স</span>
+                        <strong className="text-base font-mono font-black text-emerald-700 block mt-0.5">
+                          ৳ {(user.balance || 0).toLocaleString('en-US')} BDT
+                        </strong>
+                      </div>
+                    </div>
+
+                    {user.dueLoan && user.dueLoan > 0 ? (
+                      <div className="space-y-3 bg-white border border-slate-200 p-4 rounded-2.5xl shadow-3xs">
+                        <label className="block text-xs font-black text-slate-800">
+                          পরিশোধের পরিমাণ নির্বাচন বা লিখুন (৳):
+                        </label>
+
+                        {/* Preset quick buttons */}
+                        <div className="grid grid-cols-2 gap-2.5">
+                          <button
+                            type="button"
+                            onClick={() => setCustomRepayInput(String(Math.min(user.dueLoan || 0, Math.ceil((user.dueLoan || 0) / 3))))}
+                            className={`p-3 rounded-2xl border text-xs font-extrabold transition cursor-pointer flex flex-col items-center justify-center ${
+                              customRepayInput === String(Math.min(user.dueLoan || 0, Math.ceil((user.dueLoan || 0) / 3)))
+                                ? 'bg-emerald-600 text-white border-emerald-600 shadow-xs'
+                                : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
+                            }`}
+                          >
+                            <span>1 কিস্তি পরিশোধ</span>
+                            <span className="text-[10px] opacity-90 font-mono">৳ {Math.min(user.dueLoan || 0, Math.ceil((user.dueLoan || 0) / 3)).toLocaleString('en-US')} BDT</span>
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => setCustomRepayInput(String(user.dueLoan))}
+                            className={`p-3 rounded-2xl border text-xs font-extrabold transition cursor-pointer flex flex-col items-center justify-center ${
+                              customRepayInput === String(user.dueLoan) || (!customRepayInput && user.dueLoan > 0)
+                                ? 'bg-emerald-600 text-white border-emerald-600 shadow-xs'
+                                : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
+                            }`}
+                          >
+                            <span>সম্পূর্ণ ঋণ পরিশোধ</span>
+                            <span className="text-[10px] opacity-90 font-mono">৳ {user.dueLoan.toLocaleString('en-US')} BDT</span>
+                          </button>
+                        </div>
+
+                        {/* Custom Input */}
+                        <div className="relative">
+                          <span className="absolute left-3.5 top-3 text-slate-400 font-bold text-xs">৳</span>
+                          <input
+                            type="number"
+                            value={customRepayInput}
+                            onChange={(e) => setCustomRepayInput(e.target.value)}
+                            placeholder={`নিজের পছন্দমতো টাকার সংখ্যা লিখুন (উদাঃ ${user.dueLoan})`}
+                            className="w-full bg-slate-50 border border-slate-200 rounded-2xl pl-8 pr-4 py-2.5 text-xs font-mono font-bold text-slate-800 focus:outline-none focus:border-emerald-500 focus:bg-white"
+                          />
+                        </div>
+
+                        {/* Execute Button */}
+                        <button
+                          onClick={async () => {
+                            const amtToPay = parseFloat(customRepayInput) || user.dueLoan || 0;
+                            await handleLoanRepay(amtToPay);
+                            setShowRepayModal(false);
+                          }}
+                          disabled={loading}
+                          className="w-full py-3.5 bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs rounded-2xl active:scale-95 transition cursor-pointer flex items-center justify-center gap-2 shadow-md"
+                        >
+                          <Coins className="w-4 h-4 text-white" />
+                          মেইন ওয়ালেট থেকে ৳ {(parseFloat(customRepayInput) || user.dueLoan || 0).toLocaleString('en-US')} BDT পরিশোধ করুন
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="text-center py-8 px-4 bg-slate-50 border border-slate-200 rounded-2.5xl space-y-3">
+                        <span className="text-3xl block">🎉</span>
+                        <h4 className="text-sm font-black text-slate-800">আপনার কোনো বকেয়া করযে হাসানা ঋণ নেই!</h4>
+                        <p className="text-xs text-slate-500 font-medium max-w-md mx-auto">
+                          আপনার একাউন্টে বর্তমানে কোনো বকেয়া ঋণ নেই। আপনি অন্য কোনো সদস্যের কিস্তি পরিশোধ করতে চাইলে **"ঋণ গ্রহীতা ও কিস্তি তালিকা"** ট্যাবে ক্লিক করুন।
+                        </p>
+                        <button
+                          type="button"
+                          onClick={() => setRepaySubTab('borrowers_list')}
+                          className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs rounded-xl shadow-xs transition inline-flex items-center gap-1.5 cursor-pointer"
+                        >
+                          <ClipboardList className="w-4 h-4" />
+                          অন্যান্য ঋণ গ্রহীতা সদস্য তালিকা দেখুন
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* SUB TAB 2: BORROWERS LIST & DIRECT PIN REPAYMENT */}
+                {repaySubTab === 'borrowers_list' && (() => {
+                  const borrowersList = qardHistory
+                    .filter(t => t.type === 'qard_loan_disbursment' && t.status === 'success')
+                    .map((t) => {
+                      const repayments = qardHistory
+                        .filter(rp => rp.type === 'qard_loan_repayment' && rp.status === 'success' && rp.userId === t.userId);
+                      const totalRepaidAmount = repayments.reduce((sum, r) => sum + r.amount, 0);
+                      const remaining = Math.max(0, t.amount - totalRepaidAmount);
+                      const isComplete = remaining === 0;
+
+                      const uInfo = usersMap[t.userId] || (t.userPhone ? usersMap[t.userPhone] : null);
+                      const memberName = uInfo?.name || t.userName || 'সম্মানিত সদস্য';
+                      const memberPhone = (uInfo as any)?.phone || t.userPhone || '';
+
+                      return {
+                        userId: t.userId,
+                        name: memberName,
+                        phone: memberPhone,
+                        amount: t.amount,
+                        dueAmount: remaining,
+                        isComplete,
+                        uInfo
+                      };
+                    });
+
+                  return (
+                    <div className="space-y-3">
+                      <div className="p-3 bg-slate-50 border border-slate-200 rounded-2xl flex items-center justify-between">
+                        <span className="text-xs font-black text-slate-800">সকল ঋণ গ্রহীতা সদস্যবৃন্দ ({borrowersList.length} জন)</span>
+                        <span className="text-[10px] text-emerald-800 font-extrabold bg-emerald-100 px-2 py-0.5 rounded-full">
+                          সরাসরি কিস্তি পরিশোধ
+                        </span>
+                      </div>
+
+                      <div className="space-y-2">
+                        {borrowersList.length === 0 ? (
+                          <div className="p-8 text-center text-slate-400 bg-white border border-slate-200 rounded-2xl text-xs font-bold">
+                            কোনো ঋণ গ্রহীতার তালিকা পাওয়া যায়নি।
+                          </div>
+                        ) : (
+                          borrowersList.map((item, idx) => (
+                            <div key={idx} className="p-3 bg-white border border-slate-200 rounded-2xl flex items-center justify-between gap-3 shadow-4xs">
+                              <div className="min-w-0">
+                                <h4 className="text-xs font-black text-slate-800 truncate">{item.name}</h4>
+                                <p className="text-[10px] text-slate-500 font-mono font-bold mt-0.5">ফোনঃ {item.phone || 'N/A'}</p>
+                                <div className="flex items-center gap-2 mt-1 text-[10px]">
+                                  <span className="text-slate-600 font-bold">নেয়াঃ ৳{item.amount}</span>
+                                  <span className="text-slate-300">•</span>
+                                  <span className={item.isComplete ? 'text-emerald-700 font-black' : 'text-rose-600 font-black'}>
+                                    বকেয়াঃ ৳{item.dueAmount}
+                                  </span>
+                                </div>
+                              </div>
+
+                              <div className="shrink-0 text-right">
+                                {item.dueAmount > 0 ? (
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setSelectedTargetUser(item);
+                                      setPayMemberAmountInput(String(Math.min(item.dueAmount, Math.ceil(item.dueAmount / 3))));
+                                      setPayMemberPinInput('');
+                                      setPayMemberError('');
+                                      setShowPayForMemberModal(true);
+                                    }}
+                                    className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-[11px] font-black shadow-xs transition cursor-pointer"
+                                  >
+                                    এনার কিস্তি পরিশোধ করুন
+                                  </button>
+                                ) : (
+                                  <span className="text-[10px] font-black text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-1 rounded-lg inline-block">
+                                    ✓ পরিশোধিত
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    </div>
+                  );
+                })()}
+
+                {/* SUB TAB 3: ALL BENEFICIARIES LIST (প্রথম থেকে শেষ পর্যন্ত কয়জন টাকা নিয়েছে) */}
+                {repaySubTab === 'all_beneficiaries' && (() => {
+                  const allBeneficiariesList = qardHistory
+                    .filter(t => t.type === 'qard_loan_disbursment' && t.status === 'success')
+                    .map((t) => {
+                      const repayments = qardHistory
+                        .filter(rp => rp.type === 'qard_loan_repayment' && rp.status === 'success' && rp.userId === t.userId);
+                      const totalRepaidAmount = repayments.reduce((sum, r) => sum + (r.amount || 0), 0);
+                      const remaining = Math.max(0, (t.amount || 0) - totalRepaidAmount);
+                      const isComplete = remaining === 0;
+
+                      const uInfo = usersMap[t.userId] || (t.userPhone ? usersMap[t.userPhone] : null);
+                      const memberName = uInfo?.name || t.userName || 'সুবিধাভোগী সদস্য';
+                      const memberPhone = (uInfo as any)?.phone || t.userPhone || '';
+                      const memberPhoto = (uInfo as any)?.photoURL || (uInfo as any)?.photo || t.userPhoto || '';
+
+                      return {
+                        userId: t.userId,
+                        name: memberName,
+                        phone: memberPhone,
+                        photo: memberPhoto,
+                        amount: t.amount || 0,
+                        dueAmount: remaining,
+                        isComplete,
+                        date: t.createdAt ? new Date(t.createdAt).toLocaleDateString('bn-BD', { day: 'numeric', month: 'long', year: 'numeric' }) : 'N/A'
+                      };
+                    });
+
+                  allBeneficiariesList.sort((a, b) => b.amount - a.amount);
+
+                  const filteredBeneficiaries = allBeneficiariesList.filter(b => 
+                    !beneficiariesSearchQuery.trim() || 
+                    b.name.toLowerCase().includes(beneficiariesSearchQuery.toLowerCase()) ||
+                    b.phone.includes(beneficiariesSearchQuery) ||
+                    String(b.amount).includes(beneficiariesSearchQuery)
+                  );
+
+                  const totalDisbursedSum = allBeneficiariesList.reduce((acc, c) => acc + c.amount, 0);
+
+                  return (
+                    <div className="space-y-3 font-sans">
+                      {/* Summary Banner */}
+                      <div className="bg-gradient-to-r from-emerald-50 via-teal-50 to-sky-50 border border-emerald-200 p-4 rounded-2.5xl flex items-center justify-between shadow-xs">
+                        <div>
+                          <span className="text-[10px] text-emerald-800 font-extrabold uppercase block">সর্বমোট সুবিধাভোগী সংখ্যা</span>
+                          <strong className="text-xl font-mono font-black text-emerald-950 block mt-0.5">
+                            {allBeneficiariesList.length} জন সদস্য
+                          </strong>
+                        </div>
+                        <div className="text-right">
+                          <span className="text-[10px] text-slate-500 font-extrabold uppercase block">বিতরণকৃত সর্বমোট ফান্ড</span>
+                          <strong className="text-base font-mono font-black text-emerald-700 block mt-0.5">
+                            ৳ {totalDisbursedSum.toLocaleString('en-US')} BDT
+                          </strong>
+                        </div>
+                      </div>
+
+                      {/* Search Bar */}
+                      <div className="relative">
+                        <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                        <input
+                          type="text"
+                          placeholder="সুবিধাভোগী সদস্যের নাম বা ফোন নম্বর লিখে খুঁজুন..."
+                          value={beneficiariesSearchQuery}
+                          onChange={(e) => setBeneficiariesSearchQuery(e.target.value)}
+                          className="w-full pl-8 pr-7 py-2.5 text-xs bg-slate-50 border border-slate-200 rounded-2xl text-slate-800 placeholder-slate-400 focus:outline-none focus:border-emerald-500 font-sans font-bold"
+                        />
+                        {beneficiariesSearchQuery && (
+                          <button
+                            type="button"
+                            onClick={() => setBeneficiariesSearchQuery('')}
+                            className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 text-xs font-bold"
+                          >
+                            ✕
+                          </button>
+                        )}
+                      </div>
+
+                      {/* List */}
+                      <div className="space-y-2">
+                        {filteredBeneficiaries.length === 0 ? (
+                          <div className="p-8 text-center text-slate-400 bg-white border border-slate-200 rounded-2xl text-xs font-bold">
+                            কোনো সুবিধাভোগী সদস্যের রেকর্ড পাওয়া যায়নি।
+                          </div>
+                        ) : (
+                          filteredBeneficiaries.map((item, idx) => (
+                            <div key={idx} className="p-3 bg-white border border-slate-200 rounded-2xl flex items-center justify-between gap-3 shadow-4xs">
+                              <div className="flex items-center gap-2.5 min-w-0">
+                                {item.photo ? (
+                                  <img
+                                    src={item.photo}
+                                    alt={item.name}
+                                    className="w-9 h-9 rounded-full object-cover border border-emerald-500 shrink-0"
+                                    referrerPolicy="no-referrer"
+                                  />
+                                ) : (
+                                  <div className="w-9 h-9 rounded-full bg-emerald-100 text-emerald-800 font-black text-xs flex items-center justify-center shrink-0 border border-emerald-300">
+                                    {item.name.trim().charAt(0).toUpperCase()}
+                                  </div>
+                                )}
+                                <div className="min-w-0">
+                                  <h4 className="text-xs font-black text-slate-800 truncate">{item.name}</h4>
+                                  <p className="text-[10px] text-slate-500 font-mono font-bold mt-0.5">
+                                    ফোনঃ {item.phone || 'N/A'} • {item.date}
+                                  </p>
+                                </div>
+                              </div>
+
+                              <div className="shrink-0 text-right space-y-0.5">
+                                <span className="text-xs font-mono font-black text-emerald-800 block">
+                                  ৳ {item.amount.toLocaleString('en-US')}
+                                </span>
+                                {item.isComplete ? (
+                                  <span className="text-[9px] font-black text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-md inline-block">
+                                    ✓ সম্পূর্ণ পরিশোধিত
+                                  </span>
+                                ) : (
+                                  <span className="text-[9px] font-black text-rose-700 bg-rose-50 border border-rose-200 px-2 py-0.5 rounded-md inline-block">
+                                    ⏳ বকেয়া: ৳{item.dueAmount.toLocaleString('en-US')}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    </div>
+                  );
+                })()}
+
+                {/* SUB TAB 4: LATE PAYERS & BLACKLISTED DEFAULTERS (বিলম্বকারী ও ২-বার ব্যর্থতায় স্থায়ী আজীবন নিষিদ্ধ) */}
+                {repaySubTab === 'late_defaulters' && (() => {
+                  const latePayersMap: Record<string, { userId: string; name: string; phone: string; lateCount: number; totalFine: number; lastFineDate: string; isBanned: boolean; photo?: string }> = {};
+
+                  qardHistory.forEach((t) => {
+                    if (t.type === 'qard_fine' || t.category === 'qard_late_fine') {
+                      const uid = t.userId;
+                      if (!uid) return;
+                      const uInfo = usersMap[uid] || (t.userPhone ? usersMap[t.userPhone] : null);
+                      const mName = uInfo?.name || t.userName || 'সদস্য';
+                      const mPhone = (uInfo as any)?.phone || t.userPhone || '';
+                      const mPhoto = (uInfo as any)?.photoURL || (uInfo as any)?.photo || '';
+
+                      if (!latePayersMap[uid]) {
+                        latePayersMap[uid] = {
+                          userId: uid,
+                          name: mName,
+                          phone: mPhone,
+                          lateCount: 0,
+                          totalFine: 0,
+                          lastFineDate: t.createdAt,
+                          isBanned: false,
+                          photo: mPhoto
+                        };
+                      }
+                      latePayersMap[uid].lateCount += 1;
+                      latePayersMap[uid].totalFine += (t.amount || 0);
+                      if (latePayersMap[uid].lateCount >= 2) {
+                        latePayersMap[uid].isBanned = true;
+                      }
+                    }
+                  });
+
+                  const latePayersList = Object.values(latePayersMap);
+                  latePayersList.sort((a, b) => b.lateCount - a.lateCount);
+
+                  const filteredDefaulters = latePayersList.filter(d => 
+                    !defaultersSearchQuery.trim() || 
+                    d.name.toLowerCase().includes(defaultersSearchQuery.toLowerCase()) ||
+                    d.phone.includes(defaultersSearchQuery)
+                  );
+
+                  return (
+                    <div className="space-y-3 font-sans">
+                      {/* Rules Banner */}
+                      <div className="p-3.5 bg-rose-50 border border-rose-200 rounded-2xl text-[11px] text-rose-950 font-bold leading-relaxed space-y-1">
+                        <div className="flex items-center gap-1.5 text-rose-800 font-black text-xs">
+                          <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0" />
+                          <span>২-বার বিলম্ব এবং আজীবন নিষিদ্ধকরণ নিয়মাবলী:</span>
+                        </div>
+                        <p className="text-slate-700">
+                          প্রথমবার ৩০ দিন মেয়াদ পার করে দেরিতে পরিশোধ করলে ১টি বিলম্ব জরিমানা ও সতর্কবার্তা যুক্ত হয়। কিন্তু ২য় বার সময়মতো পরিশোধে ব্যর্থ হলে (বিলম্ব কাউন্ট ২) উক্ত ব্যক্তি আজীবনের জন্য করযে হাসানা ফান্ড বা সমবায় সমিতি থেকে নতুন কোনো ঋণ নেওয়ার যোগ্যতা স্থায়ীভাবে হারাবে (LIFETIME BANNED)।
+                        </p>
+                      </div>
+
+                      {/* Search Bar */}
+                      <div className="relative">
+                        <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                        <input
+                          type="text"
+                          placeholder="বিলম্বকারী বা নিষিদ্ধ সদস্যদের নাম/ফোন লিখে খুঁজুন..."
+                          value={defaultersSearchQuery}
+                          onChange={(e) => setDefaultersSearchQuery(e.target.value)}
+                          className="w-full pl-8 pr-7 py-2.5 text-xs bg-slate-50 border border-slate-200 rounded-2xl text-slate-800 placeholder-slate-400 focus:outline-none focus:border-rose-500 font-sans font-bold"
+                        />
+                        {defaultersSearchQuery && (
+                          <button
+                            type="button"
+                            onClick={() => setDefaultersSearchQuery('')}
+                            className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 text-xs font-bold"
+                          >
+                            ✕
+                          </button>
+                        )}
+                      </div>
+
+                      {/* List */}
+                      <div className="space-y-2">
+                        {filteredDefaulters.length === 0 ? (
+                          <div className="p-8 text-center text-slate-400 bg-white border border-slate-200 rounded-2xl text-xs font-bold">
+                            বর্তমানে কোনো বিলম্বকারী বা ব্ল্যাকলিস্টেড সদস্যের তথ্য পাওয়া যায়নি।
+                          </div>
+                        ) : (
+                          filteredDefaulters.map((item, idx) => (
+                            <div key={idx} className={`p-3 bg-white border rounded-2xl flex items-center justify-between gap-3 shadow-4xs ${item.isBanned ? 'border-rose-300 bg-rose-50/30' : 'border-slate-200'}`}>
+                              <div className="flex items-center gap-2.5 min-w-0">
+                                {item.photo ? (
+                                  <img
+                                    src={item.photo}
+                                    alt={item.name}
+                                    className="w-9 h-9 rounded-full object-cover border border-rose-500 shrink-0"
+                                    referrerPolicy="no-referrer"
+                                  />
+                                ) : (
+                                  <div className="w-9 h-9 rounded-full bg-rose-100 text-rose-800 font-black text-xs flex items-center justify-center shrink-0 border border-rose-300">
+                                    {item.name.trim().charAt(0).toUpperCase()}
+                                  </div>
+                                )}
+                                <div className="min-w-0">
+                                  <h4 className="text-xs font-black text-slate-800 truncate">{item.name}</h4>
+                                  <p className="text-[10px] text-slate-500 font-mono font-bold mt-0.5">
+                                    ফোনঃ {item.phone || 'N/A'} • মোট বিলম্ব জরিমানা: ৳{item.totalFine.toLocaleString('en-US')}
+                                  </p>
+                                </div>
+                              </div>
+
+                              <div className="shrink-0 text-right space-y-0.5">
+                                <span className="text-[10px] font-black text-slate-700 block">
+                                  বিলম্ব কাউন্ট: {item.lateCount} বার
+                                </span>
+                                {item.isBanned || item.lateCount >= 2 ? (
+                                  <span className="text-[9px] font-black text-white bg-rose-700 border border-rose-800 px-2 py-0.5 rounded-md inline-flex items-center gap-1 shadow-3xs">
+                                    🚫 আজীবন নিষিদ্ধ (LIFETIME BANNED)
+                                  </span>
+                                ) : (
+                                  <span className="text-[9px] font-black text-amber-900 bg-amber-100 border border-amber-300 px-2 py-0.5 rounded-md inline-block">
+                                    ⚠️ ১ম বার বিলম্ব (সতর্কবার্তা)
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    </div>
+                  );
+                })()}
+
+              </div>
+
+              {/* Bottom Footer */}
+              <div className="p-3 bg-slate-50 border-t border-slate-200 text-center shrink-0">
+                <p className="text-[10px] text-slate-400 font-bold">
+                  © Business Network Bangladesh (BNB) — সুদমুক্ত করযে হাসানা ফান্ড পোর্টাল
                 </p>
               </div>
 
-              {user.dueLoan && user.dueLoan > 0 ? (
-                /* Execution Form if user has due loan */
-                <div className="space-y-3 pt-2">
-                  <label className="block text-xs font-black text-slate-800">
-                    পরিশোধের পরিমাণ নির্বাচন বা প্রদান করুন (৳):
-                  </label>
-
-                  {/* Preset quick buttons */}
-                  <div className="grid grid-cols-2 gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setCustomRepayInput(String(Math.min(user.dueLoan || 0, Math.ceil((user.dueLoan || 0) / 3))))}
-                      className={`p-2.5 rounded-xl border text-xs font-extrabold transition cursor-pointer flex flex-col items-center justify-center ${
-                        customRepayInput === String(Math.min(user.dueLoan || 0, Math.ceil((user.dueLoan || 0) / 3)))
-                          ? 'bg-amber-600 text-white border-amber-600 shadow-xs'
-                          : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
-                      }`}
-                    >
-                      <span>1 কিস্তি পরিশোধ</span>
-                      <span className="text-[9.5px] opacity-90 font-mono">৳ {Math.min(user.dueLoan || 0, Math.ceil((user.dueLoan || 0) / 3)).toLocaleString('bn-BD')} BDT</span>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => setCustomRepayInput(String(user.dueLoan))}
-                      className={`p-2.5 rounded-xl border text-xs font-extrabold transition cursor-pointer flex flex-col items-center justify-center ${
-                        customRepayInput === String(user.dueLoan) || (!customRepayInput && user.dueLoan > 0)
-                          ? 'bg-amber-600 text-white border-amber-600 shadow-xs'
-                          : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
-                      }`}
-                    >
-                      <span>সম্পূর্ণ ঋণ পরিশোধ</span>
-                      <span className="text-[9.5px] opacity-90 font-mono">৳ {user.dueLoan.toLocaleString('bn-BD')} BDT</span>
-                    </button>
-                  </div>
-
-                  {/* Custom Input */}
-                  <div className="relative">
-                    <span className="absolute left-3.5 top-2.5 text-slate-400 font-bold text-xs">৳</span>
-                    <input
-                      type="number"
-                      value={customRepayInput}
-                      onChange={(e) => setCustomRepayInput(e.target.value)}
-                      placeholder={`নিজের ইচ্ছেমতো টাকার পরিমাণ লিখুন (উদাঃ ${user.dueLoan})`}
-                      className="w-full bg-white border border-slate-200 rounded-xl pl-8 pr-4 py-2 text-xs font-mono font-bold text-slate-800 focus:outline-none focus:border-amber-500"
-                    />
-                  </div>
-
-                  {/* Execute Button */}
-                  <button
-                    onClick={async () => {
-                      const amtToPay = parseFloat(customRepayInput) || user.dueLoan || 0;
-                      await handleLoanRepay(amtToPay);
-                      setShowRepayModal(false);
-                    }}
-                    disabled={loading}
-                    className="w-full py-3 bg-amber-600 hover:bg-amber-700 text-white font-black text-xs rounded-2xl active:scale-95 transition cursor-pointer flex items-center justify-center gap-2 shadow-sm"
-                  >
-                    <Coins className="w-4 h-4 text-white" />
-                    ওয়ালেট থেকে এক্ষুণি ৳ {(parseFloat(customRepayInput) || user.dueLoan || 0).toLocaleString('bn-BD')} BDT পরিশোধ করুন
-                  </button>
-                </div>
-              ) : (
-                /* Clear status message if no due loan */
-                <div className="text-center py-4 space-y-3 bg-slate-50 border border-slate-100 rounded-2xl">
-                  <span className="text-2xl block">🎉</span>
-                  <h4 className="text-xs font-black text-slate-800">আপনার কোনো বকেয়া করযে হাসানা ঋণ নেই!</h4>
-                  <p className="text-[10.5px] text-slate-500 font-bold px-4">
-                    আপনার একাউন্টে বর্তমানে কোনো বকেয়া নেই। প্রয়োজন হলে আপনি সহজেই 1 মাস বা 3 মাসের মেয়াদে সুদমুক্ত করযে হাসানা ঋণের জন্য আবেদন করতে পারেন।
-                  </p>
-                  <button
-                    onClick={() => {
-                      setShowRepayModal(false);
-                      setActiveTab('apply');
-                    }}
-                    className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs rounded-xl shadow-xs cursor-pointer inline-flex items-center gap-1.5"
-                  >
-                    <Coins className="w-4 h-4" />
-                    সুদমুক্ত ঋণ নিতে আবেদন করুন
-                  </button>
-                </div>
-              )}
             </motion.div>
           </motion.div>
         )}

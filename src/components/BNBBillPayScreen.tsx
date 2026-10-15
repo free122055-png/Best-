@@ -25,14 +25,14 @@ import {
 } from 'lucide-react';
 import { motion } from 'motion/react';
 
-interface AmbBillPayScreenProps {
+interface BNBBillPayScreenProps {
   user: User;
   onBack: () => void;
   syncLiveProfile?: () => void;
   appConfig?: AppConfig | null;
 }
 
-export default function AmbBillPayScreen({ user, onBack, syncLiveProfile, appConfig }: AmbBillPayScreenProps) {
+export default function BNBBillPayScreen({ user, onBack, syncLiveProfile, appConfig }: BNBBillPayScreenProps) {
   const [billCategory, setBillCategory] = useState<string | null>(null);
   const [selectedBillProvider, setSelectedBillProvider] = useState<any | null>(null);
   const [billSearchQuery, setBillSearchQuery] = useState('');
@@ -71,7 +71,7 @@ export default function AmbBillPayScreen({ user, onBack, syncLiveProfile, appCon
 
     // Internet
     { id: 'link3', name: 'Link3', label: 'Link3 ইন্টারনেট বিল', enLabel: 'Link3 Internet Bill', category: 'internet', iconColor: 'bg-purple-100 text-purple-600' },
-    { id: 'amber_it', name: 'Amber IT', label: 'Amber IT ইন্টারনেট বিল', enLabel: 'Amber IT Internet Bill', category: 'internet', iconColor: 'bg-purple-100 text-purple-600' },
+    { id: 'amber_it', name: 'BNBer IT', label: 'BNBer IT ইন্টারনেট বিল', enLabel: 'BNBer IT Internet Bill', category: 'internet', iconColor: 'bg-purple-100 text-purple-600' },
     { id: 'carnival', name: 'Carnival', label: 'Carnival ইন্টারনেট বিল', enLabel: 'Carnival Internet Bill', category: 'internet', iconColor: 'bg-purple-100 text-purple-600' },
 
     // Cable TV
@@ -124,7 +124,7 @@ export default function AmbBillPayScreen({ user, onBack, syncLiveProfile, appCon
       activeBg: 'bg-purple-500', 
       iconColor: 'text-purple-500',
       badgeBg: 'bg-purple-100 text-purple-800 border-purple-300',
-      description: 'লিংক থ্রি (Link3), আম্বার আইটি (Amber IT), কার্নিভাল (Carnival) সহ দেশের সকল অনুমোদিত ব্রডব্যান্ড আইএসপি এবং ওয়াইফাই সংযোগের বিল পরিশোধ ও প্যাকেজ রিনিউ করুন।'
+      description: 'লিংক থ্রি (Link3), আম্বার আইটি (BNBer IT), কার্নিভাল (Carnival) সহ দেশের সকল অনুমোদিত ব্রডব্যান্ড আইএসপি এবং ওয়াইফাই সংযোগের বিল পরিশোধ ও প্যাকেজ রিনিউ করুন।'
     },
     { 
       id: 'tv', 
@@ -201,7 +201,7 @@ export default function AmbBillPayScreen({ user, onBack, syncLiveProfile, appCon
     try {
       addDoc(collection(db, 'admin_notifications'), {
         title: '⚡ নতুন BNB ইউটিলিটি বিল পে আবেদন',
-        message: `${user.name || 'সদস্য'} (${user.memberId || 'N/A'}) ${selectedBillProvider.name} এর ৳${amountNum.toLocaleString('bn-BD')} টাকা বিল পেমেন্ট রিকোয়েস্ট করেছেন (হিসাব/মিটার: ${billAccNo})।`,
+        message: `${user.name || 'সদস্য'} (${user.memberId || 'N/A'}) ${selectedBillProvider.name} এর ৳${amountNum.toLocaleString('en-US')} টাকা বিল পেমেন্ট রিকোয়েস্ট করেছেন (হিসাব/মিটার: ${billAccNo})।`,
         userId: user.uid,
         userName: user.name || '',
         memberId: user.memberId || '',
@@ -225,12 +225,12 @@ export default function AmbBillPayScreen({ user, onBack, syncLiveProfile, appCon
           phone: billAccNo,
           billImage: billImage || '',
           createdAt: new Date().toISOString(),
-          description: `${selectedBillProvider.label} (${billAccNo}) এর ${billMonth} মাসের বিল ৳${amountNum.toLocaleString('bn-BD')} পরিশোধের আবেদন (পেন্ডিং)`
+          description: `${selectedBillProvider.label} (${billAccNo}) এর ${billMonth} মাসের বিল ৳${amountNum.toLocaleString('en-US')} পরিশোধের আবেদন (পেন্ডিং)`
         }),
         addDoc(collection(db, 'user_notifications'), {
           userId: user.uid,
           title: 'বিল পেমেন্ট রিকোয়েস্ট সাবমিট হয়েছে',
-          message: `${selectedBillProvider.label} এর ৳${amountNum.toLocaleString('bn-BD')} বিল পরিশোধের রিকোয়েস্টটি সাবমিট হয়েছে। এডমিন ভেরিফাই করে পে করবে।`,
+          message: `${selectedBillProvider.label} এর ৳${amountNum.toLocaleString('en-US')} বিল পরিশোধের রিকোয়েস্টটি সাবমিট হয়েছে। এডমিন ভেরিফাই করে পে করবে।`,
           read: false,
           createdAt: new Date().toISOString()
         })
@@ -265,12 +265,12 @@ export default function AmbBillPayScreen({ user, onBack, syncLiveProfile, appCon
             <ChevronLeft className="w-5 h-5" />
           </button>
           <div>
-            <h1 className="text-sm font-black text-slate-900 leading-tight">AMB বিল পে</h1>
+            <h1 className="text-sm font-black text-slate-900 leading-tight">BNB বিল পে</h1>
             <p className="text-[10px] text-slate-400 font-bold">ইউটিলিটি ও যাবতীয় পরিষেবা বিল প্রদান</p>
           </div>
         </div>
         <div className="bg-emerald-50 border border-emerald-200 text-emerald-800 px-3 py-1 rounded-full text-[10px] font-black flex items-center gap-1.5 shadow-3xs">
-          <span>৳ {(user.balance || 0).toLocaleString('bn-BD')}</span>
+          <span>৳ {(user.balance || 0).toLocaleString('en-US')}</span>
           <span className="text-[8px] text-emerald-600 uppercase font-sans">BDT</span>
         </div>
       </div>

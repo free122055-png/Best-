@@ -25,14 +25,14 @@ import { User, Transaction, Notice, Offer, BapReport, BapGroup, BapAdminRequest,
 import { normalizeMemberId, formatBanglaAmount, normalizePhoneNumber, findUserInFirestoreByPhone, getNextSequentialMemberId, deleteUserCompletelyFromDatabase, convertBengaliToEnglishDigits } from '../../lib/memberUtils';
 import { sortTransactionsNewestFirst, getTxTime } from '../../lib/transactionUtils';
 import { saveAppConfig, DEFAULT_QARD_CONFIG } from '../../lib/config';
-import { AMBLogo } from '../AMBLogo';
+import { BNBLogo } from '../BNBLogo';
 import { HeaderPendingModal } from '../HeaderPendingModal';
 import SamityScreen from '../SamityScreen';
 import UnifiedBackButton from '../UnifiedBackButton';
 import SamityAdmin from '../SamityAdmin';
 import SafiPremiumShop from '../SafiPremiumShop';
 import TelecomAdmin from '../TelecomAdmin';
-import AmbSalaryAdmin from '../AmbSalaryAdmin';
+import BNBSalaryAdmin from '../BNBSalaryAdmin';
 import { HistoryRetentionSettings } from '../HistoryRetentionSettings';
 import { runWalletEndToEndTests, TestResultItem } from '../../lib/walletTests';
 import { 
@@ -301,7 +301,8 @@ export function AdminRationSection(props: any) {
     cfgRationMaxSelectLimit,
     setCfgRationMaxSelectLimit,
     cfgRationTotalItemsText,
-    setCfgRationTotalItemsText
+    setCfgRationTotalItemsText,
+    appConfig = {} // Default to empty object if not provided
   } = props;
 
   return (
@@ -515,7 +516,7 @@ export function AdminRationSection(props: any) {
                           value={rcNewCardNo}
                           onChange={(e) => setRcNewCardNo(e.target.value)}
                           required
-                          placeholder="AMBRC-746"
+                          placeholder="BNBRC-746"
                           className="w-full px-3 py-2 bg-slate-50 border border-slate-200/80 text-slate-600 rounded-xl text-xs font-mono font-bold text-slate-900"
                         />
                       </div>
@@ -964,6 +965,82 @@ export function AdminRationSection(props: any) {
                   💾 রেশন সেটিংস সংরক্ষণ করুন
                 </button>
               </form>
+
+              {/* Card Category Management */}
+              <div className="mt-8 border-t border-slate-200 pt-6">
+                <div className="flex items-center gap-2 mb-4">
+                  <CreditCard className="w-5 h-5 text-emerald-700" />
+                  <h3 className="text-sm font-extrabold text-slate-700">💳 ৪ ধাপে ডিজিটাল রেশন কার্ড ক্যাটাগরি ও মূল্য নির্ধারণ</h3>
+                </div>
+                
+                <div className="flex flex-col md:flex-row gap-3 overflow-x-auto no-scrollbar pb-2">
+                  {[
+                    { id: 'red_white', label: 'Golden Premium (গোল্ডেন প্রিমিয়াম)', color: 'bg-red-500', defaultLabel: 'গোল্ডেন প্রিমিয়াম কার্ড', defaultPrice: 500, colorHex: '#DC2626' },
+                    { id: 'blue_white', label: 'Golden (গোল্ডেন)', color: 'bg-blue-500', defaultLabel: 'গোল্ডেন কার্ড', defaultPrice: 300, colorHex: '#2563EB' },
+                    { id: 'green_white', label: 'Premium (প্রিমিয়াম)', color: 'bg-emerald-500', defaultLabel: 'প্রিমিয়াম কার্ড', defaultPrice: 200, colorHex: '#059669' },
+                    { id: 'black_white', label: 'Regular (রেগুলার)', color: 'bg-slate-700', defaultLabel: 'রেগুলার কার্ড', defaultPrice: 100, colorHex: '#1E293B' }
+                  ].map((card) => (
+                    <div key={card.id} className="bg-white border border-slate-200 rounded-2xl p-3 shadow-sm space-y-2 min-w-[200px] flex-1">
+                      <div className="flex items-center gap-2 pb-2 border-b border-slate-100">
+                        <div className={`w-3 h-3 rounded-full ${card.color}`} />
+                        <span className="text-[11px] font-black text-slate-800">{card.label}</span>
+                      </div>
+                      
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-bold text-slate-500 uppercase">কার্ডের নাম (Label) *</label>
+                        <input
+                          type="text"
+                          value={appConfig?.rationCardConfigs?.[card.id]?.label || card.defaultLabel}
+                          onChange={async (e) => {
+                            const val = e.target.value;
+                            const currentConfigs = appConfig?.rationCardConfigs || {};
+                            const newConfigs = { 
+                              ...currentConfigs,
+                              [card.id]: {
+                                ...(currentConfigs[card.id] || {}),
+                                label: val,
+                                price: currentConfigs[card.id]?.price || card.defaultPrice,
+                                colorHex: currentConfigs[card.id]?.colorHex || card.colorHex
+                              }
+                            };
+                            try {
+                              const configRef = doc(db, 'system_settings', 'app_config');
+                              await updateDoc(configRef, { rationCardConfigs: newConfigs });
+                            } catch (err) { console.error("Update ration label failed:", err); }
+                          }}
+                          className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold text-slate-800 outline-none focus:border-emerald-500"
+                        />
+                      </div>
+
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-bold text-slate-500 uppercase">কার্ডের মূল্য (Price) ৳ *</label>
+                        <input
+                          type="number"
+                          value={appConfig?.rationCardConfigs?.[card.id]?.price || card.defaultPrice}
+                          onChange={async (e) => {
+                            const val = Number(e.target.value);
+                            const currentConfigs = appConfig?.rationCardConfigs || {};
+                            const newConfigs = { 
+                              ...currentConfigs,
+                              [card.id]: {
+                                ...(currentConfigs[card.id] || {}),
+                                price: val,
+                                label: currentConfigs[card.id]?.label || card.defaultLabel,
+                                colorHex: currentConfigs[card.id]?.colorHex || card.colorHex
+                              }
+                            };
+                            try {
+                              const configRef = doc(db, 'system_settings', 'app_config');
+                              await updateDoc(configRef, { rationCardConfigs: newConfigs });
+                            } catch (err) { console.error("Update ration price failed:", err); }
+                          }}
+                          className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold text-slate-800 outline-none focus:border-emerald-500"
+                        />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
             </div>
           )}
         </div>

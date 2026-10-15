@@ -428,7 +428,7 @@ export default function SamityInvestmentsView({ user, onBack, isAdmin }: SamityI
         dislikedUsers: editingPost?.dislikedUsers && Array.isArray(editingPost.dislikedUsers) ? editingPost.dislikedUsers : [],
         viewsCount: editingPost ? (Number(editingPost.viewsCount) || 0) : 0,
         comments: editingPost?.comments && Array.isArray(editingPost.comments) ? editingPost.comments : [],
-        authorName: 'AMB ইনভেস্টমেন্ট বোর্ড / ম্যানেজমেন্ট',
+        authorName: 'BNB ইনভেস্টমেন্ট বোর্ড / ম্যানেজমেন্ট',
         authorRole: 'ভেরিফায়েড সেন্ট্রাল বোর্ড',
         isPinned: Boolean(formIsPinned),
         createdAt: editingPost?.createdAt || new Date().toISOString(),
@@ -1007,7 +1007,7 @@ export default function SamityInvestmentsView({ user, onBack, isAdmin }: SamityI
 
                     <div>
                       <h3 className="text-xs sm:text-[12.5px] font-black text-slate-900 leading-tight">
-                        {post.authorName || 'AMB ইনভেস্টমেন্ট বোর্ড / ম্যানেজমেন্ট'}
+                        {post.authorName || 'BNB ইনভেস্টমেন্ট বোর্ড / ম্যানেজমেন্ট'}
                       </h3>
                       <div className="flex items-center gap-1 text-[9px] sm:text-[10px] text-slate-500 mt-0.5">
                         <span className="font-semibold">{post.authorRole || 'সেন্ট্রাল বোর্ড'}</span>
@@ -1749,7 +1749,7 @@ export default function SamityInvestmentsView({ user, onBack, isAdmin }: SamityI
                           {item.memberId ? (
                             <span className="text-[9.5px] text-slate-400 font-mono">আইডি: {item.memberId}</span>
                           ) : (
-                            <span className="text-[9.5px] text-emerald-600 font-semibold">AMB মেম্বার অ্যাকাউন্ট</span>
+                            <span className="text-[9.5px] text-emerald-600 font-semibold">BNB মেম্বার অ্যাকাউন্ট</span>
                           )}
                         </div>
                       </div>

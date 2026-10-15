@@ -26,7 +26,7 @@ export async function restoreAndSeedDatabase() {
 
     const defaultAdmin: User = {
       uid: 'admin_master',
-      name: 'Bangladesh AMB Administrator',
+      name: 'Bangladesh BNB Administrator',
       phone: '+8800011112222',
       normalizedPhone: '+8800011112222',
       memberId: 'MAIN_ADMIN',
@@ -85,9 +85,9 @@ export async function restoreAndSeedDatabase() {
           }
           if (uData.memberId === 'MAIN_ADMIN') {
             // Assign real sequential ID instead of hardcoded duplicate
-            updatesToApply.memberId = `AMB${String(Math.floor(1000 + Math.random() * 9000)).padStart(8, '0')}`;
+            updatesToApply.memberId = `BNB${String(Math.floor(1000 + Math.random() * 9000)).padStart(8, '0')}`;
           }
-          if (uName === 'AMB National Admin' || uName === 'Bangladesh AMB Administrator' || (uPhone === '01618599077' && uName === 'AMB National Admin')) {
+          if (uName === 'BNB National Admin' || uName === 'Bangladesh BNB Administrator' || (uPhone === '01618599077' && uName === 'BNB National Admin')) {
             updatesToApply.name = 'সম্মানিত সদস্য';
           }
         }
@@ -119,14 +119,14 @@ export async function restoreAndSeedDatabase() {
     const configSnap = await getDoc(configRef);
     if (!configSnap.exists()) {
       await setDoc(configRef, {
-        appName: 'Al Mayadin Bazar (AMB)',
+        appName: 'Business Network Bangladesh (BNB)',
         appSubtitle: 'ন্যাশনাল কোঅপারেটিভ ও বিজনেস পোর্টাল',
-        noticeText: 'AMB ম্যানেজমেন্ট কোম্পানি ইনভেস্টর সাধারণ ফান্ডে স্বাগতম! আপনার অ্যাকাউন্ট এবং ব্যালেন্স সম্পূর্ণ সুরক্ষিত রয়েছে।',
+        noticeText: 'BNB ম্যানেজমেন্ট কোম্পানি ইনভেস্টর সাধারণ ফান্ডে স্বাগতম! আপনার অ্যাকাউন্ট এবং ব্যালেন্স সম্পূর্ণ সুরক্ষিত রয়েছে।',
         helpline: '01618599077',
         bKashMerchant: '01618599077',
         nagadMerchant: '01618599077',
         rocketMerchant: '01618599077',
-        bankAccountInfo: 'AMB Business Cooperative Ltd, A/C: 1150-201-998877, Islami Bank Bangladesh PLC',
+        bankAccountInfo: 'BNB Business Cooperative Ltd, A/C: 1150-201-998877, Islami Bank Bangladesh PLC',
         maintenanceMode: false,
         minDeposit: 100,
         minWithdraw: 500,

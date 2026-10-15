@@ -1,12 +1,12 @@
 import React from 'react';
 
-interface AMBLogoProps {
+interface BNBLogoProps {
   className?: string;
   size?: number | string;
   variant?: 'white' | 'emerald' | 'currentColor' | 'black';
 }
 
-export const AMBLogo: React.FC<AMBLogoProps> = ({ 
+export const BNBLogo: React.FC<BNBLogoProps> = ({ 
   className = '', 
   size = '100%', 
   variant = 'currentColor' 
@@ -78,7 +78,7 @@ export const AMBLogo: React.FC<AMBLogoProps> = ({
         strokeLinecap="round" 
       />
 
-      {/* "AMB" word in bold typeface for Al Mayadin Bazar */}
+      {/* "BNB" word in bold typeface for Business Network Bangladesh */}
       <text 
         x="100" 
         y="126" 
@@ -88,7 +88,7 @@ export const AMBLogo: React.FC<AMBLogoProps> = ({
         letterSpacing="0.8"
         style={{ fontWeight: 950 }}
       >
-        AMB
+        BNB
       </text>
 
       {/* Left Hand cupping the center logo */}
@@ -133,3 +133,4 @@ export const AMBLogo: React.FC<AMBLogoProps> = ({
     </svg>
   );
 };
+

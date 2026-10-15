@@ -1,0 +1,400 @@
+        console.error("Ration orders sync failed", err);
+        setLoadingOrders(false);
+      }
+    );
+
+    // 3. Sync dynamic ration items catalog from firestore
+    const unsubRationItems = onSnapshot(
+      collection(db, 'ration_items'),
+      (snap) => {
+        if (!snap.empty) {
+          const items = snap.docs.map(d => ({
+            id: d.id,
+            ...d.data()
+          })) as RationItem[];
+          // Sort items by sortOrder or id
+          items.sort((a: any, b: any) => (a.sortOrder || 0) - (b.sortOrder || 0));
+          setDbRationItems(items);
+        } else {
+          // Fallback to static items if empty
+          setDbRationItems(rationItems);
+        }
+      },
+      (err) => {
+        console.error("Ration items dynamic sync failed", err);
+        setDbRationItems(rationItems);
+      }
+    );
+
+    return () => {
+      unsubCard();
+      unsubOrders();
+      unsubRationItems();
+    };
+  }, [liveUser]);
+
+  // Handle registration activation
+  const handleRegisterCard = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!regName.trim() || !regAddress.trim()) {
+      alert("অনুগ্রহ করে কার্ডধারীর পুরো নাম এবং সঠিক ঠিকানা পূরণ করুন।");
+      return;
+    }
+
+    const activationFee = 150;
+    if ((liveUser.balance || 0) < activationFee) {
+      alert(`রেশন কার্ডের ওয়ান-টাইম সক্রিয়করণ ফি ৳${activationFee} BDT। আপনার ওয়ালেটে পর্যাপ্ত ব্যালেন্স নেই!`);
+      return;
+    }
+
+    setSubmittingReg(true);
+    try {
+      const timestamp = new Date().toISOString();
+      const cardNo = `BNB-RC-${Math.floor(1000 + Math.random() * 9000)}-${Math.floor(100000 + Math.random() * 900000)}`;
+      
+      // 1. Save to Firebase
+      await addDoc(collection(db, 'ration_cards'), {
+        userId: liveUser.uid,
+        userName: regName,
+        phone: liveUser.phone || '01812115535',
+        address: regAddress,
+        village: 'Jashore',
+        upazila: 'Jashore Sadar',
+        district: 'Jashore',
+        nominee: regNominee || 'প্রযোজ্য নয়',
+        cardType: regType,
+        cardNo: cardNo,
+        issueDate: '07/06/2026',
+        expiryDate: '06/06/2027',
+        signature: 'S.Hasan',
+        securityCode: liveUser.pin || '1234',
+        createdAt: timestamp,
+        status: 'active'
+      });
+
+      // 2. Deduct penalty from user
+      const userRef = doc(db, 'users', liveUser.uid);
+      await updateDoc(userRef, {
+        balance: liveUser.balance - activationFee,
+        mainBalance: liveUser.balance - activationFee
+      });
+
+      // 3. Record log
+      await addDoc(collection(db, 'transactions'), {
+        id: `tx-rc-activation-${Date.now()}`,
+        userId: liveUser.uid,
+        userName: liveUser.name,
+        memberId: liveUser.memberId,
+        type: 'fee_payment',
+        typeLabel: 'রেশন কার্ড ফি',
+        amount: activationFee,
+        status: 'success',
+        description: `ডিজিটাল রেশন কার্ড (${cardNo}) সচলরণ ফি চার্জ করা হয়েছে।`,
+        createdAt: timestamp,
+        paymentMethod: 'Main Balance'
+      });
+
+      alert("অভিনন্দন! আপনার ডিজিটাল রেশন কার্ডটি সফলভাবে সক্রিয় করা হয়েছে।");
+      await syncLiveProfile();
+    } catch (err: any) {
+      alert("ত্রুটি দেখা দিয়েছে: " + err.message);
+    } finally {
+      setSubmittingReg(false);
+    }
+  };
+
+  // Checkbox select toggle
+  const toggleItemSelection = (id: string) => {
+    const maxLimit = appConfig?.rationMaxSelectLimit || 5;
+    if (selectedItemIds.includes(id)) {
+      setSelectedItemIds(selectedItemIds.filter(item => item !== id));
+    } else {
+      if (selectedItemIds.length >= maxLimit) {
+        alert(`আপনি সর্বোচ্চ ${englishToBengali(maxLimit)}টি আইটেম সিলেক্ট করতে পারবেন!`);
+        return;
+      }
+      setSelectedItemIds([...selectedItemIds, id]);
+    }
+  };
+
+  // Selected details
+  const selectedItems = (dbRationItems.length > 0 ? dbRationItems : rationItems).filter(p => selectedItemIds.includes(p.id));
+  const totalPrice = selectedItems.reduce((acc, curr) => acc + curr.price, 0);
+  const totalMarketPrice = selectedItems.reduce((acc, curr) => acc + curr.marketPrice, 0);
+  const savings = totalMarketPrice - totalPrice;
+
+  // Action Order Execution
+  const handlePlaceOrder = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!rationCard || rationCard.status !== 'active') {
+      setCheckoutError("ভর্তুকি মূল্যে রেশন পণ্য অর্ডার করতে আপনার একটি সচল ডিজিটাল রেশন কার্ড প্রয়োজন। দয়া করে প্রথমে কার্ডের আবেদন করুন।");
+      return;
+    }
+    if (selectedItems.length === 0) {
+      setCheckoutError("অনুগ্রহ করে কমপক্ষে 1টি আইটেম নির্বাচন করুন।");
+      return;
+    }
+    if (selectedItems.length > 5) {
+      setCheckoutError("আপনি সর্বোচ্চ 5টি আইটেম সিলেক্ট করতে পারবেন।");
+      return;
+    }
+    if (securityPin !== liveUser.pin) {
+      setCheckoutError("আপনার 4 ডিজিটের নিরাপত্তা পিন নম্বরটি সঠিক নয়!");
+      return;
+    }
+    if (liveUser.balance < totalPrice) {
+      setCheckoutError(`আপনার পর্যাপ্ত ব্যালেন্স নেই! প্রয়োজন ৳${totalPrice} আপনার ব্যালেন্স মাত্র ৳${liveUser.balance}।`);
+      return;
+    }
+
+    setPlacingOrder(true);
+    setCheckoutError('');
+    try {
+      const timestamp = new Date().toISOString();
+      const orderNo = `RATION-ORD-${Math.floor(100000 + Math.random() * 900000)}`;
+
+      // 1. Create order inside Firestore
+      await addDoc(collection(db, 'ration_orders'), {
+        userId: liveUser.uid,
+        userName: rationCard?.userName || liveUser.name,
+        userPhone: liveUser.phone,
+        cardNo: rationCard?.cardNo || 'N/A',
+        orderNo: orderNo,
+        items: selectedItems.map((p, idx) => ({
+          id: p.id,
+          name: p.name,
+          qty: p.qty,
+          price: p.price
+        })),
+        totalPrice: totalPrice,
+        status: 'Pending', // Pending Center collection
+        createdAt: timestamp,
+        issueCenter: 'হেমায়েতপুর মেইন কো-অপারেটিভ বিতরণ কেন্দ্র'
+      });
+
+      // 2. Deduct user balance
+      const userRef = doc(db, 'users', liveUser.uid);
+      await updateDoc(userRef, {
+        balance: liveUser.balance - totalPrice,
+        mainBalance: liveUser.balance - totalPrice
+      });
+
+      // 3. Log main transaction
+      await addDoc(collection(db, 'transactions'), {
+        id: `tx-ration-buy-${Date.now()}`,
+        userId: liveUser.uid,
+        userName: liveUser.name,
+        memberId: liveUser.memberId,
+        type: 'fee_payment',
+        typeLabel: 'রেশন পণ্য সাবসিডি ক্রয়',
+        amount: totalPrice,
+        status: 'success',
+        description: `রেশন কার্ড মেম্বার রিফিল সুবিধাঃ অর্ডার নং ${orderNo}। সাবসিডি মূল্যে পণ্য সরবরাহ নিশ্চিত করা হয়েছে।`,
+        createdAt: timestamp,
+        paymentMethod: 'Main Balance'
+      });
+      addDoc(collection(db, 'admin_notifications'), {
+        title: '🛒 নতুন রেশন পণ্য ভর্তুকি অর্ডার',
+        message: `${liveUser.name || 'সদস্য'} (${liveUser.memberId || 'N/A'}) ৳${totalPrice} টাকার ভর্তুকি রেশন সামগ্রী অর্ডার করেছেন।`,
+        userId: liveUser.uid,
+        userName: liveUser.name || '',
+        memberId: liveUser.memberId || '',
+        userPhone: liveUser.phone || '',
+        amount: totalPrice,
+        type: 'ration_order',
+        read: false,
+        createdAt: new Date().toISOString()
+      }).catch(e => console.warn('Admin notif error:', e));
+
+      // 4. Log system notices
+      await addDoc(collection(db, 'notices'), {
+        title: `রেশন প্রোডাক্ট ডিলার বুকিং সম্পন্ন!`,
+        content: `আপনার রেশন কার্ডের বিপরীতে ৳${totalPrice} মূল্যের পণ্য বুকিং সফল হয়েছে। অর্ডার নম্বরঃ ${orderNo}। 2 কার্যদিবসের মধ্যে নিকটস্থ কেন্টাল বা হেমায়েতপুর মেইন বিতরণ কেন্দ্র হতে পণ্য বুঝে নিন।`,
+        createdAt: timestamp
+      });
+
+      alert(`সাফল্যঃ আপনার রেশন অর্ডার ${orderNo} সফলভাবে সম্পন্ন হয়েছে। ৳${totalPrice} আপনার মেইন অ্যাকাউন্ট থেকে কেটে নেওয়া হয়েছে।`);
+      setSelectedItemIds([]);
+      setSecurityPin('');
+      setShowCheckoutModal(false);
+      setActiveTab('my_orders');
+      await syncLiveProfile();
+    } catch (err: any) {
+      setCheckoutError("অর্ডার প্লেস করা যায়নি: " + err.message);
+    } finally {
+      setPlacingOrder(false);
+    }
+  };
+
+  // Custom UI elements
+  if (loadingCard) {
+    return (
+      <div className="bg-slate-50 min-h-screen flex items-center justify-center text-slate-800">
+        <div className="animate-pulse font-black text-xl text-[#015335]">লোড হচ্ছে...</div>
+      </div>
+    );
+  }
+
+  // Render application form tab if user clicks apply/order card
+  if (activeTab === 'apply') {
+    return (
+      <div className="bg-slate-50 text-slate-800 font-sans min-h-screen">
+        <RationApplicationForm 
+          liveUser={liveUser} 
+          appConfig={appConfig}
+          onClose={() => setActiveTab('dashboard')} 
+        />
+      </div>
+    );
+  }
+
+  return (
+    <div className="bg-slate-50 text-slate-800 font-sans min-h-screen">
+      
+      {/* HEADER BAR - SLIM, THIN, MINIMALIST */}
+      <div className="bg-white border-b border-slate-200 px-4 py-2 flex items-center justify-between sticky top-0 z-30 font-sans shadow-3xs">
+        <div className="flex items-center gap-2">
+          {onClose && (
+            <UnifiedBackButton
+              onClick={handleBack}
+              variant="dark"
+              title="পিছনে যান"
+            />
+          )}
+          <div className="w-8 h-8 bg-emerald-950 rounded-lg flex items-center justify-center font-black text-rose-50 border border-teal-800">
+            <span className="text-white text-xs tracking-tighter">BNB</span>
+          </div>
+          <div className="text-left font-sans">
+            <h1 className="text-xs sm:text-[13.5px] font-black text-emerald-950 tracking-tight leading-none">BNB রেশন কার্ড পোর্টাল</h1>
+          </div>
+        </div>
+
+        {/* Mini profile stats top-right */}
+        <div className="flex items-center gap-1.5 sm:gap-2.5">
+          
+          {/* 1/ Dashboard Balance */}
+          <div className="bg-emerald-50 px-2 py-1 rounded-lg border border-emerald-200 flex items-center gap-1 shadow-3xs">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-650 animate-pulse shrink-0"></span>
+            <div className="text-left leading-none">
+              <p className="text-[7.5px] sm:text-[8.5px] text-emerald-800 font-extrabold tracking-tight">ড্যাশবোর্ড ব্যালেন্স</p>
+              <p className="text-[9.5px] sm:text-xs font-black text-emerald-950 font-sans mt-0.5">৳{englishToBengali(liveUser.balance || 0)}</p>
+            </div>
+          </div>
+
+          {/* 2/ Corner Transaction History Trigger */}
+          <button
+            type="button"
+            onClick={() => setActiveTab('history')}
+            className={`p-1 px-2 rounded-lg text-[9px] sm:text-[10px] font-black transition-all cursor-pointer flex items-center gap-1 border shadow-3xs ${
+              activeTab === 'history'
+                ? 'bg-amber-100 border-amber-400 text-amber-950'
+                : 'bg-amber-50 hover:bg-amber-100 text-amber-900 border-amber-200'
+            }`}
+            title="লেনদেন ইতিহাস"
+          >
+            <span>📜 লেনদেন হিস্টরি</span>
+          </button>
+        </div>
+      </div>
+
+      <div className="max-w-7xl mx-auto">
+        
+        {/* RIGHT MAIN VIEWS PANEL */}
+        <div className="p-3 sm:p-6 lg:p-8 space-y-4 sm:space-y-6 overflow-y-auto">
+          
+          {/* Urgent Notice Scroll Ticker */}
+          <div className="bg-white border border-emerald-800/25 rounded-full px-2.5 py-1.5 flex items-center gap-3 w-full mx-auto font-sans shadow-3xs">
+            <div className="bg-[#006A4E] text-white text-[10px] font-black px-3 py-0.5 rounded-full shrink-0 flex items-center gap-1">
+              <span>ঘোষণা</span>
+            </div>
+            <div className="flex-grow overflow-hidden relative mr-1.5 flex items-center">
+              <marquee className="text-[11.5px] font-bold text-slate-800 leading-none py-0.5" behavior="scroll" direction="left" scrollamount="4">
+                {appConfig?.rationTicker || "কো-অপারেティブ ডিজিটাল রেশন কার্ড সেবাঃ ভর্তুকি মূল্যে নিত্যপ্রয়োজনীয় চাল, ডাল, তেল ও অন্যান্য পণ্যসামগ্রী ক্রয়ের সুবিধা উপভোগ করুন।"}
+              </marquee>
+            </div>
+          </div>
+
+
+          {/* TAB 1: DASHBOARD TAB */}
+          {activeTab === 'dashboard' && (
+            <div className="space-y-4 sm:space-y-6">
+
+              {/* NON-CARD HOLDER NOTICE BANNER */}
+              {!rationCard && (
+                <div className="bg-gradient-to-r from-[#015335] via-emerald-800 to-teal-900 text-white rounded-2xl sm:rounded-3xl p-4 sm:p-5 shadow-md flex flex-col sm:flex-row items-center justify-between gap-3 border border-emerald-500/40">
+                  <div className="flex items-center gap-3">
+                    <div className="w-11 h-11 rounded-2xl bg-amber-400/20 border border-amber-300/40 flex items-center justify-center text-amber-300 shrink-0 shadow-inner">
+                      <CreditCard className="w-6 h-6" />
+                    </div>
+                    <div className="text-left font-sans">
+                      <div className="flex items-center gap-2">
+                        <h3 className="text-sm font-black text-amber-300">আপনার কোনো ডিজিটাল রেশন কার্ড নেই</h3>
+                        <span className="text-[9px] font-black bg-amber-400 text-slate-950 px-2 py-0.5 rounded-full uppercase">আবেদন প্রয়োজন</span>
+                      </div>
+                      <p className="text-[11px] text-emerald-100 font-bold mt-0.5 leading-tight">
+                        ভর্তুকি মূল্যে নিত্যপ্রয়োজনীয় ১০টি পণ্য থেকে ৫টি পণ্য সরাসরি কেনাকাটা করতে অনলাইন রেশন কার্ডের আবেদন সম্পন্ন করুন।
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab('apply')}
+                    className="w-full sm:w-auto px-5 py-2.5 bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-xs rounded-xl shadow-lg transition cursor-pointer shrink-0 flex items-center justify-center gap-1.5"
+                  >
+                    <span>💳 ডিজিটাল কার্ডের আবেদন করুন</span>
+                    <ChevronRight className="w-4 h-4" />
+                  </button>
+                </div>
+              )}
+
+              {/* PENDING CARD HOLDER NOTICE BANNER */}
+              {rationCard?.status === 'pending' && (
+                <div className="bg-amber-50 border border-amber-300 text-amber-950 rounded-2xl p-4 shadow-xs flex flex-col sm:flex-row items-center justify-between gap-3">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-amber-200/80 flex items-center justify-center text-amber-800 shrink-0">
+                      <Clock className="w-5 h-5 animate-spin" />
+                    </div>
+                    <div className="text-left font-sans">
+                      <h3 className="text-xs font-black text-amber-900">আপনার রেশন কার্ডের আবেদনটি ভেরিফিকেশনে আছে (Pending)</h3>
+                      <p className="text-[10.5px] text-amber-800 font-bold">
+                        এডমিন রিভিউ সম্পন্ন হলে কার্ডের স্ট্যাটাস সচল হবে। নিচে সমস্ত ক্যাটালগ ও কেনাকাটার সুযোগ দেওয়া রয়েছে।
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab('apply')}
+                    className="w-full sm:w-auto px-4 py-2 bg-amber-200 hover:bg-amber-300 text-amber-950 font-black text-xs rounded-xl border border-amber-400 transition cursor-pointer shrink-0"
+                  >
+                    আবেদন স্ট্যাটাস
+                  </button>
+                </div>
+              )}
+              
+              {/* BRAND HERO HIGHLIGHT & DIGITAL RATION CARD GRAPHIC MATCHING PRECISELY */}
+              <div className="flex flex-col gap-6 items-center">
+                
+                {/* Card representation - STACKED FULL WIDTH BANNER */}
+                <div className="w-full flex justify-center">
+                  {renderBeautifulRationCard(rationCard)}
+                </div>
+
+              </div>
+
+              {/* QUICK METRICS GRID CONTAINER */}
+              <div className="grid grid-cols-4 gap-1.5 sm:gap-4">
+                
+                {/* Metric 1 */}
+                <div className="bg-white p-1.5 sm:p-4 rounded-xl sm:rounded-2xl border border-slate-200/80 text-left space-y-0.5 sm:space-y-1">
+                  <div className="flex items-center gap-1 sm:gap-2">
+                    <div className="w-5 h-5 sm:w-7 sm:h-7 bg-blue-50 rounded-md sm:rounded-lg flex items-center justify-center text-blue-600 shrink-0">
+                      <CreditCard className="w-3 h-3 sm:w-4 h-4" />
+                    </div>
+                    <span className="text-[7.5px] sm:text-[10px] text-slate-400 uppercase font-black tracking-wide truncate">আমার কার্ড</span>
+                  </div>
+                  <h3 className="text-xs sm:text-base font-black text-slate-900 pt-0.5 sm:pt-1 leading-snug">
+                    <span className="text-blue-600 text-[8px] sm:text-xs font-black mr-0.5 sm:mr-1 block sm:inline">Active</span>
+                    <span className="text-xs sm:text-lg font-mono">1 টি</span>
+                  </h3>
+                </div>
+

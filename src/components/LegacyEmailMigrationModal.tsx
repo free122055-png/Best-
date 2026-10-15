@@ -122,7 +122,7 @@ export function LegacyEmailMigrationModal({
       }
 
       const targetUid = foundUser.uid || (foundUser as any).id;
-      const targetMemberId = foundUser.memberId || 'AMB Member';
+      const targetMemberId = foundUser.memberId || 'BNB Member';
 
       // 1. Update user document with email in Firestore
       await updateDoc(doc(db, 'users', targetUid), {
@@ -298,7 +298,7 @@ export function LegacyEmailMigrationModal({
                         <span>অ্যাকাউন্ট সনাক্ত হয়েছে</span>
                       </span>
                       <span className="text-[10px] font-mono font-bold text-emerald-800 bg-emerald-100 px-1.5 py-0.2 rounded">
-                        {foundUser.memberId || 'AMB'}
+                        {foundUser.memberId || 'BNB'}
                       </span>
                     </div>
 

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { User, Transaction, Offer, AppConfig, generateAmbTrxId, formatShortTrxId } from '../types';
+import { User, Transaction, Offer, AppConfig, generateBNBTrxId, formatShortTrxId } from '../types';
 import { db } from '../lib/firebase';
 import UnifiedBackButton from './UnifiedBackButton';
 import { collection, addDoc, doc, updateDoc, setDoc, query, where, getDocs } from 'firebase/firestore';
@@ -35,7 +35,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { useBackHandler } from '../lib/navigationManager';
 import TelecomAdmin from './TelecomAdmin';
 import MoneyExchangeModule from './MoneyExchangeModule';
-import { AmbPaymentReceiptModal, PaymentReceiptData } from './AmbPaymentReceiptModal';
+import { BNBPaymentReceiptModal, PaymentReceiptData } from './BNBPaymentReceiptModal';
 
 // Helper functions for operator-specific cashback rules matching
 const isOperatorMatch = (ruleOpRaw?: string, targetOpRaw?: string): boolean => {
@@ -100,7 +100,7 @@ const getFilteredRulesForOperator = (rules: any[] = [], operator: string) => {
   return [...filtered].sort((a, b) => Number(a.amount) - Number(b.amount));
 };
 
-interface AMBTelecomScreenProps {
+interface BNBTelecomScreenProps {
   user: User;
   allOffers: Offer[];
   onBack: () => void;
@@ -110,7 +110,7 @@ interface AMBTelecomScreenProps {
   allNotices?: any[];
 }
 
-export const AMBTelecomScreen = React.memo(function AMBTelecomScreen({ 
+export const BNBTelecomScreen = React.memo(function BNBTelecomScreen({ 
   user, 
   allOffers, 
   onBack, 
@@ -118,7 +118,7 @@ export const AMBTelecomScreen = React.memo(function AMBTelecomScreen({
   onOpenDeposit,
   appConfig,
   allNotices = []
-}: AMBTelecomScreenProps) {
+}: BNBTelecomScreenProps) {
   
   const [activeSubView, setActiveSubView] = useState<'main' | 'admin'>('main');
   const [addBalanceMsg, setAddBalanceMsg] = useState<{ text: string; type: 'error' | 'success' } | null>(null);
@@ -208,7 +208,7 @@ export const AMBTelecomScreen = React.memo(function AMBTelecomScreen({
       fee: 0,
       totalAmount: tx.amount || 0,
       status: tx.status || 'pending',
-      beneficiaryName: tx.userName || user.name || 'AMB সদস্য',
+      beneficiaryName: tx.userName || user.name || 'BNB সদস্য',
       beneficiaryAccount: tx.memberId || user.memberId || user.phone,
       senderPhone: tx.phone || tx.receiverPhone || user.phone || 'N/A',
       description: tx.description,
@@ -221,7 +221,7 @@ export const AMBTelecomScreen = React.memo(function AMBTelecomScreen({
         minute: 'numeric',
         second: 'numeric',
         hour12: true
-      }) : new Date().toLocaleString('bn-BD')
+      }) : new Date().toLocaleString('en-US')
     });
     setIsReceiptOpen(true);
   };
@@ -253,7 +253,7 @@ export const AMBTelecomScreen = React.memo(function AMBTelecomScreen({
     prevModalCountRef.current = activeModalCount;
   }, [activeModalCount]);
 
-  // AMB Telecom Internal Back Handler
+  // BNB Telecom Internal Back Handler
   useBackHandler(() => {
     const modalClosed = closeTelecomModals();
     if (modalClosed) return true;
@@ -318,7 +318,7 @@ export const AMBTelecomScreen = React.memo(function AMBTelecomScreen({
         typeLabel: 'ডেইলি বোনাস',
         amount: 5,
         status: 'success',
-        description: 'AMB টেলিকম ডেইলি বোনাস (৳5.00) সফলভাবে মেইন ওয়ালেটে যুক্ত হয়েছে।',
+        description: 'BNB টেলিকম ডেইলি বোনাস (৳5.00) সফলভাবে মেইন ওয়ালেটে যুক্ত হয়েছে।',
         createdAt: new Date().toISOString()
       };
 
@@ -374,7 +374,7 @@ export const AMBTelecomScreen = React.memo(function AMBTelecomScreen({
       const rules = appConfig?.rechargeCashbackRules || [];
       const matchedCashback = getMatchedCashbackForRule(rules, selectedOffer.price, offerOp);
 
-      const ambTrxId = generateAmbTrxId('BN');
+      const ambTrxId = generateBNBTrxId('BN');
       const txId = `tx-tel-${ambTrxId}`;
       let description = `${selectedOffer.operator} নম্বরে (${recipientNumber}) প্যাকঃ "${selectedOffer.title}" ক্রয়ের আবেদন করা হয়েছে। অ্যাডমিন ভেরিফিকেশন পেন্ডিং রয়েছে।`;
       if (matchedCashback > 0) {
@@ -509,7 +509,7 @@ export const AMBTelecomScreen = React.memo(function AMBTelecomScreen({
       const rules = appConfig?.rechargeCashbackRules || [];
       const matchedCashback = getMatchedCashbackForRule(rules, reloadAmt, cashRechargeOperator);
 
-      const ambTrxId = generateAmbTrxId('BN');
+      const ambTrxId = generateBNBTrxId('BN');
       const txId = `tx-cash-${ambTrxId}`;
       const typeLabel = cashRechargeOperator === 'Alaap' 
         ? 'আলাপ রিচার্জ' 
@@ -656,7 +656,7 @@ export const AMBTelecomScreen = React.memo(function AMBTelecomScreen({
           <div className="text-left">
             <h1 className="text-xs xs:text-sm font-black flex items-center gap-1 text-indigo-700">
               <Zap className="w-3.5 h-3.5 text-amber-500 fill-amber-500" />
-              AMB টেলিকম
+              BNB টেলিকম
             </h1>
             <p className="text-[8px] xs:text-[10px] text-slate-550 uppercase tracking-wider font-mono">ID: {user.memberId}</p>
           </div>
@@ -1190,7 +1190,7 @@ export const AMBTelecomScreen = React.memo(function AMBTelecomScreen({
                     {/* Current user Wallet snippet */}
                     <div className="flex justify-between items-center text-xs font-bold text-slate-500 px-0.5">
                       <span>আমার মেইন ওয়ালেট ব্যালেন্সঃ</span>
-                      <strong className="text-indigo-950 font-mono">৳ {(user.balance || 0).toLocaleString('bn-BD')} BDT</strong>
+                      <strong className="text-indigo-950 font-mono">৳ {(user.balance || 0).toLocaleString('en-US')} BDT</strong>
                     </div>
 
                     {/* Recipient Number Input */}
@@ -1326,7 +1326,7 @@ export const AMBTelecomScreen = React.memo(function AMBTelecomScreen({
                         : '💸 মোবাইল ক্যাশ রিচার্জ'}
                   </span>
                   <span className="bg-indigo-800/80 text-emerald-300 px-2 py-0.5 rounded-full text-[10px] font-extrabold font-mono border border-indigo-700/60 inline-flex items-center gap-1">
-                    মোবাইল ব্যালেন্স: ৳{(user.balance || 0).toLocaleString('bn-BD')}
+                    মোবাইল ব্যালেন্স: ৳{(user.balance || 0).toLocaleString('en-US')}
                   </span>
                 </div>
                 <button 
@@ -1599,7 +1599,7 @@ export const AMBTelecomScreen = React.memo(function AMBTelecomScreen({
                     <Headphones className="w-5 h-5" />
                   </div>
                   <div>
-                    <h3 className="text-sm font-black text-slate-900">AMB টেলিকম হেল্পলাইন</h3>
+                    <h3 className="text-sm font-black text-slate-900">BNB টেলিকম হেল্পলাইন</h3>
                     <p className="text-[10px] text-slate-500 font-extrabold">সরাসরি সাপোর্ট ও মেসেজিং সেকশন</p>
                   </div>
                 </div>
@@ -1804,7 +1804,7 @@ export const AMBTelecomScreen = React.memo(function AMBTelecomScreen({
                         </div>
                         <div className="text-right shrink-0">
                           <span className="text-xs font-black font-mono block text-rose-600">
-                            - ৳{tx.amount.toLocaleString('bn-BD')}
+                            - ৳{tx.amount.toLocaleString('en-US')}
                           </span>
                           <span className={`inline-block text-[8.5px] font-extrabold px-1.5 py-0.2 mt-1 rounded-md uppercase ${
                             tx.status === 'success' || tx.status === 'approved' ? 'bg-emerald-50 text-emerald-700 border border-emerald-100' :
@@ -1821,7 +1821,7 @@ export const AMBTelecomScreen = React.memo(function AMBTelecomScreen({
 
               {/* Footer */}
               <div className="p-4 bg-slate-50 border-t border-slate-100 text-center">
-                <span className="text-[10px] text-slate-400 font-bold">© BUSINESS NETWORK BANGLADESH (AMB)</span>
+                <span className="text-[10px] text-slate-400 font-bold">© BUSINESS NETWORK BANGLADESH (BNB)</span>
               </div>
             </motion.div>
           </div>
@@ -1831,7 +1831,7 @@ export const AMBTelecomScreen = React.memo(function AMBTelecomScreen({
   )}
 
       {/* Full-Screen Al Mayadin Payment Receipt Modal */}
-      <AmbPaymentReceiptModal
+      <BNBPaymentReceiptModal
         isOpen={isReceiptOpen}
         onClose={() => setIsReceiptOpen(false)}
         data={receiptModalData}
@@ -1842,4 +1842,4 @@ export const AMBTelecomScreen = React.memo(function AMBTelecomScreen({
   );
 });
 
-export default AMBTelecomScreen;
+export default BNBTelecomScreen;

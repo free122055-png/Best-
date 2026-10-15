@@ -163,12 +163,8 @@ export const resetLockout = (identifier?: string, type?: 'pin' | 'password' | 'a
 
 export const clearLockoutState = resetLockout;
 
-const bengaliDigits = ['০', '১', '২', '৩', '৪', '৫', '৬', '৭', '৮', '৯'];
 export const toBengaliDigits = (num: number | string): string => {
-  return String(num).split('').map(char => {
-    const digit = parseInt(char, 10);
-    return !isNaN(digit) && digit >= 0 && digit <= 9 ? bengaliDigits[digit] : char;
-  }).join('');
+  return String(num);
 };
 
 export const formatRemainingTime = (totalSeconds: number): {

@@ -35,7 +35,7 @@ import {
   SearchCode
 } from 'lucide-react';
 
-interface AmbSalaryAdminProps {
+interface BNBSalaryAdminProps {
   onBack: () => void;
 }
 
@@ -84,7 +84,7 @@ interface PlatformUser {
   balance?: number;
 }
 
-export default function AmbSalaryAdmin({ onBack }: AmbSalaryAdminProps) {
+export default function BNBSalaryAdmin({ onBack }: BNBSalaryAdminProps) {
   // Master lists
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [configs, setConfigs] = useState<SalaryConfig[]>([]);
@@ -561,7 +561,7 @@ export default function AmbSalaryAdmin({ onBack }: AmbSalaryAdminProps) {
             <div>
               <h1 className="text-base sm:text-xl font-black tracking-tight flex items-center gap-2">
                 <Briefcase className="w-5 h-5 text-emerald-400 fill-emerald-400/20" />
-                AMB অটো স্যালারি পে অ্যাডমিন প্যানেল
+                BNB অটো স্যালারি পে অ্যাডমিন প্যানেল
               </h1>
               <p className="text-[10px] sm:text-xs text-emerald-200 font-bold">সকল প্রতিষ্ঠানের কর্মী ডাটাবেজ, বেতন প্রদান ও প্রোফাইল কনফিগারেশন গেটওয়ে</p>
             </div>
@@ -1249,7 +1249,7 @@ export default function AmbSalaryAdmin({ onBack }: AmbSalaryAdminProps) {
 
               {/* Company Name */}
               <div>
-                <label className="text-[10px] font-black text-slate-500 block mb-1">প্রতিষ্ঠানের নাম (যেমন: AMB সল্যুশনস) *</label>
+                <label className="text-[10px] font-black text-slate-500 block mb-1">প্রতিষ্ঠানের নাম (যেমন: BNB সল্যুশনস) *</label>
                 <input
                   type="text"
                   placeholder="প্রতিষ্ঠানের নাম লিখুন"
@@ -1262,7 +1262,7 @@ export default function AmbSalaryAdmin({ onBack }: AmbSalaryAdminProps) {
 
               {/* Company ID */}
               <div>
-                <label className="text-[10px] font-black text-slate-500 block mb-1">কোম্পানি রেজিস্টার্ড আইডি (যেমন: AMB-CORP-99) *</label>
+                <label className="text-[10px] font-black text-slate-500 block mb-1">কোম্পানি রেজিস্টার্ড আইডি (যেমন: BNB-CORP-99) *</label>
                 <input
                   type="text"
                   placeholder="কোম্পানি আইডি দিন"

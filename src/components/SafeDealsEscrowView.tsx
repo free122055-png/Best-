@@ -476,7 +476,7 @@ export const SafeDealsEscrowView = React.memo(function SafeDealsEscrowView({
       if (resolvedRecipient) {
         await addDoc(collection(db, 'notices'), {
           title: `নিরাপদ লেনদেন জমার নিবেদন!`,
-          content: `${liveUser.name} (AMB ID: ${liveUser.memberId}) আপনার ফোন নম্বরে ৳${cleanAmount.toLocaleString('bn-BD')} BDT এর একটি নিরাপদ লেনদেন বুকিং জমা করেছেন। ট্র্যাকিং জমা দিয়ে বা পণ্যটি পাঠিয়ে রিলিজ বুঝে নিন।`,
+          content: `${liveUser.name} (BNB ID: ${liveUser.memberId}) আপনার ফোন নম্বরে ৳${cleanAmount.toLocaleString('bn-BD')} BDT এর একটি নিরাপদ লেনদেন বুকিং জমা করেছেন। ট্র্যাকিং জমা দিয়ে বা পণ্যটি পাঠিয়ে রিলিজ বুঝে নিন।`,
           createdAt: timestamp
         });
       }
@@ -937,7 +937,7 @@ export const SafeDealsEscrowView = React.memo(function SafeDealsEscrowView({
           </div>
           <div className="flex-grow overflow-hidden relative mr-1.5">
             <marquee className="text-[12px] font-bold text-slate-800 leading-none py-0.5" behavior="scroll" direction="left" scrollamount="4">
-              {appConfig?.escrowTicker || "AMB নিরাপদ লেনদেনঃ যেকোনো প্রোডাক্ট কুরিয়ার কন্ডিশনে ক্রয়ের পূর্বে এসক্রো ডিল বুকিং করে আপনার মেইন ব্যালেন্সের পেমেন্ট নিরাপদ করুন।"}
+              {appConfig?.escrowTicker || "BNB নিরাপদ লেনদেনঃ যেকোনো প্রোডাক্ট কুরিয়ার কন্ডিশনে ক্রয়ের পূর্বে এসক্রো ডিল বুকিং করে আপনার মেইন ব্যালেন্সের পেমেন্ট নিরাপদ করুন।"}
             </marquee>
           </div>
         </div>
@@ -1270,7 +1270,7 @@ export const SafeDealsEscrowView = React.memo(function SafeDealsEscrowView({
                     <input 
                       type="text"
                       required
-                      placeholder="উদাঃ AMB00005327 অথবা মোবাইল"
+                      placeholder="উদাঃ BNB00005327 অথবা মোবাইল"
                       value={sendPhone}
                       onChange={(e) => setSendPhone(e.target.value)}
                       className="w-full px-3 py-2 bg-slate-50 border border-slate-200 text-slate-900 rounded-xl focus:outline-none focus:border-blue-500 font-mono text-sm pl-10"
@@ -1394,7 +1394,7 @@ export const SafeDealsEscrowView = React.memo(function SafeDealsEscrowView({
                     
                     {pendingSales.length === 0 ? (
                       <div className="p-8 text-center border border-dashed border-slate-200 rounded-2xl text-slate-400 text-xs font-bold leading-relaxed">
-                        আপাতত আপনার জন্য কোনো পেন্ডিং বুকিং পাওয়া যায়নি। ক্রেতাদের আপনার AMB মোবাইল নম্বরে বা AMB মেম্বার আইডিতে "টাকা পাঠান" সেকশন ব্যবহার করে পেমেন্ট করার কথা বলুন।
+                        আপাতত আপনার জন্য কোনো পেন্ডিং বুকিং পাওয়া যায়নি। ক্রেতাদের আপনার BNB মোবাইল নম্বরে বা BNB মেম্বার আইডিতে "টাকা পাঠান" সেকশন ব্যবহার করে পেমেন্ট করার কথা বলুন।
                       </div>
                     ) : (
                       <div className="space-y-3">
@@ -1872,7 +1872,7 @@ export const SafeDealsEscrowView = React.memo(function SafeDealsEscrowView({
                   <ShieldCheck className="w-7 h-7 text-emerald-300" />
                 </div>
                 <h2 className="text-sm font-extrabold tracking-wide text-emerald-100">BUSINESS NETWORK BANGLADESH</h2>
-                <p className="text-[10px] text-white/70">নিরাপদ বাতায়ন ও সমবায় ব্যাংকিং</p>
+                <p className="text-[10px] text-white/70">নিরাপদ বাতায়ন ও সমবায় লেনদেন</p>
                 <div className="inline-block mt-3 bg-white/15 text-emerald-50 text-[11px] font-black px-3 py-1 rounded-full border border-white/10">
                   {voucherData.title}
                 </div>
@@ -1990,7 +1990,7 @@ export const SafeDealsEscrowView = React.memo(function SafeDealsEscrowView({
 
                         ctx.fillStyle = '#475569';
                         ctx.font = 'bold 12px system-ui, sans-serif';
-                        ctx.fillText('নিরাপদ বাতায়ন ও সমবায় ব্যাংকিং', canvas.width / 2, 95);
+                        ctx.fillText('নিরাপদ বাতায়ন ও সমবায় লেনদেন', canvas.width / 2, 95);
 
                         // Draw Badge Title
                         ctx.fillStyle = '#f1f5f9';
@@ -2127,7 +2127,7 @@ export const SafeDealsEscrowView = React.memo(function SafeDealsEscrowView({
                         ctx.fillStyle = '#94a3b8';
                         ctx.font = 'bold 10px system-ui, sans-serif';
                         ctx.fillText('এটি একটি সিস্টেম জেনারেটেড রসিদ কপি। যেকোনো তথ্যের জন্য সাপোর্ট টিমে যোগাযোগ করুন।', canvas.width / 2, currentY + 30);
-                        ctx.fillText('© BUSINESS NETWORK BANGLADESH (AMB)', canvas.width / 2, currentY + 48);
+                        ctx.fillText('© BUSINESS NETWORK BANGLADESH (BNB)', canvas.width / 2, currentY + 48);
 
                         // Bottom scallops
                         ctx.fillStyle = '#f1f5f9';
@@ -2152,7 +2152,7 @@ export const SafeDealsEscrowView = React.memo(function SafeDealsEscrowView({
                         const blobUrl = URL.createObjectURL(blob);
 
                         const link = document.createElement('a');
-                        link.download = `AMB-Escrow-Voucher-${voucherData.bookingId}.png`;
+                        link.download = `BNB-Escrow-Voucher-${voucherData.bookingId}.png`;
                         link.href = blobUrl;
                         document.body.appendChild(link);
                         link.click();
@@ -2263,7 +2263,7 @@ export const SafeDealsEscrowView = React.memo(function SafeDealsEscrowView({
                   <AlertTriangle className="w-6 h-6 text-amber-400 stroke-[2]" />
                 </div>
                 <h2 className="text-[11px] font-extrabold tracking-widest text-slate-300 uppercase">BUSINESS NETWORK BANGLADESH</h2>
-                <p className="text-[9px] text-white/65 mt-0.5 font-medium">নিরাপদ বাতায়ন ও সমবায় ব্যাংকিং এসক্রো সিস্টেম</p>
+                <p className="text-[9px] text-white/65 mt-0.5 font-medium">নিরাপদ বাতায়ন ও সমবায় লেনদেন এসক্রো সিস্টেম</p>
                 <div className="mt-2.5 inline-block bg-slate-700/60 text-slate-100 text-[11px] font-black px-3.5 py-1 rounded-full border border-slate-600/50">
                   {confirmModalData.title}
                 </div>
@@ -2435,7 +2435,7 @@ export const SafeDealsEscrowView = React.memo(function SafeDealsEscrowView({
                   <h3 className="text-sm font-black text-slate-800 flex items-center gap-1.5">
                     <ShieldCheck className="w-5 h-5 text-emerald-600" /> অ্যাডমিন সাপোর্ট ও ট্র্যাকিং সেন্টার
                   </h3>
-                  <p className="text-[10px] text-slate-450 font-bold">Al Mayadin Bazar (AMB)</p>
+                  <p className="text-[10px] text-slate-450 font-bold">Al Mayadin Bazar (BNB)</p>
                 </div>
                 <button 
                   type="button"
@@ -2698,7 +2698,7 @@ export const SafeDealsEscrowView = React.memo(function SafeDealsEscrowView({
 
               {/* Footer */}
               <div className="p-4 bg-slate-50 border-t border-slate-100 text-center">
-                <span className="text-[10px] text-slate-400 font-bold">© BUSINESS NETWORK BANGLADESH (AMB)</span>
+                <span className="text-[10px] text-slate-400 font-bold">© BUSINESS NETWORK BANGLADESH (BNB)</span>
               </div>
             </motion.div>
           </div>

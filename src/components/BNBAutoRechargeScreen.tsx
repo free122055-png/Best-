@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { User, Transaction, AppConfig, generateAmbTrxId, formatShortTrxId } from '../types';
+import { User, Transaction, AppConfig, generateBNBTrxId, formatShortTrxId } from '../types';
 import { db } from '../lib/firebase';
 import UnifiedBackButton from './UnifiedBackButton';
 import { doc, updateDoc, setDoc, addDoc, collection, query, where, getDocs } from 'firebase/firestore';
@@ -22,7 +22,7 @@ import {
   ShieldCheck
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { AmbPaymentReceiptModal, PaymentReceiptData } from './AmbPaymentReceiptModal';
+import { BNBPaymentReceiptModal, PaymentReceiptData } from './BNBPaymentReceiptModal';
 
 // Helper functions for operator-specific cashback rules matching
 const isOperatorMatch = (ruleOpRaw?: string, targetOpRaw?: string): boolean => {
@@ -87,19 +87,19 @@ const getFilteredRulesForOperator = (rules: any[] = [], operator: string) => {
   return [...filtered].sort((a, b) => Number(a.amount) - Number(b.amount));
 };
 
-interface AmbAutoRechargeScreenProps {
+interface BNBAutoRechargeScreenProps {
   user: User;
   onBack: () => void;
   syncLiveProfile: () => void;
   appConfig?: AppConfig;
 }
 
-export default function AmbAutoRechargeScreen({
+export default function BNBAutoRechargeScreen({
   user,
   onBack,
   syncLiveProfile,
   appConfig
-}: AmbAutoRechargeScreenProps) {
+}: BNBAutoRechargeScreenProps) {
   const [operator, setOperator] = useState<string>('');
   const [rechargeAmount, setRechargeAmount] = useState<string>('');
   const [recipientNumber, setRecipientNumber] = useState<string>('');
@@ -173,10 +173,10 @@ export default function AmbAutoRechargeScreen({
       fee: 0,
       totalAmount: tx.amount || 0,
       status: tx.status || 'pending',
-      beneficiaryName: tx.userName || user.name || 'AMB সদস্য',
+      beneficiaryName: tx.userName || user.name || 'BNB সদস্য',
       beneficiaryAccount: tx.memberId || user.memberId || user.phone,
       senderPhone: tx.phone || tx.receiverPhone || user.phone || 'N/A',
-      paymentMethod: tx.operator || tx.paymentMethod || 'AMB রিচার্জ',
+      paymentMethod: tx.operator || tx.paymentMethod || 'BNB রিচার্জ',
       description: tx.description,
       transactionDate: tx.createdAt ? new Date(tx.createdAt).toLocaleString('bn-BD', {
         day: 'numeric',
@@ -186,7 +186,7 @@ export default function AmbAutoRechargeScreen({
         minute: 'numeric',
         second: 'numeric',
         hour12: true
-      }) : new Date().toLocaleString('bn-BD')
+      }) : new Date().toLocaleString('en-US')
     });
     setIsReceiptOpen(true);
   };
@@ -237,7 +237,7 @@ export default function AmbAutoRechargeScreen({
         description: `মেইন ব্যালেন্স থেকে ৳${amt.toLocaleString()} রিচার্জ ব্যালেন্সে অ্যাড করা হয়েছে। (২% বোনাস কমিশন ৳${commission.toFixed(2)} সহ মোট ৳${totalToAdd.toFixed(2)} রিচার্জ ওয়ালেটে যুক্ত হয়েছে)।`,
         createdAt: new Date().toISOString(),
         rechargeCommission: commission,
-        operator: 'AMB Telecom'
+        operator: 'BNB Telecom'
       } as any;
 
       // Real-time notification
@@ -309,7 +309,7 @@ export default function AmbAutoRechargeScreen({
 
     const availableTelecom = user.telecomBalance || 0;
     if (availableTelecom < reloadAmt) {
-      setErrorMessage(`অপর্যাপ্ত রিচার্জ ব্যালেন্স (আছে: ৳${availableTelecom.toLocaleString('bn-BD')})! দয়া করে উপরে "+ Add" বাটনে ক্লিক করে মেইন থেকে রিচার্জ ব্যালেন্সে টাকা যুক্ত করুন (২% বোনাস সহ)।`);
+      setErrorMessage(`অপর্যাপ্ত রিচার্জ ব্যালেন্স (আছে: ৳${availableTelecom.toLocaleString('en-US')})! দয়া করে উপরে "+ Add" বাটনে ক্লিক করে মেইন থেকে রিচার্জ ব্যালেন্সে টাকা যুক্ত করুন (২% বোনাস সহ)।`);
       return;
     }
 
@@ -325,11 +325,11 @@ export default function AmbAutoRechargeScreen({
       user.telecomBalance = remainingTelecom;
       const updateFields = { telecomBalance: remainingTelecom };
 
-      const ambTrxId = generateAmbTrxId('BN');
+      const ambTrxId = generateBNBTrxId('BN');
       const txId = `tx-auto-${ambTrxId}`;
       const typeLabel = 'অটো মোবাইল রিচার্জ';
 
-      const description = `${operator} নম্বরে (${cleanCashNumber}) ৳${reloadAmt.toLocaleString('bn-BD')} ইনস্ট্যান্ট অটো রিচার্জের রিকোয়েস্ট সম্পন্ন হয়েছে (রিচার্জ ব্যালেন্স থেকে প্রদেয়)।`;
+      const description = `${operator} নম্বরে (${cleanCashNumber}) ৳${reloadAmt.toLocaleString('en-US')} ইনস্ট্যান্ট অটো রিচার্জের রিকোয়েস্ট সম্পন্ন হয়েছে (রিচার্জ ব্যালেন্স থেকে প্রদেয়)।`;
           
       const newTx: Transaction = {
         id: txId,
@@ -361,7 +361,7 @@ export default function AmbAutoRechargeScreen({
           await setDoc(doc(db, 'transactions', newTx.id), newTx, { merge: true });
           addDoc(collection(db, 'admin_notifications'), {
             title: '⚡ নতুন BNB অটো রিচার্জ রিকোয়েস্ট',
-            message: `${user.name || 'সদস্য'} (${user.memberId || 'N/A'}) ${operator} নম্বরে (${cleanCashNumber}) ৳${reloadAmt.toLocaleString('bn-BD')} টাকা অটো রিচার্জের আবেদন করেছেন।`,
+            message: `${user.name || 'সদস্য'} (${user.memberId || 'N/A'}) ${operator} নম্বরে (${cleanCashNumber}) ৳${reloadAmt.toLocaleString('en-US')} টাকা অটো রিচার্জের আবেদন করেছেন।`,
             userId: user.uid,
             userName: user.name || '',
             memberId: user.memberId || '',
@@ -436,7 +436,7 @@ export default function AmbAutoRechargeScreen({
             <div>
               <h1 className="text-xs sm:text-sm font-black tracking-tight flex items-center gap-1">
                 <Smartphone className="w-3.5 h-3.5 text-cyan-400" />
-                AMB মোবাইল রিচার্জ (অটো)
+                BNB মোবাইল রিচার্জ (অটো)
               </h1>
               {/* Red-marked area: Main Balance Pill right under title */}
               <div 
@@ -445,7 +445,7 @@ export default function AmbAutoRechargeScreen({
                 title="মেইন ব্যালেন্স রিফ্রেশ করুন"
               >
                 <span className="text-[8px] text-emerald-200 font-sans">মেইনঃ</span>
-                <span className="font-mono text-emerald-300 font-black">৳{(user.balance || 0).toLocaleString('bn-BD')}</span>
+                <span className="font-mono text-emerald-300 font-black">৳{(user.balance || 0).toLocaleString('en-US')}</span>
                 <RefreshCw className="w-2.5 h-2.5 text-emerald-300 animate-pulse" />
               </div>
             </div>
@@ -457,7 +457,7 @@ export default function AmbAutoRechargeScreen({
             <div className="bg-white/10 backdrop-blur-md px-2 py-1 rounded-xl border border-white/15 text-right flex items-center gap-1.5 shadow-3xs">
               <div>
                 <span className="text-[7.5px] text-rose-200 block leading-none font-bold">রিচার্জ ব্যালেন্স</span>
-                <span className="text-[11px] sm:text-xs font-black text-rose-300 font-mono">৳{(user.telecomBalance || 0).toLocaleString('bn-BD')}</span>
+                <span className="text-[11px] sm:text-xs font-black text-rose-300 font-mono">৳{(user.telecomBalance || 0).toLocaleString('en-US')}</span>
               </div>
               <button
                 type="button"
@@ -670,11 +670,11 @@ export default function AmbAutoRechargeScreen({
               <div className="bg-slate-50 border border-slate-200/80 rounded-2xl p-3 mb-4 grid grid-cols-2 gap-2 text-center">
                 <div className="bg-white p-2 rounded-xl border border-slate-150">
                   <span className="text-[9px] font-bold text-slate-500 block">মেইন ওয়ালেট</span>
-                  <span className="text-xs font-black text-emerald-700 font-mono">৳{(user.balance || 0).toLocaleString('bn-BD')}</span>
+                  <span className="text-xs font-black text-emerald-700 font-mono">৳{(user.balance || 0).toLocaleString('en-US')}</span>
                 </div>
                 <div className="bg-white p-2 rounded-xl border border-slate-150">
                   <span className="text-[9px] font-bold text-slate-500 block">বর্তমান রিচার্জ</span>
-                  <span className="text-xs font-black text-rose-700 font-mono">৳{(user.telecomBalance || 0).toLocaleString('bn-BD')}</span>
+                  <span className="text-xs font-black text-rose-700 font-mono">৳{(user.telecomBalance || 0).toLocaleString('en-US')}</span>
                 </div>
               </div>
 
@@ -871,14 +871,14 @@ export default function AmbAutoRechargeScreen({
                               )}
                             </div>
                             <p className="text-[10px] text-slate-500 font-mono mt-0.5">
-                              {tx.phone || tx.receiverPhone ? `নম্বর: ${tx.phone || tx.receiverPhone}` : new Date(tx.createdAt || '').toLocaleString('bn-BD')}
+                              {tx.phone || tx.receiverPhone ? `নম্বর: ${tx.phone || tx.receiverPhone}` : new Date(tx.createdAt || '').toLocaleString('en-US')}
                             </p>
                           </div>
                         </div>
 
                         <div className="text-right shrink-0">
                           <span className={`text-xs font-black font-mono block ${isAdd ? 'text-emerald-600' : 'text-slate-900'}`}>
-                            {isAdd ? '+' : '-'}৳{Number(tx.amount || 0).toLocaleString('bn-BD')}
+                            {isAdd ? '+' : '-'}৳{Number(tx.amount || 0).toLocaleString('en-US')}
                           </span>
                           <span className={`text-[9px] font-extrabold px-1.5 py-0.5 rounded-full inline-block mt-0.5 ${
                             isApproved ? 'bg-emerald-100 text-emerald-800' : isRejected ? 'bg-rose-100 text-rose-800' : 'bg-amber-100 text-amber-800'
@@ -909,7 +909,7 @@ export default function AmbAutoRechargeScreen({
 
       {/* Transaction Receipt Modal */}
       {isReceiptOpen && receiptModalData && (
-        <AmbPaymentReceiptModal
+        <BNBPaymentReceiptModal
           isOpen={isReceiptOpen}
           data={receiptModalData}
           onClose={() => {

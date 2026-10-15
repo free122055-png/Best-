@@ -221,7 +221,7 @@ const MoneyExchangeModule: React.FC<MoneyExchangeModuleProps> = ({
     });
   };
 
-  // 🟢 STEP 1: AMB ডিল হোল্ড (Create a New Escrow Deal)
+  // 🟢 STEP 1: BNB ডিল হোল্ড (Create a New Escrow Deal)
   const handleCreateDeal = async () => {
     if (activeDeal) {
       setToastNotice({ text: 'দুঃখিত, ইতিমধ্যে একটি নিরাপদ এক্সচেঞ্জ ডিল সচল রয়েছে! নতুন ডিল শুরু করার আগে বর্তমান ডিলটি সম্পন্ন করুন।', type: 'error' });
@@ -235,7 +235,7 @@ const MoneyExchangeModule: React.FC<MoneyExchangeModuleProps> = ({
     }
 
     if (!resolvedRecipient) {
-      setToastNotice({ text: 'দয়া করে সঠিক প্রাপকের AMB অ্যাপে নিবন্ধিত মোবাইল নম্বর বা মেম্বার আইডি দিন!', type: 'error' });
+      setToastNotice({ text: 'দয়া করে সঠিক প্রাপকের BNB অ্যাপে নিবন্ধিত মোবাইল নম্বর বা মেম্বার আইডি দিন!', type: 'error' });
       return;
     }
 
@@ -255,7 +255,7 @@ const MoneyExchangeModule: React.FC<MoneyExchangeModuleProps> = ({
     }
 
     setIsProcessing(true);
-    const txnId = `TXN-AMB-${Math.floor(10000000 + Math.random() * 90000000)}`;
+    const txnId = `TXN-BNB-${Math.floor(10000000 + Math.random() * 90000000)}`;
 
     try {
       await runTransaction(db, async (transaction) => {
@@ -332,7 +332,7 @@ const MoneyExchangeModule: React.FC<MoneyExchangeModuleProps> = ({
         timestamp: getFormattedNow(),
         statusBadge: '🟢 এসক্রো ফান্ড লক্ড (স্ট্যাটাস: হোল্ড)',
         statusColor: 'emerald',
-        note: 'আলহামদুলিল্লাহ! আপনার নিরাপদ এক্সচেঞ্জ ডিল সফলভাবে শুরু হয়েছে এবং টাকা নিরাপদে AMB হোল্ডে সংরক্ষিত করা হয়েছে।'
+        note: 'আলহামদুলিল্লাহ! আপনার নিরাপদ এক্সচেঞ্জ ডিল সফলভাবে শুরু হয়েছে এবং টাকা নিরাপদে BNB হোল্ডে সংরক্ষিত করা হয়েছে।'
       });
 
       setHoldAmountInput('');
@@ -393,7 +393,7 @@ const MoneyExchangeModule: React.FC<MoneyExchangeModuleProps> = ({
 
       // Instant digital money receipt popup modal
       setReceiptModal({
-        txnId: activeDeal.id ? `TXN-AMB-${activeDeal.id.substring(0, 8).toUpperCase()}` : `TXN-AMB-${Math.floor(10000000 + Math.random() * 90000000)}`,
+        txnId: activeDeal.id ? `TXN-BNB-${activeDeal.id.substring(0, 8).toUpperCase()}` : `TXN-BNB-${Math.floor(10000000 + Math.random() * 90000000)}`,
         type: 'sent',
         title: 'টাকা পাঠানো সম্পন্ন মানি রিসিট (Receipt)',
         amount: activeDeal.amount,
@@ -499,7 +499,7 @@ const MoneyExchangeModule: React.FC<MoneyExchangeModuleProps> = ({
 
         // Instant Digital Receipt
         setReceiptModal({
-          txnId: activeDeal.id ? `TXN-AMB-${activeDeal.id.substring(0, 8).toUpperCase()}` : `TXN-AMB-${Math.floor(10000000 + Math.random() * 90000000)}`,
+          txnId: activeDeal.id ? `TXN-BNB-${activeDeal.id.substring(0, 8).toUpperCase()}` : `TXN-BNB-${Math.floor(10000000 + Math.random() * 90000000)}`,
           type: 'received',
           title: 'টাকা প্রাপ্তি নিশ্চয়তা মানি রিসিট',
           amount: activeDeal.amount,
@@ -593,7 +593,7 @@ const MoneyExchangeModule: React.FC<MoneyExchangeModuleProps> = ({
 
         // High-speed Completion Receipt Modal
         setReceiptModal({
-          txnId: activeDeal.id ? `TXN-AMB-${activeDeal.id.substring(0, 8).toUpperCase()}` : `TXN-AMB-${Math.floor(10000000 + Math.random() * 90000000)}`,
+          txnId: activeDeal.id ? `TXN-BNB-${activeDeal.id.substring(0, 8).toUpperCase()}` : `TXN-BNB-${Math.floor(10000000 + Math.random() * 90000000)}`,
           type: 'completed',
           title: 'নিরাপদ লেনদেন চূড়ান্ত রিলিজ মানি রিসিট',
           amount: refundAmount - overtimeFine,
@@ -623,7 +623,7 @@ const MoneyExchangeModule: React.FC<MoneyExchangeModuleProps> = ({
   // Copy receipt to clipboard
   const copyReceiptToClipboard = () => {
     if (!receiptModal) return;
-    const text = `=================================\n   AMB ডিজিটাল মানি এক্সচেঞ্জ রিসিট\n=================================\nরিসিট শিরোনাম: ${receiptModal.title}\nট্রানজেকশন নম্বর: ${receiptModal.txnId}\nটাকার পরিমাণ: ৳${receiptModal.amount.toLocaleString('bn-BD')}\nলেনদেনের তারিখ ও সময়: ${receiptModal.timestamp}\nবর্তমান স্ট্যাটাস: ${receiptModal.statusBadge}\nসবুজ পক্ষ (দাতা): ${receiptModal.senderName} (${receiptModal.senderPhone || 'N/A'})\nলাল পক্ষ (প্রাপক): ${receiptModal.recipientName} (${receiptModal.recipientPhone || 'N/A'})\nবিবরণ: ${receiptModal.note}\n=================================\nAl Mayadin Bazar Escrow Gateway`;
+    const text = `=================================\n   BNB ডিজিটাল মানি এক্সচেঞ্জ রিসিট\n=================================\nরিসিট শিরোনাম: ${receiptModal.title}\nট্রানজেকশন নম্বর: ${receiptModal.txnId}\nটাকার পরিমাণ: ৳${receiptModal.amount.toLocaleString('bn-BD')}\nলেনদেনের তারিখ ও সময়: ${receiptModal.timestamp}\nবর্তমান স্ট্যাটাস: ${receiptModal.statusBadge}\nসবুজ পক্ষ (দাতা): ${receiptModal.senderName} (${receiptModal.senderPhone || 'N/A'})\nলাল পক্ষ (প্রাপক): ${receiptModal.recipientName} (${receiptModal.recipientPhone || 'N/A'})\nবিবরণ: ${receiptModal.note}\n=================================\nAl Mayadin Bazar Escrow Gateway`;
 
     navigator.clipboard.writeText(text);
     setCopiedReceipt(true);
@@ -663,7 +663,7 @@ const MoneyExchangeModule: React.FC<MoneyExchangeModuleProps> = ({
         </div>
       )}
 
-      {/* 1. HEADER (AMB নিরাপদ এক্সচেঞ্জ / Al Mayadin Bazar Escrow Gateway) */}
+      {/* 1. HEADER (BNB নিরাপদ এক্সচেঞ্জ / Al Mayadin Bazar Escrow Gateway) */}
       <div className="bg-gradient-to-r from-[#014022] to-[#015E34] text-white p-4 pb-6 rounded-b-[2rem] shadow-xl relative shrink-0">
         <div className="flex justify-between items-start gap-2">
           {/* Back Action */}
@@ -674,8 +674,8 @@ const MoneyExchangeModule: React.FC<MoneyExchangeModuleProps> = ({
           {/* Core Applet Title */}
           <div className="flex-1 mt-1 text-center sm:text-left sm:pl-3">
             <div className="flex items-center justify-center sm:justify-start gap-1.5">
-              <span className="bg-white/20 text-xs font-black px-2 py-0.5 rounded-lg tracking-widest">AMB</span>
-              <h1 className="font-extrabold text-lg tracking-tight leading-none">AMB নিরাপদ এক্সচেঞ্জ</h1>
+              <span className="bg-white/20 text-xs font-black px-2 py-0.5 rounded-lg tracking-widest">BNB</span>
+              <h1 className="font-extrabold text-lg tracking-tight leading-none">BNB নিরাপদ এক্সচেঞ্জ</h1>
             </div>
             <p className="text-[9px] opacity-80 font-mono mt-1 uppercase tracking-wider">Al Mayadin Bazar Escrow Gateway</p>
           </div>
@@ -760,7 +760,7 @@ const MoneyExchangeModule: React.FC<MoneyExchangeModuleProps> = ({
             </span>
           </button>
 
-          {/* 🟢 AMB ডিল হোল্ড (Step 1 Button) */}
+          {/* 🟢 BNB ডিল হোল্ড (Step 1 Button) */}
           <button
             onClick={() => {
               if (activeDeal) {
@@ -780,12 +780,12 @@ const MoneyExchangeModule: React.FC<MoneyExchangeModuleProps> = ({
             <div className="w-10 h-10 bg-white text-emerald-600 rounded-full flex items-center justify-center font-bold shadow-sm">
               <span className="text-xl">↑</span>
             </div>
-            <span className="font-extrabold text-base tracking-tight">AMB ডিল হোল্ড</span>
+            <span className="font-extrabold text-base tracking-tight">BNB ডিল হোল্ড</span>
           </button>
 
         </div>
 
-        {/* Bottom Tri-Module Row (হ্যাঁ পাইছি | AMB Hold | সম্পূর্ণ) */}
+        {/* Bottom Tri-Module Row (হ্যাঁ পাইছি | BNB Hold | সম্পূর্ণ) */}
         <div className="grid grid-cols-3 gap-3 items-stretch">
           
           {/* 🟢 হ্যাঁ, পাইছি (Step 3 Button) */}
@@ -801,14 +801,14 @@ const MoneyExchangeModule: React.FC<MoneyExchangeModuleProps> = ({
             <span className="font-black text-sm tracking-tight block">হ্যাঁ<br/>পাইছি</span>
           </button>
 
-          {/* ⚫ AMB HOLD (Middle Black Box / Escrow Hold Balance Display) */}
+          {/* ⚫ BNB HOLD (Middle Black Box / Escrow Hold Balance Display) */}
           <div className="bg-black text-white p-4 flex flex-col items-center justify-center rounded-tr-[2.5rem] rounded-bl-[2.5rem] shadow-2xl border border-slate-800 text-center select-none min-h-[110px]">
             <span className="text-[14px] font-black font-mono text-emerald-400">
               ৳{activeDeal ? activeDeal.amount.toLocaleString() : '0.00'}
             </span>
             <div className="flex items-center gap-1 mt-1 shrink-0">
               <ShieldCheck className="w-3.5 h-3.5 text-emerald-400 animate-pulse" />
-              <span className="text-[11px] font-extrabold text-slate-300">AMB</span>
+              <span className="text-[11px] font-extrabold text-slate-300">BNB</span>
             </div>
           </div>
 
@@ -911,7 +911,7 @@ const MoneyExchangeModule: React.FC<MoneyExchangeModuleProps> = ({
             <div className="space-y-4">
               {/* Recipient Input */}
               <div>
-                <label className="text-[10px] font-black text-slate-500 uppercase tracking-wider block mb-1">প্রাপকের AMB নিবন্ধিত নম্বর বা মেম্বার আইডি</label>
+                <label className="text-[10px] font-black text-slate-500 uppercase tracking-wider block mb-1">প্রাপকের BNB নিবন্ধিত নম্বর বা মেম্বার আইডি</label>
                 <input
                   type="text"
                   placeholder="যেমনঃ 017xxxxxxxx বা মেম্বার আইডি"
@@ -935,7 +935,7 @@ const MoneyExchangeModule: React.FC<MoneyExchangeModuleProps> = ({
                 ) : recipientInput.trim().length >= 5 && !resolvingRecipient ? (
                   <div className="mt-2 p-2 bg-rose-50 border border-rose-150 rounded-xl text-[10px] font-black text-rose-700 flex items-center gap-1.5 animate-fade-in">
                     <AlertCircle className="w-3.5 h-3.5 text-rose-500" />
-                    <span>দুঃখিত, কোনো নিবন্ধিত AMB সদস্য খুঁজে পাওয়া যায়নি!</span>
+                    <span>দুঃখিত, কোনো নিবন্ধিত BNB সদস্য খুঁজে পাওয়া যায়নি!</span>
                   </div>
                 ) : null}
               </div>
@@ -1142,7 +1142,7 @@ const MoneyExchangeModule: React.FC<MoneyExchangeModuleProps> = ({
 
               {/* Security Seal Note */}
               <div className="text-[10px] text-slate-400 text-center font-bold">
-                🔒 100% নিরাপদ এনক্রিপ্টেড ডিজিটাল মানি রিসিট • AMB Bangladesh
+                🔒 100% নিরাপদ এনক্রিপ্টেড ডিজিটাল মানি রিসিট • BNB Bangladesh
               </div>
             </div>
 
@@ -1202,7 +1202,7 @@ const MoneyExchangeModule: React.FC<MoneyExchangeModuleProps> = ({
                 {historyDeals.map((deal, idx) => (
                   <div key={`${deal.id}-${idx}`} className="bg-slate-50 p-4 rounded-2xl border border-slate-150/80 flex justify-between items-center text-xs">
                     <div className="space-y-1 text-left">
-                      <p className="font-black text-slate-800">৳{deal.amount.toLocaleString()} AMB</p>
+                      <p className="font-black text-slate-800">৳{deal.amount.toLocaleString()} BNB</p>
                       <p className="text-[10px] text-slate-500 font-bold">গ্রহীতাঃ {deal.recipientName}</p>
                       <p className="text-[8px] text-slate-400 font-mono">
                         {deal.completedAt ? new Date(deal.completedAt).toLocaleString('bn-BD') : ''}

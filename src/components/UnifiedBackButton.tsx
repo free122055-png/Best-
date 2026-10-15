@@ -10,7 +10,7 @@ interface UnifiedBackButtonProps {
 }
 
 /**
- * Standardized Unified Back Button (← ব্যাক) for all screens and sub-views in AMB App.
+ * Standardized Unified Back Button (← ব্যাক) for all screens and sub-views in BNB App.
  * Matches exact UI style from Safi Premium Shop:
  * Pill container, bold '← ব্যাক' text, smooth active-scale animation, step-by-step back.
  */

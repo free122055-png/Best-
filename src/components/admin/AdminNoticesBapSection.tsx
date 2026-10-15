@@ -25,7 +25,7 @@ import { User, Transaction, Notice, Offer, BapReport, BapGroup, BapAdminRequest,
 import { normalizeMemberId, formatBanglaAmount, normalizePhoneNumber, findUserInFirestoreByPhone, getNextSequentialMemberId, deleteUserCompletelyFromDatabase, convertBengaliToEnglishDigits } from '../../lib/memberUtils';
 import { sortTransactionsNewestFirst, getTxTime } from '../../lib/transactionUtils';
 import { saveAppConfig, DEFAULT_QARD_CONFIG, DEFAULT_MANDATORY_NOTICE } from '../../lib/config';
-import { AMBLogo } from '../AMBLogo';
+import { BNBLogo } from '../BNBLogo';
 import { HeaderPendingModal } from '../HeaderPendingModal';
 import { MandatoryNoticeModal } from '../MandatoryNoticeModal';
 import SamityScreen from '../SamityScreen';
@@ -33,7 +33,7 @@ import UnifiedBackButton from '../UnifiedBackButton';
 import SamityAdmin from '../SamityAdmin';
 import SafiPremiumShop from '../SafiPremiumShop';
 import TelecomAdmin from '../TelecomAdmin';
-import AmbSalaryAdmin from '../AmbSalaryAdmin';
+import BNBSalaryAdmin from '../BNBSalaryAdmin';
 import { HistoryRetentionSettings } from '../HistoryRetentionSettings';
 import { runWalletEndToEndTests, TestResultItem } from '../../lib/walletTests';
 import { 
@@ -769,7 +769,7 @@ export function AdminNoticesBapSection(props: any) {
                         className="block w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl text-slate-800 focus:outline-none focus:ring-1 focus:ring-emerald-500 text-xs font-sans font-extrabold"
                       >
                         <option value="general">সাধারণ নোটিশ (General Dashboard)</option>
-                        <option value="telecom">টেলিকম নোটিশ (AMB Telecom)</option>
+                        <option value="telecom">টেলিকম নোটিশ (BNB Telecom)</option>
                         <option value="safe_deal">নিরাপদ ডিল নোটিশ (Safe Deals Escrow)</option>
                         <option value="samity">সমবায় সমিতি নোটিশ (Samity)</option>
                         <option value="bank">ব্যাংক নোটিশ (Bank Admin)</option>

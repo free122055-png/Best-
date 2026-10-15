@@ -190,9 +190,9 @@ export function getDeviceFingerprint(): string {
       ctx.fillRect(100, 1, 40, 15);
       ctx.fillStyle = "#069";
       ctx.font = "12px sans-serif";
-      ctx.fillText("AMB_Lock_🛡️", 2, 12);
+      ctx.fillText("BNB_Lock_🛡️", 2, 12);
       ctx.fillStyle = "rgba(102, 204, 0, 0.6)";
-      ctx.fillText("AMB_Lock_🛡️", 3, 13);
+      ctx.fillText("BNB_Lock_🛡️", 3, 13);
       canvasSig = canvas.toDataURL();
     }
   } catch (e) {}
@@ -323,18 +323,18 @@ export function isSameDevice(
 export async function getDeviceBoundUser(clientDevId?: string): Promise<{ docId: string; user: User } | null> { return null; }
 
 export function normalizeMemberId(id: string | undefined | null): string {
-  if (!id) return 'AMB00000000';
+  if (!id) return 'BNB00000000';
   
   const trimmed = id.trim().toUpperCase();
   
-  // If it's already a perfect AMB00000000 style, return it
-  if (trimmed.startsWith('AMB') && trimmed.length === 11 && /^\d+$/.test(trimmed.slice(3))) {
+  // If it's already a perfect BNB00000000 style, return it
+  if (trimmed.startsWith('BNB') && trimmed.length === 11 && /^\d+$/.test(trimmed.slice(3))) {
     return trimmed;
   }
 
-  // Handle legacy AMB prefix transition
-  if (trimmed.startsWith('AMB') && trimmed.length === 11 && /^\d+$/.test(trimmed.slice(3))) {
-    return 'AMB' + trimmed.slice(3);
+  // Handle legacy BNB prefix transition -> convert to BNB
+  if (trimmed.startsWith('BNB') && trimmed.length === 11 && /^\d+$/.test(trimmed.slice(3))) {
+    return 'BNB' + trimmed.slice(3);
   }
   
   // Main Admin does not have a serial number
@@ -347,7 +347,7 @@ export function normalizeMemberId(id: string | undefined | null): string {
   if (digits) {
     const num = parseInt(digits, 10);
     if (!isNaN(num)) {
-      return `AMB${String(num).padStart(8, '0')}`;
+      return `BNB${String(num).padStart(8, '0')}`;
     }
   }
 
@@ -357,7 +357,7 @@ export function normalizeMemberId(id: string | undefined | null): string {
     hash = trimmed.charCodeAt(i) + ((hash << 5) - hash);
   }
   const positiveHash = Math.abs(hash) % 100000000;
-  return `AMB${String(positiveHash).padStart(8, '0')}`;
+  return `BNB${String(positiveHash).padStart(8, '0')}`;
 }
 
 export function formatBanglaAmount(amount: number | string | undefined | null): string {
@@ -451,7 +451,7 @@ export function hasCompletedSamityProfile(user: User | null | undefined): boolea
 }
 
 export interface MembershipCategoryMeta {
-  key: 'regular' | 'investor' | 'shareholder';
+  key: 'regular' | 'investor' | 'shareholder' | 'owner';
   titleBn: string;
   badgeBn: string;
   shortLabel: string;
@@ -461,6 +461,10 @@ export interface MembershipCategoryMeta {
   borderColor: string;
   textColor: string;
   tagColor: string;
+  monthlyRate?: number;
+  quarterlyRate?: number;
+  maxNominees?: number;
+  requiredNominees?: number;
 }
 
 export function getMembershipCategory(user: User | null | undefined): MembershipCategoryMeta {
@@ -470,9 +474,11 @@ export function getMembershipCategory(user: User | null | undefined): Membership
       titleBn: 'সাধারণ সদস্য',
       badgeBn: 'সাধারণ সদস্য',
       shortLabel: 'সাধারণ সদস্য',
-      descBn: 'লেনদেন ও ক্রয়-বিক্রয়ের সুবিধা। করযে হাসানা ঋণ পাওয়ার জন্য সম্পূর্ণ প্রোফাইল ফিলাপ করতে হবে (মাসিক কিস্তি নেই)।',
-      emoji: '👤',
-      bgGradient: 'from-slate-700 to-slate-900',
+      maxNominees: 1,
+      requiredNominees: 1,
+      descBn: 'লেনদেন ও অ্যাপস ব্যবহারের সুবিধা (সমিতি সেকশন সীমিত)। ১ জন নমিনি তথ্য বাধ্যতামূলক।',
+      emoji: '⚪',
+      bgGradient: 'from-slate-600 to-slate-800',
       borderColor: 'border-slate-300',
       textColor: 'text-slate-700',
       tagColor: 'bg-slate-100 text-slate-800'
@@ -480,32 +486,59 @@ export function getMembershipCategory(user: User | null | undefined): Membership
   }
 
   // 1. Explicit Category if assigned
+  if (user.memberCategory === 'owner') {
+    return {
+      key: 'owner',
+      titleBn: 'ওনার সদস্য',
+      badgeBn: 'ওনার',
+      shortLabel: 'ওনার',
+      monthlyRate: 4000,
+      quarterlyRate: 10000,
+      maxNominees: 3,
+      requiredNominees: 3,
+      descBn: 'মাসিক কিস্তি: ৳৪,০০০ | ৩ মাস পর পর কিস্তি: ৳১০,০০০ (জানুয়ারি • এপ্রিল • জুলাই • অক্টোবর) | লাল ভেরিফাইড প্রোফাইল | ৩ জন নমিনি তথ্য বাধ্যতামূলক।',
+      emoji: '🔴',
+      bgGradient: 'from-rose-600 to-red-800',
+      borderColor: 'border-red-500',
+      textColor: 'text-red-600',
+      tagColor: 'bg-red-100 text-red-900'
+    };
+  }
+
   if (user.memberCategory === 'shareholder') {
     return {
       key: 'shareholder',
       titleBn: 'শেয়ার হোল্ডার সদস্য',
       badgeBn: 'শেয়ার হোল্ডার',
       shortLabel: 'শেয়ার হোল্ডার',
-      descBn: 'যদি আমরা কখনো জায়গা কিনি বা বড় কোনো প্রজেক্ট করি, মিনিমাম ৫০,০০০ টাকা থেকে ৫ লক্ষ টাকা পর্যন্ত দেওয়ার ক্যাপাসিটি থাকতে হবে এবং প্রতি মাসে মিনিমাম ১,০০০ টাকা থেকে ৫,০০০ টাকা পর্যন্ত সঞ্চয় কিস্তি চালিয়ে যেতে হবে।',
-      emoji: '👑',
-      bgGradient: 'from-amber-600 to-amber-900',
-      borderColor: 'border-amber-400',
-      textColor: 'text-amber-800',
-      tagColor: 'bg-amber-100 text-amber-900'
+      monthlyRate: 2000,
+      quarterlyRate: 5000,
+      maxNominees: 3,
+      requiredNominees: 3,
+      descBn: 'মাসিক কিস্তি: ৳২,০০০ | ৩ মাস পর পর কিস্তি: ৳৫,০০০ (জানুয়ারি • এপ্রিল • জুলাই • অক্টোবর) | নীল ভেরিফাইড প্রোফাইল | ৩ জন নমিনি তথ্য বাধ্যতামূলক।',
+      emoji: '🔵',
+      bgGradient: 'from-blue-600 to-blue-800',
+      borderColor: 'border-blue-500',
+      textColor: 'text-blue-600',
+      tagColor: 'bg-blue-100 text-blue-900'
     };
   }
 
   if (user.memberCategory === 'investor') {
     return {
       key: 'investor',
-      titleBn: 'ইনভেস্টর সদস্য',
-      badgeBn: 'ইনভেস্টর',
-      shortLabel: 'ইনভেস্টর',
-      descBn: 'কোনো এককালীন বড় শর্ত নেই, তবে প্রতি মাসে মিনিমাম ৫০০ টাকা থেকে ৫,০০০ টাকা পর্যন্ত সঞ্চয় কিস্তি নিয়মিত চালিয়ে যেতে হবে।',
-      emoji: '💎',
-      bgGradient: 'from-emerald-700 to-teal-900',
-      borderColor: 'border-emerald-400',
-      textColor: 'text-emerald-800',
+      titleBn: 'ইনভেস্টার সদস্য',
+      badgeBn: 'ইনভেস্টার',
+      shortLabel: 'ইনভেস্টার',
+      monthlyRate: 1000,
+      quarterlyRate: 0,
+      maxNominees: 2,
+      requiredNominees: 2,
+      descBn: 'মাসিক কিস্তি: ৳১,০০০ | অতিরিক্ত কোনো কিস্তি নেই | সবুজ ভেরিফাইড প্রোফাইল | ২ জন নমিনি তথ্য বাধ্যতামূলক।',
+      emoji: '🟢',
+      bgGradient: 'from-emerald-600 to-green-800',
+      borderColor: 'border-emerald-500',
+      textColor: 'text-emerald-600',
       tagColor: 'bg-emerald-100 text-emerald-900'
     };
   }
@@ -516,71 +549,87 @@ export function getMembershipCategory(user: User | null | undefined): Membership
       titleBn: 'সাধারণ সদস্য',
       badgeBn: 'সাধারণ সদস্য',
       shortLabel: 'সাধারণ সদস্য',
-      descBn: 'লেনদেন ও ক্রয়-বিক্রয়ের সুবিধা। শুধু নাম, ফোন, বিকল্প ফোন ও পেশা লাগবে। তবে করযে হাসানা সুদমুক্ত ঋণ নেওয়ার জন্য সম্পূর্ণ ফরম ফিলাপ করতে হবে (মাসিক কিস্তি নেই)।',
-      emoji: '👤',
-      bgGradient: 'from-slate-700 to-slate-900',
+      maxNominees: 1,
+      requiredNominees: 1,
+      descBn: 'লেনদেন ও অ্যাপস ব্যবহারের সুবিধা (সমিতি সেকশন সীমিত)। ১ জন নমিনি তথ্য বাধ্যতামূলক।',
+      emoji: '⚪',
+      bgGradient: 'from-slate-600 to-slate-800',
       borderColor: 'border-slate-300',
       textColor: 'text-slate-700',
       tagColor: 'bg-slate-100 text-slate-800'
     };
   }
 
-  // 2. Automatic smart resolution:
-  // Shareholder / Co-op Owner: approved samity member or has shares or is admin
-  const isShareholder = Boolean(
-    user.isSamityMember === true || 
-    user.samityStatus === 'approved' || 
-    user.samityApproved === true || 
-    (user.shares && user.shares > 0)
-  );
+  // 2. Automatic smart resolution based on Monthly Savings Target
+  const monthlyRate = user.monthlySavingsTarget || 0;
 
-  if (isShareholder) {
+  if (monthlyRate >= 4000) {
+    return {
+      key: 'owner',
+      titleBn: 'ওনার সদস্য',
+      badgeBn: 'ওনার',
+      shortLabel: 'ওনার',
+      monthlyRate: 4000,
+      quarterlyRate: 10000,
+      maxNominees: 3,
+      requiredNominees: 3,
+      descBn: 'মাসিক কিস্তি: ৳৪,০০০ | ৩ মাস পর পর কিস্তি: ৳১০,০০০ | লাল প্রোফাইল | ৩ জন নমিনি বাধ্যতামূলক।',
+      emoji: '🔴',
+      bgGradient: 'from-rose-600 to-red-800',
+      borderColor: 'border-red-500',
+      textColor: 'text-red-600',
+      tagColor: 'bg-red-100 text-red-900'
+    };
+  }
+
+  if (monthlyRate >= 2000) {
     return {
       key: 'shareholder',
       titleBn: 'শেয়ার হোল্ডার সদস্য',
       badgeBn: 'শেয়ার হোল্ডার',
       shortLabel: 'শেয়ার হোল্ডার',
-      descBn: 'যদি আমরা কখনো জায়গা কিনি বা বড় কোনো প্রজেক্ট করি, মিনিমাম ৫০,০০০ টাকা থেকে ৫ লক্ষ টাকা পর্যন্ত দেওয়ার ক্যাপাসিটি থাকতে হবে এবং প্রতি মাসে মিনিমাম ১,০০০ টাকা থেকে ৫,০০০ টাকা পর্যন্ত সঞ্চয় কিস্তি চালিয়ে যেতে হবে।',
-      emoji: '👑',
-      bgGradient: 'from-amber-600 to-amber-900',
-      borderColor: 'border-amber-400',
-      textColor: 'text-amber-800',
-      tagColor: 'bg-amber-100 text-amber-900'
+      monthlyRate: 2000,
+      quarterlyRate: 5000,
+      maxNominees: 3,
+      requiredNominees: 3,
+      descBn: 'মাসিক কিস্তি: ৳২,০০০ | ৩ মাস পর পর কিস্তি: ৳৫,০০০ | নীল প্রোফাইল | ৩ জন নমিনি বাধ্যতামূলক।',
+      emoji: '🔵',
+      bgGradient: 'from-blue-600 to-blue-800',
+      borderColor: 'border-blue-500',
+      textColor: 'text-blue-600',
+      tagColor: 'bg-blue-100 text-blue-900'
     };
   }
 
-  // Monthly Investor: has monthly savings target or active deposit/savings or pending samity application
-  const isInvestor = Boolean(
-    (user.monthlySavingsTarget && user.monthlySavingsTarget > 0) || 
-    (user.savings && user.savings > 0) ||
-    user.samitySchemeActive ||
-    user.samityStatus === 'pending'
-  );
-
-  if (isInvestor) {
+  if (monthlyRate >= 1000) {
     return {
       key: 'investor',
-      titleBn: 'ইনভেস্টর সদস্য',
-      badgeBn: 'ইনভেস্টর',
-      shortLabel: 'ইনভেস্টর',
-      descBn: 'কোনো এককালীন বড় শর্ত নেই, তবে প্রতি মাসে মিনিমাম ৫০০ টাকা থেকে ৫,০০০ টাকা পর্যন্ত সঞ্চয় কিস্তি নিয়মিত চালিয়ে যেতে হবে।',
-      emoji: '💎',
-      bgGradient: 'from-emerald-700 to-teal-900',
-      borderColor: 'border-emerald-400',
-      textColor: 'text-emerald-800',
+      titleBn: 'ইনভেস্টার সদস্য',
+      badgeBn: 'ইনভেস্টার',
+      shortLabel: 'ইনভেস্টার',
+      monthlyRate: 1000,
+      quarterlyRate: 0,
+      maxNominees: 2,
+      requiredNominees: 2,
+      descBn: 'মাসিক কিস্তি: ৳১,০০০ | অতিরিক্ত কিস্তি নেই | সবুজ প্রোফাইল | ২ জন নমিনি বাধ্যতামূলক।',
+      emoji: '🟢',
+      bgGradient: 'from-emerald-600 to-green-800',
+      borderColor: 'border-emerald-500',
+      textColor: 'text-emerald-600',
       tagColor: 'bg-emerald-100 text-emerald-900'
     };
   }
 
-  // Default: Regular / General Member
   return {
     key: 'regular',
     titleBn: 'সাধারণ সদস্য',
     badgeBn: 'সাধারণ সদস্য',
     shortLabel: 'সাধারণ সদস্য',
-    descBn: 'লেনদেন ও ক্রয়-বিক্রয়ের সুবিধা। শুধু নাম, ফোন, বিকল্প ফোন ও পেশা লাগবে। তবে করযে হাসানা সুদমুক্ত ঋণ নেওয়ার জন্য সম্পূর্ণ ফরম ফিলাপ করতে হবে (মাসিক কিস্তি নেই)।',
-    emoji: '👤',
-    bgGradient: 'from-slate-700 to-slate-900',
+    maxNominees: 1,
+    requiredNominees: 1,
+    descBn: 'লেনদেন ও অ্যাপস ব্যবহারের সুবিধা (সমিতি সেকশন সীমিত)। ১ জন নমিনি তথ্য বাধ্যতামূলক।',
+    emoji: '⚪',
+    bgGradient: 'from-slate-600 to-slate-800',
     borderColor: 'border-slate-300',
     textColor: 'text-slate-700',
     tagColor: 'bg-slate-100 text-slate-800'
@@ -647,7 +696,7 @@ export function maskSecretPhone(phone: string | undefined | null): string {
 }
 
 /**
- * Generates the next strictly sequential Member ID (e.g., AMB00000014)
+ * Generates the next strictly sequential Member ID (e.g., BNB00000014)
  * using an atomic Firestore transaction on the master serial counter.
  * Ensures serials are clean, contiguous, and never skip or generate random numbers.
  */
@@ -673,7 +722,7 @@ export async function getNextSequentialMemberId(): Promise<string> {
           const uData = uDoc.data();
           if (uData.memberId && typeof uData.memberId === 'string') {
             const rawId = uData.memberId.trim().toUpperCase();
-            if ((rawId.startsWith('AMB') || rawId.startsWith('AMB')) && !rawId.includes('TEST') && !rawId.includes('DEMO')) {
+            if ((rawId.startsWith('BNB') || rawId.startsWith('BNB')) && !rawId.includes('TEST') && !rawId.includes('DEMO')) {
               const digits = rawId.replace(/\D/g, '');
               const num = parseInt(digits, 10);
               // Ignore invalid astronomical numbers (e.g. phone hashes or demo numbers > 10000)
@@ -689,7 +738,7 @@ export async function getNextSequentialMemberId(): Promise<string> {
       const newSerial = currentSerial + 1;
       const payload = {
         lastSerial: newSerial,
-        lastAssignedId: `AMB${String(newSerial).padStart(8, '0')}`,
+        lastAssignedId: `BNB${String(newSerial).padStart(8, '0')}`,
         updatedAt: new Date().toISOString()
       };
 
@@ -699,7 +748,7 @@ export async function getNextSequentialMemberId(): Promise<string> {
       return newSerial;
     });
 
-    return `AMB${String(nextSerial).padStart(8, '0')}`;
+    return `BNB${String(nextSerial).padStart(8, '0')}`;
   } catch (err) {
     console.warn("Transaction failed for member counter, scanning users collection fallback:", err);
     let maxSerial = 0;
@@ -710,7 +759,7 @@ export async function getNextSequentialMemberId(): Promise<string> {
         const uData = uDoc.data();
         if (uData.memberId && typeof uData.memberId === 'string') {
           const rawId = uData.memberId.trim().toUpperCase();
-          if ((rawId.startsWith('AMB') || rawId.startsWith('AMB')) && !rawId.includes('TEST') && !rawId.includes('DEMO')) {
+          if ((rawId.startsWith('BNB') || rawId.startsWith('BNB')) && !rawId.includes('TEST') && !rawId.includes('DEMO')) {
             const digits = rawId.replace(/\D/g, '');
             const num = parseInt(digits, 10);
             if (!isNaN(num) && num > maxSerial && num < 10000) {
@@ -723,12 +772,12 @@ export async function getNextSequentialMemberId(): Promise<string> {
     const nextSerial = (maxSerial > 0 ? maxSerial : 1) + 1;
     const payload = {
       lastSerial: nextSerial,
-      lastAssignedId: `AMB${String(nextSerial).padStart(8, '0')}`,
+      lastAssignedId: `BNB${String(nextSerial).padStart(8, '0')}`,
       updatedAt: new Date().toISOString()
     };
     setDoc(counterRef, payload, { merge: true }).catch(() => {});
     setDoc(sysCounterRef, payload, { merge: true }).catch(() => {});
-    return `AMB${String(nextSerial).padStart(8, '0')}`;
+    return `BNB${String(nextSerial).padStart(8, '0')}`;
   }
 }
 
@@ -859,7 +908,7 @@ export async function deleteUserCompletelyFromDatabase(targetUserOrId: string | 
 
 /**
  * Super-robust user search helper:
- * Finds an active user in Firestore regardless of phone number formatting, member ID (e.g. AMB00000015), email, or name.
+ * Finds an active user in Firestore regardless of phone number formatting, member ID (e.g. BNB00000015), email, or name.
  * Reads directly from Firestore to ensure freshness and prevent stale local state mismatches.
  */
 export async function findUserInFirestoreByPhone(
@@ -958,8 +1007,11 @@ export async function findUserInFirestoreByPhone(
   const queryPromises = [];
   
   // Query by memberId
-  if (normalizedMemberQuery && normalizedMemberQuery !== 'AMB00000000') {
+  if (normalizedMemberQuery && normalizedMemberQuery !== 'BNB00000000') {
     queryPromises.push(getDocs(query(collection(db, 'users'), where('memberId', '==', normalizedMemberQuery))));
+    if (normalizedMemberQuery.startsWith('BNB')) {
+      queryPromises.push(getDocs(query(collection(db, 'users'), where('memberId', '==', 'BNB' + normalizedMemberQuery.slice(3)))));
+    }
   }
   
   // Candidate phone and normalizedPhone queries
@@ -983,7 +1035,12 @@ export async function findUserInFirestoreByPhone(
         const uNormDigits = uData.normalizedPhone ? convertBengaliToEnglishDigits(uData.normalizedPhone).replace(/\D/g, '') : '';
         const uMember = uData.memberId ? uData.memberId.toUpperCase() : '';
 
-        const memberMatch = Boolean(normalizedMemberQuery && normalizedMemberQuery !== 'AMB00000000' && uMember === normalizedMemberQuery);
+        const memberMatch = Boolean(
+          normalizedMemberQuery && 
+          normalizedMemberQuery !== 'BNB00000000' && 
+          normalizedMemberQuery !== 'BNB00000000' && 
+          (uMember === normalizedMemberQuery || (normalizedMemberQuery.startsWith('BNB') && uMember === 'BNB' + normalizedMemberQuery.slice(3)))
+        );
         
         // Strict phone validation:
         // When searching by phone, the document's phone digits MUST end with last9Digits!
@@ -1028,7 +1085,12 @@ export async function findUserInFirestoreByPhone(
         ((uPhone && uPhone.endsWith(last9Digits)) || 
          (!uPhone && uNorm && uNorm.endsWith(last9Digits)))
       );
-      const memberMatch = Boolean(normalizedMemberQuery && normalizedMemberQuery !== 'AMB00000000' && uMember === normalizedMemberQuery);
+      const memberMatch = Boolean(
+        normalizedMemberQuery && 
+        normalizedMemberQuery !== 'BNB00000000' && 
+        normalizedMemberQuery !== 'BNB00000000' && 
+        (uMember === normalizedMemberQuery || (normalizedMemberQuery.startsWith('BNB') && uMember === 'BNB' + normalizedMemberQuery.slice(3)))
+      );
       const emailMatch = Boolean(uData.email && uData.email.toLowerCase() === trimmedQuery.toLowerCase());
 
       const isMatch = phoneMatch || memberMatch || emailMatch;
@@ -1052,7 +1114,7 @@ export async function findUserInFirestoreByPhone(
   // 5. Check Local Backup Cache ONLY if phone or member ID matches exactly
   try {
     if (typeof window !== 'undefined' && typeof localStorage !== 'undefined') {
-      const backupKeys = ['amb_registered_members', 'amb_all_users_backup', 'amb_last_user', 'amb_registered_members', 'amb_all_users_backup', 'amb_last_user'];
+      const backupKeys = ['bnb_registered_members', 'amb_registered_members', 'bnb_all_users_backup', 'amb_all_users_backup', 'bnb_last_user', 'amb_last_user'];
       for (const backupKey of backupKeys) {
         const raw = localStorage.getItem(backupKey);
         if (!raw) continue;
@@ -1065,7 +1127,7 @@ export async function findUserInFirestoreByPhone(
             const uMember = u.memberId ? u.memberId.toUpperCase() : '';
             if (
               (last9Digits && uDigits.length >= 9 && uDigits.endsWith(last9Digits)) ||
-              (normalizedMemberQuery && normalizedMemberQuery !== 'AMB00000000' && (uMember === normalizedMemberQuery || (normalizedMemberQuery.startsWith('AMB') && uMember === 'AMB' + normalizedMemberQuery.slice(3))))
+              (normalizedMemberQuery && normalizedMemberQuery !== 'BNB00000000' && normalizedMemberQuery !== 'BNB00000000' && (uMember === normalizedMemberQuery || (normalizedMemberQuery.startsWith('BNB') && uMember === 'BNB' + normalizedMemberQuery.slice(3))))
             ) {
               const uid = u.uid || ('user_' + (normalizePhoneNumber(u.phone) || digitsOnly));
               const recoveredObj: User = { ...u, uid };
@@ -1087,7 +1149,7 @@ export async function findUserInFirestoreByPhone(
 export async function recoverOldAccount(phoneOrMemberId: string, name?: string, pin: string = '1234'): Promise<User> {
   const normalized = normalizePhoneNumber(phoneOrMemberId);
   let memberId = '';
-  if (phoneOrMemberId.startsWith('AMB') && phoneOrMemberId.length >= 6) {
+  if ((phoneOrMemberId.startsWith('BNB') || phoneOrMemberId.startsWith('BNB')) && phoneOrMemberId.length >= 6) {
     memberId = normalizeMemberId(phoneOrMemberId);
   } else {
     memberId = await getNextSequentialMemberId();

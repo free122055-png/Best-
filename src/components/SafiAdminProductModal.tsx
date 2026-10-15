@@ -165,12 +165,12 @@ export default function SafiAdminProductModal({
   };
 
   return (
-    <div className="fixed inset-0 z-70 flex items-center justify-center p-3 bg-black/75 backdrop-blur-xs overflow-y-auto font-sans">
+    <div className="fixed inset-0 z-70 flex flex-col bg-[#f8fafc] w-screen h-screen overflow-hidden font-sans">
       <motion.div 
-        initial={{ scale: 0.95, opacity: 0 }}
+        initial={{ scale: 0.98, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
-        exit={{ scale: 0.95, opacity: 0 }}
-        className="bg-white w-full max-w-lg rounded-3xl overflow-hidden shadow-2xl text-left my-auto border border-slate-200 flex flex-col max-h-[92vh]"
+        exit={{ scale: 0.98, opacity: 0 }}
+        className="bg-white w-full h-full flex flex-col overflow-hidden text-left"
       >
         {/* Modal Header */}
         <div className="bg-gradient-to-r from-amber-600 via-orange-600 to-amber-700 text-white p-4 flex items-center justify-between shrink-0 shadow-md">

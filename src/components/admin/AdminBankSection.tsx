@@ -25,14 +25,14 @@ import { User, Transaction, Notice, Offer, BapReport, BapGroup, BapAdminRequest,
 import { normalizeMemberId, formatBanglaAmount, normalizePhoneNumber, findUserInFirestoreByPhone, getNextSequentialMemberId, deleteUserCompletelyFromDatabase, convertBengaliToEnglishDigits } from '../../lib/memberUtils';
 import { sortTransactionsNewestFirst, getTxTime } from '../../lib/transactionUtils';
 import { saveAppConfig, DEFAULT_QARD_CONFIG } from '../../lib/config';
-import { AMBLogo } from '../AMBLogo';
+import { BNBLogo } from '../BNBLogo';
 import { HeaderPendingModal } from '../HeaderPendingModal';
 import SamityScreen from '../SamityScreen';
 import UnifiedBackButton from '../UnifiedBackButton';
 import SamityAdmin from '../SamityAdmin';
 import SafiPremiumShop from '../SafiPremiumShop';
 import TelecomAdmin from '../TelecomAdmin';
-import AmbSalaryAdmin from '../AmbSalaryAdmin';
+import BNBSalaryAdmin from '../BNBSalaryAdmin';
 import { HistoryRetentionSettings } from '../HistoryRetentionSettings';
 import { runWalletEndToEndTests, TestResultItem } from '../../lib/walletTests';
 import { 
@@ -472,13 +472,13 @@ export function AdminBankSection(props: any) {
     <>
         {adminTab === 'bank_admin' && (
           <div className="space-y-6">
-            {/* 🌟 USER DASHBOARD REPLICA: MY AMB TRANSACTION BOX NAVIGATOR */}
+            {/* 🌟 USER DASHBOARD REPLICA: MY BNB TRANSACTION BOX NAVIGATOR */}
             <div className="bg-[#0B1528] p-5 rounded-3xl border border-slate-800 space-y-4 shadow-xl text-left animate-fade-in">
               <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-2 border-b border-slate-800/80 pb-3">
                 <div>
                   <h3 className="text-sm font-black text-white flex items-center gap-2">
                     <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse"></span>
-                    MY AMB লেনদেন ও সার্ভিস প্যানেল (Dashboard Interactive Replica)
+                    MY BNB লেনদেন ও সার্ভিস প্যানেল (Dashboard Interactive Replica)
                   </h3>
                   <p className="text-[10px] text-slate-400 mt-0.5">
                     ইউজার ড্যাশবোর্ডের এড মানি, সেন্ড মানি ও রেমিট্যান্স সার্ভিস বক্স। যেকোনো বক্সে ক্লিক করে সেই লেনদেন বা সার্ভিসের ফি, সেটিংস, রেট এডিট ও আপডেট করুন।
@@ -1082,7 +1082,7 @@ export function AdminBankSection(props: any) {
               <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
                   <h3 className="text-base font-black text-slate-800 flex items-center gap-2">
-                    🏦 AMB পেমেন্ট মেথড গেটওয়ে ও অ্যাকাউন্ট সেটিংস ম্যানেজার
+                    🏦 BNB পেমেন্ট মেথড গেটওয়ে ও অ্যাকাউন্ট সেটিংস ম্যানেজার
                   </h3>
                   <p className="text-xs text-slate-500 mt-1">
                     সদস্যদের ডিপোজিট ও উইথড্র পেইজের মোবাইল ব্যাংকিং, বাংলাদেশ ব্যাংক সমূহের অ্যাকাউন্ট এবং আন্তর্জাতিক প্রবাসী ব্যাংকের তথ্য ও সচল অবস্থা এখান থেকে নিয়ন্ত্রণ করুন।
@@ -1130,12 +1130,13 @@ export function AdminBankSection(props: any) {
                     </div>
                   </div>
 
-                  {/* 3 Channels Navigation Bar */}
-                  <div className="grid grid-cols-3 gap-2 bg-slate-900 border border-slate-800 p-2 rounded-2xl">
+                  {/* 4 Channels Navigation Bar */}
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 bg-slate-900 border border-slate-800 p-2 rounded-2xl">
                     {[
                       { id: 'mobile_bank' as const, label: 'লোকাল মোবাইল', icon: '📱', count: 4 + (appConfig.paymentBanks || []).filter(b => b.isMobileBank === true).length },
                       { id: 'bank_wallet' as const, label: 'ব্যাংক ডিপোজিট', icon: '🏛️', count: (appConfig.paymentBanks || []).filter(b => !b.isInternational && !b.isMobileBank).length },
-                      { id: 'abroad' as const, label: 'বিদেশি ব্যাংক', icon: '🌍', count: (appConfig.paymentBanks || []).filter(b => b.isInternational === true).length }
+                      { id: 'abroad' as const, label: 'বিদেশি ব্যাংক', icon: '🌍', count: (appConfig.paymentBanks || []).filter(b => b.isInternational === true).length },
+                      { id: 'zinipay' as const, label: 'অনলাইন গেটওয়ে', icon: '⚡', count: 'Active' }
                     ].map((ch) => {
                       const isActive = adminAddMoneySubTab === ch.id;
                       return (
@@ -1897,6 +1898,95 @@ export function AdminBankSection(props: any) {
                     </div>
                   </div>
                 )}
+
+                {/* SUB-TAB 4: ZINIPAY ONLINE PAYMENT GATEWAY */}
+                {adminAddMoneySubTab === 'zinipay' && (
+                  <div className="bg-slate-900 border border-emerald-500/30 p-6 rounded-3xl text-left shadow-xl text-white space-y-5 animate-fade-in font-sans">
+                    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border-b border-white/10 pb-4">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-2xl bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 flex items-center justify-center text-xl">
+                          ⚡
+                        </div>
+                        <div>
+                          <h4 className="text-sm font-black text-white flex items-center gap-2">
+                            স্বয়ংক্রিয় অনলাইন পেমেন্ট গেটওয়ে কন্ট্রোল (Auto Payment Gateway)
+                            <span className="text-[10px] font-extrabold bg-emerald-500/20 text-emerald-300 border border-emerald-400/30 px-2 py-0.5 rounded-full">
+                              🟢 সক্রিয় (Active)
+                            </span>
+                          </h4>
+                          <p className="text-[11px] text-slate-400 mt-0.5">
+                            বিকাশ, নগদ, রকেট, উপায়, ভিসা ও মাস্টারকার্ডের মাধ্যমে শতভাগ স্বয়ংক্রিয় ইনস্ট্যান্ট অ্যাড মানি সিস্টেম
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="bg-white/5 border border-white/10 p-4 rounded-2xl space-y-2">
+                        <span className="text-[11px] font-bold text-emerald-400 uppercase tracking-wider block">🔑 মার্চেন্ট এপিআই কি (Brand API Key)</span>
+                        <div className="font-mono text-xs text-white bg-black/40 p-2.5 rounded-xl break-all border border-white/5 select-all">
+                          95f4bae1906bfd060176e99fa1747c98c8ff6b1b3252d81c
+                        </div>
+                        <p className="text-[10px] text-slate-400">অনলাইন পেমেন্ট গেটওয়ে ড্যাশবোর্ডের ব্র্যান্ড কি-এর সাথে সংযুক্ত।</p>
+                      </div>
+
+                      <div className="bg-white/5 border border-white/10 p-4 rounded-2xl space-y-2">
+                        <span className="text-[11px] font-bold text-teal-400 uppercase tracking-wider block">🌐 ব্র্যান্ড রেজিস্টার্ড ডোমেইন (Registered Domain)</span>
+                        <div className="font-mono text-xs text-white bg-black/40 p-2.5 rounded-xl break-all border border-white/5 select-all">
+                          https://ais-dev-lcpzj4h5d5mm2it3dw6e57-969303088573.asia-southeast1.run.app
+                        </div>
+                        <p className="text-[10px] text-slate-400">রিডাইরেক্ট ও কলব্যাক ভ্যালিডেশনের জন্য গেটওয়েতে অনুমোদিত ডোমেইন।</p>
+                      </div>
+                    </div>
+
+                    {/* Live Endpoints Specifications */}
+                    <div className="bg-black/30 border border-white/10 p-4 rounded-2xl space-y-3">
+                      <h5 className="text-xs font-black text-slate-200 uppercase tracking-wide">
+                        📡 সক্রিয় এন্ডপয়েন্ট ও ওয়েবহুক কনফিগারেশন:
+                      </h5>
+                      <div className="space-y-2 text-[11px] font-mono">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 p-2 bg-white/5 rounded-xl">
+                          <span className="text-emerald-400 font-bold">POST Create Invoice:</span>
+                          <span className="text-slate-300">/api/payment/create ➔ https://api.zinipay.com/v1/payment/create</span>
+                        </div>
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 p-2 bg-white/5 rounded-xl">
+                          <span className="text-teal-400 font-bold">POST Verify Status:</span>
+                          <span className="text-slate-300">https://api.zinipay.com/v1/payment/verify</span>
+                        </div>
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 p-2 bg-white/5 rounded-xl">
+                          <span className="text-sky-400 font-bold">POST Webhook Callback:</span>
+                          <span className="text-slate-300">/api/payment/zinipay-webhook</span>
+                        </div>
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 p-2 bg-white/5 rounded-xl">
+                          <span className="text-purple-400 font-bold">GET Return Redirect:</span>
+                          <span className="text-slate-300">/api/payment/zinipay-callback</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Test Credentials Sandbox Box */}
+                    <div className="p-3.5 bg-emerald-950/40 border border-emerald-500/20 rounded-2xl space-y-1.5 text-xs">
+                      <div className="font-bold text-emerald-300 flex items-center gap-1.5">
+                        <span>🧪</span>
+                        <span>স্যান্ডবক্স ইনস্ট্যান্ট টেস্টিং ক্রেডেনশিয়ালস:</span>
+                      </div>
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-[11px] font-mono text-slate-300 pt-1">
+                        <div className="bg-black/30 p-2 rounded-xl">
+                          <span className="text-slate-400 block text-[9.5px]">bKash Test Wallet:</span>
+                          <strong className="text-emerald-300">01770618575</strong>
+                        </div>
+                        <div className="bg-black/30 p-2 rounded-xl">
+                          <span className="text-slate-400 block text-[9.5px]">Test OTP:</span>
+                          <strong className="text-emerald-300">123456</strong>
+                        </div>
+                        <div className="bg-black/30 p-2 rounded-xl">
+                          <span className="text-slate-400 block text-[9.5px]">Test PIN:</span>
+                          <strong className="text-emerald-300">12121</strong>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 
@@ -2501,7 +2591,7 @@ export function AdminBankSection(props: any) {
                         <input type="number" step="0.1" value={cfgSendBankFlat} onChange={e => setCfgSendBankFlat(Number(e.target.value))} className="w-full mt-1.5 px-3 py-1.5 rounded-lg border border-slate-200 text-xs font-black text-indigo-700 font-mono focus:border-indigo-500 focus:outline-none bg-white" />
                       </div>
                       <div className="bg-indigo-50/60 p-3.5 rounded-2xl border border-indigo-200/80 shadow-2xs">
-                        <label className="text-[10px] font-black text-indigo-900 block uppercase font-sans">AMB টু ব্যাংক সার্ভিস/ক্যাশ আউট চার্জ (/1000)</label>
+                        <label className="text-[10px] font-black text-indigo-900 block uppercase font-sans">BNB টু ব্যাংক সার্ভিস/ক্যাশ আউট চার্জ (/1000)</label>
                         <input type="number" step="0.1" value={cfgSendBankSvc} onChange={e => setCfgSendBankSvc(Number(e.target.value))} className="w-full mt-1.5 px-3 py-1.5 rounded-lg border border-indigo-300 text-xs font-black text-indigo-800 font-mono focus:border-indigo-500 focus:outline-none bg-white" />
                       </div>
                       <div className="bg-slate-50 p-3.5 rounded-2xl border border-slate-200/80 shadow-2xs">
@@ -4092,8 +4182,9 @@ export function AdminBankSection(props: any) {
                   </thead>
                   <tbody className="divide-y divide-slate-100 font-medium">
                     {remitRates.map((rate, idx) => {
-                      const remitVal = Number(rate.remittanceRate || rate.value) || 0;
-                      const addVal = Number(rate.addMoneyRate) || (remitVal ? Math.max(0, remitVal - 2.5) : 0);
+                      const isSAR = (rate.name || '').includes('SAR') || (rate.name || '').includes('সৌদি') || rate.flag === '🇸🇦';
+                      const addVal = Number(rate.addMoneyRate) || (isSAR ? 32 : (Number(rate.value) || 30));
+                      const remitVal = Number(rate.remittanceRate || rate.sendMoneyRate || rate.value) || (isSAR ? Math.max(1, addVal - 1) : Math.max(1, addVal - 2.5));
                       const feeVal = Number(rate.transferFee ?? 15);
                       return (
                         <tr key={`${rate.id}-${idx}`} className="hover:bg-slate-50/50 transition">
@@ -4105,11 +4196,13 @@ export function AdminBankSection(props: any) {
                           </td>
                           <td className="p-3">
                             <span className="font-mono font-black text-emerald-700 text-sm block">৳ {remitVal.toFixed(2)}</span>
-                            <span className="text-[9px] text-emerald-600 font-bold bg-emerald-50 px-1 py-0.2 rounded border border-emerald-200">+২.৫% প্রণোদনা</span>
+                            <span className="text-[9px] text-emerald-600 font-bold bg-emerald-50 px-1 py-0.2 rounded border border-emerald-200">
+                              {isSAR ? 'সেন্ড মানি (আল রাজী -১৳)' : '+২.৫% প্রণোদনা'}
+                            </span>
                           </td>
                           <td className="p-3">
                             <span className="font-mono font-black text-indigo-700 text-sm block">৳ {addVal.toFixed(2)}</span>
-                            <span className="text-[9px] text-indigo-600 font-bold bg-indigo-50 px-1 py-0.2 rounded border border-indigo-200">ওয়ালেটে জমা</span>
+                            <span className="text-[9px] text-indigo-600 font-bold bg-indigo-50 px-1 py-0.2 rounded border border-indigo-200">এড মানি (ওয়ালেটে জমা)</span>
                           </td>
                           <td className="p-3">
                             <span className="font-mono font-bold text-amber-800 text-xs block">{feeVal}</span>

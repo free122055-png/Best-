@@ -113,7 +113,7 @@ export async function processWalletTransaction(req: WalletTransactionRequest): P
         balanceBefore: currentBalance,
         balanceAfter: finalBalance,
         status: 'success',
-        paymentMethod: req.paymentMethod || 'AMB Ledger Gateway',
+        paymentMethod: req.paymentMethod || 'BNB Ledger Gateway',
         description: req.description,
         receiverUid: req.receiverUid || null,
         receiverId: req.receiverId || null,
@@ -140,13 +140,13 @@ export interface AmbTransferRequest {
 }
 
 /**
- * Atomically processes AMB-to-AMB transfer between sender and receiver with strict invariants.
+ * Atomically processes BNB-to-BNB transfer between sender and receiver with strict invariants.
  * Sender is debited and receiver is credited in a single atomic transaction.
  * Blocks transfer if sender balance is insufficient.
  */
 export async function processAmbTransfer(req: AmbTransferRequest): Promise<{ success: boolean; senderNewBalance: number; receiverNewBalance: number; txId: string }> {
   const senderRef = doc(db, 'users', req.senderUid);
-  const txId = req.transactionId || `AMBTXN${Date.now()}${Math.floor(Math.random() * 1000)}`;
+  const txId = req.transactionId || `BNBTXN${Date.now()}${Math.floor(Math.random() * 1000)}`;
   const amount = Number(req.amount) || 0;
   const charge = Number(req.charge) || 0;
   const totalDeduction = amount + charge;
@@ -239,15 +239,15 @@ export async function processAmbTransfer(req: AmbTransferRequest): Promise<{ suc
       userPhone: senderCurrentData.phone || '',
       memberId: senderCurrentData.memberId || '',
       type: 'transfer',
-      typeLabel: 'AMB-to-AMB সেন্ড মানি (প্রেরক)',
+      typeLabel: 'BNB-to-BNB সেন্ড মানি (প্রেরক)',
       amount: amount,
       charge: charge,
       totalDeducted: totalDeduction,
       balanceBefore: senderBalance,
       balanceAfter: senderNewBal,
       status: 'success',
-      paymentMethod: 'AMB Transfer Gateway',
-      description: req.note || `AMB-to-AMB Send Money to ${receiverCurrentData.name || receiverUid} (${receiverCurrentData.phone || ''})`,
+      paymentMethod: 'BNB Transfer Gateway',
+      description: req.note || `BNB-to-BNB Send Money to ${receiverCurrentData.name || receiverUid} (${receiverCurrentData.phone || ''})`,
       receiverUid: receiverUid,
       receiverId: receiverCurrentData.memberId || '',
       receiverName: receiverCurrentData.name || '',
@@ -265,15 +265,15 @@ export async function processAmbTransfer(req: AmbTransferRequest): Promise<{ suc
       userPhone: receiverCurrentData.phone || '',
       memberId: receiverCurrentData.memberId || '',
       type: 'received_transfer',
-      typeLabel: 'AMB-to-AMB রিসিভ মানি (প্রাপক)',
+      typeLabel: 'BNB-to-BNB রিসিভ মানি (প্রাপক)',
       amount: amount,
       charge: 0,
       totalDeducted: 0,
       balanceBefore: receiverBalance,
       balanceAfter: receiverNewBal,
       status: 'success',
-      paymentMethod: 'AMB Transfer Gateway',
-      description: req.note || `AMB-to-AMB Received from ${senderCurrentData.name || req.senderUid} (${senderCurrentData.phone || ''})`,
+      paymentMethod: 'BNB Transfer Gateway',
+      description: req.note || `BNB-to-BNB Received from ${senderCurrentData.name || req.senderUid} (${senderCurrentData.phone || ''})`,
       senderUid: req.senderUid,
       senderName: senderCurrentData.name || '',
       createdAt: new Date().toISOString(),

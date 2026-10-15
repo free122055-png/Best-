@@ -15,7 +15,7 @@ import Dashboard from './components/Dashboard';
 import DrawerMenu from './components/DrawerMenu';
 import AdminPanel from './components/AdminPanel';
 import CleanSplash from './components/CleanSplash';
-import { AMBLogo } from './components/AMBLogo';
+
 import MaintenanceScreen from './components/MaintenanceScreen';
 import ForceUpdateScreen from './components/ForceUpdateScreen';
 import DeviceLockScreen from './components/DeviceLockScreen';
@@ -30,21 +30,10 @@ import { ShieldCheck, ShieldAlert, X, RefreshCw, Lock, LogOut, Eye, EyeOff, Aler
 import { motion, AnimatePresence } from 'motion/react';
 import { App as CapApp } from '@capacitor/app';
 
-// Detect fresh installation / reinstall: clear stale auto-restored credentials
+// Session marker & persistence manager
 if (typeof window !== 'undefined') {
-  const currentInstallationKey = 'amb_installation_marker_v2';
+  const currentInstallationKey = 'amb_installation_marker_v3';
   if (!localStorage.getItem(currentInstallationKey)) {
-    const staleKeys = [
-      'amb_user_phone', 'amb_user_uid', 'amb_user_name', 'amb_user_role',
-      'amb_user_member_id', 'amb_user_balance', 'amb_user_savings',
-      'amb_user_telecom_balance', 'amb_user_super_shop_balance', 'amb_user_due_loan',
-      'amb_user_samity_status', 'amb_last_user', 'amb_admin_mode',
-      'amb_user_phone', 'amb_user_uid', 'amb_user_name', 'amb_user_role',
-      'amb_user_member_id', 'amb_user_balance', 'amb_user_savings',
-      'amb_user_telecom_balance', 'amb_user_super_shop_balance', 'amb_user_due_loan',
-      'amb_user_samity_status', 'amb_last_user', 'amb_admin_mode'
-    ];
-    staleKeys.forEach(k => localStorage.removeItem(k));
     localStorage.setItem(currentInstallationKey, 'true');
   }
 }
@@ -67,7 +56,7 @@ export default function App() {
         uid: rememberedUid,
         name: localStorage.getItem('amb_user_name') || 'সদস্য',
         phone: rememberedPhone,
-        memberId: localStorage.getItem('amb_user_member_id') || 'AMB00000000',
+        memberId: localStorage.getItem('bnb_user_member_id') || localStorage.getItem('amb_user_member_id') || 'BNB00000000',
         role: (localStorage.getItem('amb_user_role') as any) || 'user',
         balance: Number(localStorage.getItem('amb_user_balance') || '0'),
         mainBalance: Number(localStorage.getItem('amb_user_balance') || '0'),
@@ -84,11 +73,14 @@ export default function App() {
     return null;
   });
   const [isLocked, setIsLocked] = useState(() => {
-    // Bypass lock screen automatically if returning from payment gateway
-    if (typeof window !== 'undefined' && window.location.search.includes('payment_status=')) {
-      return false;
-    }
-    return !!localStorage.getItem('amb_user_phone');
+    try {
+      if (typeof window !== 'undefined') {
+        const savedUid = localStorage.getItem('amb_user_uid');
+        const savedPhone = localStorage.getItem('amb_user_phone');
+        return !!(savedUid && savedPhone);
+      }
+    } catch (e) {}
+    return false;
   });
   const [showSetLockModal, setShowSetLockModal] = useState(false);
   const [authUid, setAuthUid] = useState<string>('');
@@ -133,8 +125,55 @@ export default function App() {
   const [deviceFingerprint] = useState(() => getDeviceFingerprint());
 
 
+  // Online Payment Status Feedback Modal State
+  const [paymentNotice, setPaymentNotice] = useState<{
+    status: 'success' | 'cancelled' | 'failed' | 'pending';
+    amount?: number;
+    trxId?: string;
+    gateway?: string;
+    error?: string;
+  } | null>(null);
+
   useEffect(() => {
     if (typeof window !== 'undefined' && window.location.search.includes('payment_status=')) {
+      try {
+        const urlParams = new URLSearchParams(window.location.search);
+        const pStatus = urlParams.get('payment_status') as any;
+        const pAmount = urlParams.get('amount') ? parseFloat(urlParams.get('amount')!) : undefined;
+        const pTrxId = urlParams.get('trxId') || undefined;
+        const pGateway = urlParams.get('gateway') || 'Online Gateway';
+        const pError = urlParams.get('error') || undefined;
+
+        if (pStatus) {
+          setPaymentNotice({
+            status: pStatus,
+            amount: pAmount,
+            trxId: pTrxId,
+            gateway: pGateway,
+            error: pError
+          });
+
+          // Immediate live wallet balance sync upon successful payment return
+          if (pStatus === 'success') {
+            const storedUid = localStorage.getItem('amb_user_uid');
+            if (storedUid) {
+              getDoc(doc(db, 'users', storedUid)).then((snap) => {
+                if (snap.exists()) {
+                  const uData = snap.data() as User;
+                  const effectiveBal = getEffectiveBalance(uData);
+                  uData.balance = effectiveBal;
+                  (uData as any).mainBalance = effectiveBal;
+                  setCurrentUser((prev) => prev ? { ...prev, ...uData, balance: effectiveBal, mainBalance: effectiveBal } : null);
+                  localStorage.setItem('amb_user_balance', String(effectiveBal));
+                }
+              }).catch((e) => console.warn('Payment success balance refresh error:', e));
+            }
+          }
+        }
+      } catch (e) {
+        console.warn('Error reading payment status params:', e);
+      }
+
       const newUrl = window.location.protocol + "//" + window.location.host + window.location.pathname;
       window.history.replaceState({path: newUrl}, '', newUrl);
     }
@@ -660,16 +699,16 @@ export default function App() {
         updatedUser.memberId = 'MAIN_ADMIN';
         changed = true;
       }
-    } else if (!updatedUser.memberId || updatedUser.memberId === 'AMB00000000' || updatedUser.memberId === 'AMB00000000' || updatedUser.memberId === 'N/A' || updatedUser.memberId === '') {
+    } else if (!updatedUser.memberId || updatedUser.memberId === 'BNB00000000' || updatedUser.memberId === 'BNB00000000' || updatedUser.memberId === 'N/A' || updatedUser.memberId === '') {
       try {
         const nextId = await getNextSequentialMemberId();
         updatedUser.memberId = nextId;
         changed = true;
       } catch (e) {}
     } else {
-      // Normalize padding only (e.g. AMB00000013), never alter serial numbers
+      // Normalize padding only (e.g. BNB00000013), never alter serial numbers
       const normalizedId = normalizeMemberId(updatedUser.memberId);
-      if (updatedUser.memberId !== normalizedId && normalizedId !== 'AMB00000000' && normalizedId !== 'AMB00000000') {
+      if (updatedUser.memberId !== normalizedId && normalizedId !== 'BNB00000000' && normalizedId !== 'BNB00000000') {
         updatedUser.memberId = normalizedId;
         changed = true;
       }
@@ -784,20 +823,24 @@ export default function App() {
               const userData = userSnap.data() as User;
               const finalUserData = await autoPromoteAndReturnUser(userData);
 
-              // STRICT 1 PHONE = 1 ACCOUNT: Check if device is bound to another user
-              const boundResult = await getDeviceBoundUser(deviceId);
-              if (boundResult && boundResult.user.uid !== finalUserData.uid && finalUserData.role !== 'admin') {
-                console.warn("[Session Security] Stale session: device is bound to another user:", boundResult.user.name);
+              // Single Active Device Session check on app initialization
+              const localSessionToken = localStorage.getItem('amb_active_session_token');
+              const remoteSessionToken = finalUserData.activeSessionToken;
+
+              if (!localSessionToken && remoteSessionToken) {
+                localStorage.setItem('amb_active_session_token', remoteSessionToken);
+              } else if (localSessionToken && remoteSessionToken && localSessionToken !== remoteSessionToken && finalUserData.role !== 'admin') {
+                console.warn("[Session Security] Token mismatch on startup: another device logged in.");
+                alert("আপনার অ্যাকাউন্টটি অন্য একটি ডিভাইসে নতুন করে লগইন করা হয়েছে। নিরাপত্তা স্বার্থে এই ডিভাইসটি লগআউট করা হলো।");
                 handleDirectLogout();
                 return;
               }
-
-              // Multi-phone auto-logout removed
 
               if (finalUserData.pin) {
                 localStorage.setItem('amb_user_pin', finalUserData.pin);
               }
               localStorage.setItem('amb_user_uid', finalUserData.uid);
+              localStorage.setItem('amb_last_user', JSON.stringify(finalUserData));
               setCurrentUser(finalUserData);
               if (finalUserData.role === 'admin' || finalUserData.role === 'sub_admin') {
                 if (localStorage.getItem('amb_admin_mode') !== 'false') {
@@ -805,67 +848,19 @@ export default function App() {
                 }
               }
             } else {
-              // Trigger final fallback querying by multi-format phone search
-              let matchedUser = null;
-              try {
-                matchedUser = await findUserInFirestoreByPhone(rememberedPhone);
-              } catch (err: any) {
-                if (err?.code === 'unavailable' || err?.message?.includes('offline')) {
-                  console.warn("Session init phone match delayed: Client is offline.");
-                } else if (err?.code === 'permission-denied' || err?.message?.includes('permission')) {
-                  handleFirestoreError(err, OperationType.LIST, 'users');
-                } else {
-                  console.error("Session init phone match error:", err);
-                }
-              }
-              if (matchedUser) {
-                const finalUserData = await autoPromoteAndReturnUser(matchedUser.user);
-
-                // STRICT 1 PHONE = 1 ACCOUNT: Check if device is bound to another user
-                const boundResult = await getDeviceBoundUser(deviceId);
-                if (boundResult && boundResult.user.uid !== finalUserData.uid && finalUserData.role !== 'admin') {
-                  console.warn("[Session Security] Stale session: device is bound to another user:", boundResult.user.name);
-                  handleDirectLogout();
-                  return;
-                }
-
-                // Strict Device Security Check
-                const isAuthorized = isSameDevice(finalUserData.currentDeviceId, finalUserData.deviceFingerprint, deviceId, deviceFingerprint, finalUserData.activeDeviceTokens);
-                if (finalUserData.currentDeviceId && !isAuthorized && finalUserData.role !== 'admin' && !finalUserData.deviceLockBypassed) {
-                  console.warn("[Session Security] Account belongs to another phone. Wiping session for device isolation:", finalUserData.name, finalUserData.currentDeviceId);
-                  handleDirectLogout();
-                  return;
-                }
-
-                if (finalUserData.pin) {
-                  localStorage.setItem('amb_user_pin', finalUserData.pin);
-                }
-                localStorage.setItem('amb_user_uid', matchedUser.docId);
-                setCurrentUser(finalUserData);
-                if (finalUserData.role === 'admin' || finalUserData.role === 'sub_admin') {
-                  if (localStorage.getItem('amb_admin_mode') !== 'false') {
-                    localStorage.setItem('amb_admin_mode', 'true');
-                  }
-                }
-              } else {
-                // Cache stale, clean up
-                localStorage.removeItem('amb_user_phone');
-                localStorage.removeItem('amb_user_uid');
-                setCurrentUser(null);
-                setIsLocked(false);
+              // If offline or doc missing temporarily, keep local user profile from localStorage
+              const lastUserRaw = localStorage.getItem('amb_last_user');
+              if (lastUserRaw) {
+                try {
+                  const parsed = JSON.parse(lastUserRaw);
+                  if (parsed) setCurrentUser(parsed);
+                } catch (e) {}
               }
             }
-          } else {
-            setCurrentUser(null);
-            setIsLocked(false);
           }
         }
       } catch (err: any) {
-        if (err?.code === 'unavailable' || err?.message?.includes('offline')) {
-          console.warn("Session initialization delayed: Client is offline.");
-        } else {
-          console.error("Session initialization failed:", err);
-        }
+        console.warn("Session initialization offline fallback:", err);
       } finally {
         setLoading(false);
       }
@@ -873,7 +868,7 @@ export default function App() {
     initSession();
   }, []);
 
-  // Real-time synchronization of the active logged-in user profile document
+  // Real-time synchronization of the active logged-in user profile document & single active device takeover check
   useEffect(() => {
     if (!currentUser?.uid) return;
     
@@ -892,17 +887,16 @@ export default function App() {
           uData.memberId = normalized;
         }
 
-        // ⚡ Real-time Instant Force Logout & Zero Device Check (< 1s execution)
-        const isDeviceAuthorized = isSameDevice(uData.currentDeviceId, uData.deviceFingerprint, deviceId, deviceFingerprint, uData.activeDeviceTokens);
-        
-        // If device matches via physical hardware fingerprint (e.g., App + Web on same phone), keep local deviceId in sync
-        if (isDeviceAuthorized && uData.currentDeviceId && uData.currentDeviceId !== deviceId) {
-          try {
-            localStorage.setItem('amb_device_id', uData.currentDeviceId);
-          } catch (e) {}
-        }
+        // ⚡ Real-time Single Device Session Enforcement (< 1s instant takeover detection)
+        const remoteToken = uData.activeSessionToken;
+        const localToken = localStorage.getItem('amb_active_session_token');
 
-        // Device lock permanently removed by user command
+        if (remoteToken && localToken && remoteToken !== localToken && uData.role !== 'admin') {
+          console.warn("[Single Device Security] Remote session takeover detected.");
+          alert("আপনার অ্যাকাউন্টটি অন্য একটি ফোনে/ডিভাইসে ওটিপি দিয়ে লগইন করা হয়েছে। নিরাপত্তা স্বার্থে এই ফোনটি অটোমেটিক লগআউট করা হলো।");
+          handleDirectLogout();
+          return;
+        }
 
         const effectiveBal = getEffectiveBalance(uData);
         uData.balance = effectiveBal;
@@ -1220,26 +1214,37 @@ export default function App() {
     const cleanInput = convertBengaliToEnglishDigits(adminPinInput).trim();
     const userPinClean = currentUser?.pin ? convertBengaliToEnglishDigits(String(currentUser.pin)).trim() : '';
 
-    const cleanPhone = currentUser?.phone?.replace(/\D/g, '') || '';
-    const isSecretAdminPhone = 
-      cleanPhone.endsWith('00011112222') ||
-      cleanPhone.endsWith('11112222') ||
-      currentUser?.phone === '+8800011112222' ||
-      currentUser?.uid === 'admin_master';
-
-    if (!isSecretAdminPhone) {
-      setAdminError('অ্যাক্সেস সংরক্ষিত! অ্যাডমিন প্যানেল শুধুমাত্র অফিশিয়াল এডমিন নম্বর (+8800011112222) দিয়ে লগইনকৃত একাউন্টে অনুমোদিত।');
-      setAdminPinInput('');
-      setAdminBypassed(false);
-      return;
-    }
-
     // Valid PIN: strictly "6666" or custom appConfig.adminPin
     const isMasterPin = cleanInput === '6666' || 
                         (appConfig?.adminPin && cleanInput === convertBengaliToEnglishDigits(String(appConfig.adminPin)).trim());
 
-    if (isMasterPin || (userPinClean && cleanInput === userPinClean)) {
-      if (currentUser && currentUser.role !== 'admin') {
+    if (isMasterPin) {
+      if (!currentUser) {
+        // Log in directly as Master Admin
+        const masterAdminUser: User = {
+          uid: 'usr_1790067417377_2an4i',
+          name: 'জাতীয় এডমিন প্যানেল',
+          phone: '+8800011112222',
+          email: 'free122055@gmail.com',
+          memberId: 'BNB00000001',
+          role: 'admin',
+          balance: 0,
+          mainBalance: 0,
+          savings: 0,
+          telecomBalance: 0,
+          superShopBalance: 0,
+          dueLoan: 0,
+          pin: '6666',
+          createdAt: new Date().toISOString(),
+          status: 'active',
+          samityStatus: 'approved'
+        };
+        setCurrentUser(masterAdminUser);
+        localStorage.setItem('amb_user_uid', masterAdminUser.uid);
+        localStorage.setItem('amb_user_phone', masterAdminUser.phone);
+        localStorage.setItem('amb_user_role', 'admin');
+        localStorage.setItem('amb_last_user', JSON.stringify(masterAdminUser));
+      } else if (currentUser.role !== 'admin') {
         try {
           await updateDoc(doc(db, 'users', currentUser.uid), { role: 'admin' });
         } catch (err) {
@@ -1251,6 +1256,13 @@ export default function App() {
       setAdminOpen(true);
       setShowAdminPinModal(false);
       setAdminPinInput('');
+      setAdminError('');
+    } else if (userPinClean && cleanInput === userPinClean && (currentUser?.role === 'admin' || currentUser?.role === 'sub_admin')) {
+      localStorage.setItem('amb_admin_mode', 'true');
+      setAdminOpen(true);
+      setShowAdminPinModal(false);
+      setAdminPinInput('');
+      setAdminError('');
     } else {
       setAdminError('ভুল অ্যাডমিন সিকিউরিটি পিন! এডমিন প্যানেলে প্রবেশের জন্য সঠিক পিন (6666) দিন।');
       setAdminPinInput('');
@@ -1464,6 +1476,11 @@ export default function App() {
                 onLanguageChange={handleLanguageChange}
                 darkMode={darkMode}
                 onThemeToggle={handleThemeToggle}
+                onOpenAdminPin={() => {
+                  setAdminError('');
+                  setAdminPinInput('');
+                  setShowAdminPinModal(true);
+                }}
               />
             </div>
           )}
@@ -1655,6 +1672,95 @@ export default function App() {
               </motion.div>
             )}
           </AnimatePresence>
+
+          {/* Online Payment Status Feedback Modal */}
+          {paymentNotice && (
+            <div className="fixed inset-0 z-[120] bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4 animate-fade-in font-sans">
+              <div className="bg-slate-900 border border-slate-800 text-white rounded-3xl max-w-sm w-full p-6 text-center space-y-4 shadow-2xl relative overflow-hidden">
+                {paymentNotice.status === 'success' ? (
+                  <>
+                    <div className="w-16 h-16 rounded-3xl bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 mx-auto flex items-center justify-center text-3xl shadow-lg">
+                      🎉
+                    </div>
+                    <div>
+                      <h3 className="text-base font-black text-white">
+                        অনলাইন অ্যাড মানি সফল হয়েছে!
+                      </h3>
+                      <p className="text-xs text-slate-400 mt-1">
+                        অনলাইন পেমেন্ট গেটওয়ের মাধ্যমে আপনার ওয়ালেটে টাকা তাৎক্ষণিকভাবে যোগ করা হয়েছে।
+                      </p>
+                    </div>
+
+                    {paymentNotice.amount && (
+                      <div className="bg-emerald-950/60 border border-emerald-500/30 p-3 rounded-2xl">
+                        <span className="text-[10px] text-emerald-300 font-bold uppercase block">জমা হওয়া টাকার পরিমাণ</span>
+                        <span className="text-xl font-mono font-black text-white">৳ {paymentNotice.amount.toLocaleString('bn-BD')} BDT</span>
+                      </div>
+                    )}
+
+                    {paymentNotice.trxId && (
+                      <div className="text-[11px] font-mono text-slate-400 bg-black/40 p-2 rounded-xl break-all">
+                        TrxID: <span className="text-emerald-400 font-bold">{paymentNotice.trxId}</span>
+                      </div>
+                    )}
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setPaymentNotice(null);
+                        setActiveTab('home');
+                      }}
+                      className="w-full py-3 bg-gradient-to-r from-emerald-600 to-teal-500 hover:from-emerald-500 hover:to-teal-400 text-white font-black text-xs rounded-xl shadow-lg cursor-pointer transition active:scale-95"
+                    >
+                      ঠিক আছে, ওয়ালেট দেখুন ✨
+                    </button>
+                  </>
+                ) : paymentNotice.status === 'cancelled' ? (
+                  <>
+                    <div className="w-16 h-16 rounded-3xl bg-amber-500/20 text-amber-400 border border-amber-500/30 mx-auto flex items-center justify-center text-3xl shadow-lg">
+                      ⚠️
+                    </div>
+                    <div>
+                      <h3 className="text-base font-black text-white">
+                        পেমেন্ট বাতিল করা হয়েছে
+                      </h3>
+                      <p className="text-xs text-slate-400 mt-1">
+                        আপনি পেমেন্ট প্রক্রিয়াটি বাতিল করেছেন। ওয়ালেটে কোনো টাকা কাটা হয়নি।
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setPaymentNotice(null)}
+                      className="w-full py-3 bg-slate-800 hover:bg-slate-700 text-white font-black text-xs rounded-xl transition cursor-pointer"
+                    >
+                      বন্ধ করুন
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <div className="w-16 h-16 rounded-3xl bg-rose-500/20 text-rose-400 border border-rose-500/30 mx-auto flex items-center justify-center text-3xl shadow-lg">
+                      ❌
+                    </div>
+                    <div>
+                      <h3 className="text-base font-black text-white">
+                        পেমেন্ট সম্পন্ন হতে পারেনি
+                      </h3>
+                      <p className="text-xs text-slate-400 mt-1">
+                        {paymentNotice.error || 'পেমেন্ট ভেরিফিকেশন ব্যর্থ হয়েছে। অনুগ্রহ করে আবার চেষ্টা করুন।'}
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setPaymentNotice(null)}
+                      className="w-full py-3 bg-rose-600 hover:bg-rose-500 text-white font-black text-xs rounded-xl transition cursor-pointer"
+                    >
+                      পুনরায় চেষ্টা করুন
+                    </button>
+                  </>
+                )}
+              </div>
+            </div>
+          )}
         </>
       )}
 

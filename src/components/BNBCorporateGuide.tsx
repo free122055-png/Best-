@@ -24,19 +24,19 @@ import {
   ChevronUp
 } from 'lucide-react';
 
-interface AmbCorporateGuideProps {
+interface BNBCorporateGuideProps {
   user: User;
   onBack: () => void;
   appConfig: AppConfig;
   onUpdateConfig: (newConfig: AppConfig) => void;
 }
 
-export default function AmbCorporateGuide({ 
+export default function BNBCorporateGuide({ 
   user, 
   onBack, 
   appConfig, 
   onUpdateConfig 
-}: AmbCorporateGuideProps) {
+}: BNBCorporateGuideProps) {
   const isAdmin = user?.role === 'admin' || user?.role === 'sub_admin';
 
   // Toggle expanded category boxes
@@ -190,7 +190,7 @@ export default function AmbCorporateGuide({
               <Sparkles className="w-4 h-4 text-amber-400" />
               কোম্পানি প্রোফাইল ও লক্ষ্যমাত্রা
             </h1>
-            <p className="text-[10px] text-slate-300 font-medium">AMB Corporate Guide & Mission</p>
+            <p className="text-[10px] text-slate-300 font-medium">BNB Corporate Guide & Mission</p>
           </div>
 
           <button

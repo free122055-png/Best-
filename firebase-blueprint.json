@@ -257,9 +257,28 @@
         "createdAt": { "type": "string" }
       },
       "required": ["id", "title", "category", "status", "description", "buyAmount", "createdAt"]
+    },
+    "OtpSession": {
+      "title": "OtpSession",
+      "description": "End-to-End OTP verification sessions for sensitive actions and transactions",
+      "type": "object",
+      "properties": {
+        "sessionId": { "type": "string" },
+        "userId": { "type": "string" },
+        "payload": { "type": "object" },
+        "otpCode": { "type": "string" },
+        "expiresAt": { "type": "number" },
+        "status": { "type": "string", "enum": ["pending", "verified", "expired", "failed"] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["sessionId", "userId", "otpCode", "expiresAt", "status", "createdAt"]
     }
   },
   "firestore": {
+    "otp_sessions/{sessionId}": {
+      "schema": "OtpSession",
+      "description": "Stores active and verified OTP verification sessions for secure workflows"
+    },
     "device_release_requests/{requestId}": {
       "schema": "DeviceReleaseRequest",
       "description": "Stores user device reset / zero-device complaints and requests"

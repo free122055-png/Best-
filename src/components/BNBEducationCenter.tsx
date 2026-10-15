@@ -58,13 +58,13 @@ interface PrayerTime {
   isha: string;
 }
 
-interface AmbEducationCenterProps {
+interface BNBEducationCenterProps {
   user: User | null;
   onBack: () => void;
   appConfig: AppConfig | null;
 }
 
-export default function AmbEducationCenter({ user, onBack, appConfig }: AmbEducationCenterProps) {
+export default function BNBEducationCenter({ user, onBack, appConfig }: BNBEducationCenterProps) {
   // Tabs: 'home' | 'categories' | 'bookmarks' | 'my-readings' | 'profile'
   const [eduTab, setEduTab] = useState<'home' | 'categories' | 'bookmarks' | 'my-readings' | 'profile'>('home');
   const [searchQuery, setSearchQuery] = useState('');
@@ -241,7 +241,7 @@ export default function AmbEducationCenter({ user, onBack, appConfig }: AmbEduca
   });
 
   return (
-    <div className="w-full min-h-screen bg-[#f3f4f6] pb-24 font-sans select-none relative" id="amb-education-center-root">
+    <div className="w-full min-h-screen bg-[#f3f4f6] pb-24 font-sans select-none relative" id="bnb-education-center-root">
       
       {/* Top Header with Dark Green exact replica */}
       <div className="bg-[#0b543c] px-4 pt-3 pb-4 text-white shadow-md relative">
@@ -256,7 +256,7 @@ export default function AmbEducationCenter({ user, onBack, appConfig }: AmbEduca
             </button>
             <div>
               <div className="flex items-center gap-1.5">
-                <span className="font-black text-[13px] tracking-wide text-[#00a884] bg-white px-2 py-0.5 rounded leading-none">AMB</span>
+                <span className="font-black text-[13px] tracking-wide text-[#00a884] bg-white px-2 py-0.5 rounded leading-none">BNB</span>
                 <h1 className="text-sm xs:text-base font-black tracking-tight text-white leading-none">
                   জ্ঞান ও শিক্ষা কেন্দ্র
                 </h1>
@@ -741,7 +741,7 @@ export default function AmbEducationCenter({ user, onBack, appConfig }: AmbEduca
                 </div>
                 <div>
                   <span className="text-[10px] font-bold text-slate-400 block uppercase">ডেইলি স্ট্রাইক</span>
-                  <span className="text-[13.5://] font-black text-orange-600 mt-1 block">3 দিন 🔥</span>
+                  <span className="text-[13.5px] font-black text-orange-600 mt-1 block">3 দিন 🔥</span>
                 </div>
                 <div>
                   <span className="text-[10px] font-bold text-slate-400 block uppercase">অর্জিত পয়েন্ট</span>
@@ -760,7 +760,7 @@ export default function AmbEducationCenter({ user, onBack, appConfig }: AmbEduca
                 👨‍🎓
               </div>
               <h3 className="text-[15px] font-black text-slate-800">{user?.name || 'শিক্ষার্থী মেম্বার'}</h3>
-              <p className="text-[10.5px] font-extrabold text-slate-400 mt-0.5">ID: {user?.phone || 'AMB Member'}</p>
+              <p className="text-[10.5px] font-extrabold text-slate-400 mt-0.5">ID: {user?.phone || 'BNB Member'}</p>
               
               <div className="mt-4 pt-3 border-t border-slate-100 grid grid-cols-2 gap-2 text-left">
                 <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-100">

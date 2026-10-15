@@ -1,11 +1,12 @@
-import { initializeApp } from 'firebase/app';
+import { initializeApp, getApps, getApp } from 'firebase/app';
 import { getAuth, signInAnonymously } from 'firebase/auth';
 import { initializeFirestore, memoryLocalCache, getFirestore, setLogLevel, doc, getDocFromServer } from 'firebase/firestore';
+import 'firebase/firestore';
 import { getMessaging } from 'firebase/messaging';
 import firebaseConfig from '../../firebase-applet-config.json';
 
-// Initialize Firebase
-const app = initializeApp(firebaseConfig);
+// Initialize Firebase App safely
+const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
 const TARGET_DATABASE_ID = firebaseConfig.firestoreDatabaseId || "ai-studio-120ec6e1-2db5-45d2-b1b1-46493400c959";
 
 // Suppress normal gRPC/Listen stream cancel and internal RST_STREAM info messages
@@ -25,15 +26,27 @@ if (typeof window !== 'undefined') {
   });
 }
 
-let firestoreInstance;
+let firestoreInstance: any;
 try {
   firestoreInstance = initializeFirestore(app, {
     experimentalForceLongPolling: true,
     ignoreUndefinedProperties: true,
     localCache: memoryLocalCache()
   }, TARGET_DATABASE_ID);
-} catch (e) {
-  firestoreInstance = getFirestore(app, TARGET_DATABASE_ID);
+} catch (e1) {
+  try {
+    firestoreInstance = getFirestore(app, TARGET_DATABASE_ID);
+  } catch (e2) {
+    try {
+      firestoreInstance = initializeFirestore(app, {
+        experimentalForceLongPolling: true,
+        ignoreUndefinedProperties: true,
+        localCache: memoryLocalCache()
+      });
+    } catch (e3) {
+      firestoreInstance = getFirestore(app);
+    }
+  }
 }
 
 export const db = firestoreInstance; /* CRITICAL: The app will break without this line */
@@ -41,7 +54,9 @@ export const db = firestoreInstance; /* CRITICAL: The app will break without thi
 // Validate Connection to Firestore on boot as mandated by Firebase Skill
 async function testConnection() {
   try {
-    await getDocFromServer(doc(db, 'system_settings', 'app_config'));
+    if (db) {
+      await getDocFromServer(doc(db, 'system_settings', 'app_config'));
+    }
   } catch (error) {
     if (error instanceof Error && error.message.includes('the client is offline')) {
       console.warn("Please check your Firebase configuration: client is offline.");
@@ -53,7 +68,16 @@ if (typeof window !== 'undefined') {
 }
 
 export const auth = getAuth(app);
-export const messaging = typeof window !== 'undefined' ? getMessaging(app) : null;
+
+let messagingInstance: any = null;
+try {
+  if (typeof window !== 'undefined') {
+    messagingInstance = getMessaging(app);
+  }
+} catch (e) {
+  // Messaging not supported in current environment/iframe
+}
+export const messaging = messagingInstance;
 
 // Sign in anonymously to bootstrap Auth UID so security rules resolve correctly
 let fallbackUid: string | null = null;

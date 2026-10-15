@@ -25,14 +25,14 @@ import { User, Transaction, Notice, Offer, BapReport, BapGroup, BapAdminRequest,
 import { normalizeMemberId, formatBanglaAmount, normalizePhoneNumber, findUserInFirestoreByPhone, getNextSequentialMemberId, deleteUserCompletelyFromDatabase, convertBengaliToEnglishDigits } from '../../lib/memberUtils';
 import { sortTransactionsNewestFirst, getTxTime } from '../../lib/transactionUtils';
 import { saveAppConfig, DEFAULT_QARD_CONFIG } from '../../lib/config';
-import { AMBLogo } from '../AMBLogo';
+import { BNBLogo } from '../BNBLogo';
 import { HeaderPendingModal } from '../HeaderPendingModal';
 import SamityScreen from '../SamityScreen';
 import UnifiedBackButton from '../UnifiedBackButton';
 import SamityAdmin from '../SamityAdmin';
 import SafiPremiumShop from '../SafiPremiumShop';
 import TelecomAdmin from '../TelecomAdmin';
-import AmbSalaryAdmin from '../AmbSalaryAdmin';
+import BNBSalaryAdmin from '../BNBSalaryAdmin';
 import { HistoryRetentionSettings } from '../HistoryRetentionSettings';
 import { runWalletEndToEndTests, TestResultItem } from '../../lib/walletTests';
 import { 
@@ -262,6 +262,9 @@ export function AdminBannersSection(props: any) {
     dbDashboardBanners,
     setDbDashboardBanners,
     defaultDashboardSlides,
+    dbBottomBanners,
+    setDbBottomBanners,
+    defaultBottomSlides,
     dbQardBanners,
     setDbQardBanners,
     defaultQardSlides,
@@ -466,7 +469,7 @@ export function AdminBannersSection(props: any) {
               <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
                   <h2 className="text-base sm:text-lg font-black text-amber-400 flex items-center gap-2">
-                    🖼️ AMB স্লাইডার ব্যানার ও কভার ছবি আপলোড প্যানেল
+                    🖼️ BNB স্লাইডার ব্যানার ও কভার ছবি আপলোড প্যানেল
                   </h2>
                   <p className="text-xs text-slate-450 mt-1">সব সেকশনের জন্য ছবি গ্যালারি থেকে কভার ব্যানার ছবি আপলোড করুন ও কাস্টমাইজ করুন।</p>
                 </div>
@@ -574,11 +577,19 @@ export function AdminBannersSection(props: any) {
                 >
                   🛡️ 10. সেফ ডিলস কভার
                 </button>
+                <button
+                  type="button"
+                  onClick={() => setBannerSubSection('bottom')}
+                  className={`px-3 py-2 rounded-xl text-xs font-bold tracking-tight text-center truncate ${bannerSubSection === 'bottom' ? 'bg-amber-500/10 border border-amber-500/30 text-amber-400' : 'bg-slate-900 border border-transparent text-slate-400 hover:bg-slate-850 hover:text-white'}`}
+                >
+                  📌 11. বটম প্রমো ব্যানার
+                </button>
               </div>
 
               {/* Sub-sections Rendering logic */}
               <div className="mt-6 space-y-4 text-left">
                 {bannerSubSection === 'dashboard' && renderBannerEditorList('📱 মূল হোম ড্যাশবোর্ড স্লাইডার ব্যানার সমূহ', dbDashboardBanners, setDbDashboardBanners, defaultDashboardSlides)}
+                {bannerSubSection === 'bottom' && renderBannerEditorList('📌 হোম বটম প্রমো ব্যানার সমূহ (গ্যালারি আপলোড)', dbBottomBanners, setDbBottomBanners, defaultBottomSlides)}
                 {bannerSubSection === 'qard' && renderBannerEditorList('🤝 করযে হাসানা কল্যাণ তহবিল ব্যানার সমূহ', dbQardBanners, setDbQardBanners, defaultQardSlides)}
                 {bannerSubSection === 'samity' && renderBannerEditorList('🏢 সমবায় কোম্পানি ইনভেস্টর খাতা ব্যানার সমূহ', dbSamityBanners, setDbSamityBanners, defaultSamitySlides)}
                 {bannerSubSection === 'telecom' && renderBannerEditorList('📶 বিএনবি টেলিকম অফার ব্যানার সমূহ', dbTelecomBanners, setDbTelecomBanners, defaultTelecomSlides)}
@@ -647,7 +658,7 @@ export function AdminBannersSection(props: any) {
                             {/* Demo Overlay of Escrow Cover Banner Text to show how text sits on top of images */}
                             <div className="absolute left-4 bottom-4 text-left max-w-[80%] z-10 select-none">
                               <span className="px-1.5 py-0.5 bg-emerald-850/80 text-[6.5px] font-extrabold uppercase rounded text-emerald-300">ভেরিফাইড এসক্রো মার্কেটপ্লেস</span>
-                              <h4 className="text-[11px] font-black leading-tight mt-0.5 text-white">AMB নিরাপদ লেনদেন · লাইভ গ্রুপ বাই</h4>
+                              <h4 className="text-[11px] font-black leading-tight mt-0.5 text-white">BNB নিরাপদ লেনদেন · লাইভ গ্রুপ বাই</h4>
                               <p className="text-[8px] text-emerald-100/90 leading-normal mt-0.5 max-w-sm truncate">হোম ও সমবায়ীদের প্রথম সুরক্ষাবলয় সহায়ক এসক্রো...</p>
                             </div>
                           </div>

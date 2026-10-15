@@ -76,13 +76,14 @@ export default function SetAppLockModal({
 
   return (
     <AnimatePresence>
-      <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/80 backdrop-blur-xs font-sans text-slate-800">
-        <motion.div
-          initial={{ opacity: 0, scale: 0.95, y: 10 }}
-          animate={{ opacity: 1, scale: 1, y: 0 }}
-          exit={{ opacity: 0, scale: 0.95, y: 10 }}
-          className="bg-white rounded-2xl max-w-sm w-full p-4 sm:p-5 shadow-2xl border border-slate-100 relative text-left overflow-hidden"
-        >
+      <div className="fixed inset-0 z-50 flex flex-col bg-[#0b6623] w-screen h-screen overflow-y-auto p-3 sm:p-6 font-sans text-slate-800">
+        <div className="flex items-center justify-center my-auto w-full">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.98, y: 10 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.98, y: 10 }}
+            className="bg-white rounded-3xl max-w-md w-full p-5 sm:p-6 shadow-2xl border border-slate-100 relative text-left overflow-hidden"
+          >
           {/* Close button */}
           <button
             onClick={onClose}
@@ -208,6 +209,7 @@ export default function SetAppLockModal({
           </form>
         </motion.div>
       </div>
-    </AnimatePresence>
+    </div>
+  </AnimatePresence>
   );
 }

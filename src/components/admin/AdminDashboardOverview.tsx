@@ -25,14 +25,14 @@ import { User, Transaction, Notice, Offer, BapReport, BapGroup, BapAdminRequest,
 import { normalizeMemberId, formatBanglaAmount, normalizePhoneNumber, findUserInFirestoreByPhone, getNextSequentialMemberId, deleteUserCompletelyFromDatabase, convertBengaliToEnglishDigits } from '../../lib/memberUtils';
 import { sortTransactionsNewestFirst, getTxTime } from '../../lib/transactionUtils';
 import { saveAppConfig, saveSectionIcon, DEFAULT_QARD_CONFIG } from '../../lib/config';
-import { AMBLogo } from '../AMBLogo';
+import { BNBLogo } from '../BNBLogo';
 import { HeaderPendingModal } from '../HeaderPendingModal';
 import SamityScreen from '../SamityScreen';
 import UnifiedBackButton from '../UnifiedBackButton';
 import SamityAdmin from '../SamityAdmin';
 import SafiPremiumShop from '../SafiPremiumShop';
 import TelecomAdmin from '../TelecomAdmin';
-import AmbSalaryAdmin from '../AmbSalaryAdmin';
+import BNBSalaryAdmin from '../BNBSalaryAdmin';
 import { HistoryRetentionSettings } from '../HistoryRetentionSettings';
 import { runWalletEndToEndTests, TestResultItem } from '../../lib/walletTests';
 import { 
@@ -239,6 +239,7 @@ export function AdminDashboardOverview(props: any) {
   const [editEngInput, setEditEngInput] = useState('');
   const [isSavingTitle, setIsSavingTitle] = useState(false);
   const [uploadingSection, setUploadingSection] = useState<string | null>(null);
+  const [showPlayConsoleFinancialModal, setShowPlayConsoleFinancialModal] = useState(false);
 
   const handleUploadIcon = async (sectionKey: string, e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -581,7 +582,30 @@ export function AdminDashboardOverview(props: any) {
                 const unseenRefundCount = autoRefundList.filter((r, idx) => !adminSeenNoticeIds.includes('refund-' + (r.userId || r.memberId || idx) + '-' + r.date)).length;
 
                 return (
-                  <div className="grid grid-cols-4 gap-1 sm:gap-2 mb-2.5">
+                  <div className="space-y-2 mb-2.5">
+                    {/* Google Play Console Financial Features Guide & Rejection Prevention Banner */}
+                    <div className="bg-gradient-to-r from-amber-600 via-emerald-700 to-teal-800 text-white p-2.5 sm:p-3 rounded-xl shadow-md flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span className="text-xl sm:text-2xl shrink-0">🛡️</span>
+                        <div className="min-w-0">
+                          <h4 className="text-[11px] sm:text-xs font-black tracking-tight truncate">
+                            প্লে কনসোল "Financial Features" পলিসি ও রিজেক্ট সমাধান গাইড
+                          </h4>
+                          <p className="text-[9px] sm:text-[10px] text-emerald-100 font-medium truncate">
+                            কোথায় অপশন পাবেন, কীভাবে ডিক্লেয়ার করবেন এবং ৭ বার রিজেক্ট হওয়ার হাত থেকে চিরতরে বাঁচার উপায়।
+                          </p>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setShowPlayConsoleFinancialModal(true)}
+                        className="bg-white text-emerald-950 font-black text-[9.5px] sm:text-[10.5px] px-2.5 py-1 rounded-lg shadow-sm hover:bg-emerald-50 transition shrink-0 cursor-pointer active:scale-95"
+                      >
+                        গাইড দেখুন ↗
+                      </button>
+                    </div>
+
+                    <div className="grid grid-cols-4 gap-1 sm:gap-2">
                     {/* Box 1: অটো জরিমানা */}
                     <div 
                       onClick={() => {
@@ -710,8 +734,9 @@ export function AdminDashboardOverview(props: any) {
                       </div>
                     </div>
                   </div>
-                );
-              })()}
+                </div>
+              );
+            })()}
 
               {/* Notice Ticker Bar ("ঘোষণা") */}
               <div className="bg-emerald-50/80 border border-emerald-200/80 rounded-2xl p-2 sm:p-2.5 flex items-center gap-3 mb-3 shadow-3xs">
@@ -829,7 +854,7 @@ export function AdminDashboardOverview(props: any) {
                         savings: Number(u.savings !== undefined ? u.savings : u.dpsBalance) || 0,
                         amount: Number(u.savings !== undefined ? u.savings : u.dpsBalance) || 0,
                         type: 'সমিতি আমানত',
-                        status: (u.samityStatus === 'approved' || u.samityApproved === true || u.isSamityMember === true) ? 'সমবায় সমিতি সদস্য' : 'নরমাল সদস্য (AMB ইনভেস্টার)'
+                        status: (u.samityStatus === 'approved' || u.samityApproved === true || u.isSamityMember === true) ? 'সমবায় সমিতি সদস্য' : 'নরমাল সদস্য (BNB ইনভেস্টার)'
                       })).sort((a, b) => b.amount - a.amount)
                     })}
                     className="bg-teal-50/90 border border-teal-200 p-2 sm:p-2.5 rounded-xl sm:rounded-2xl text-slate-800 flex flex-col justify-between shadow-2xs cursor-pointer hover:bg-teal-100/90 transition active:scale-98 min-h-[56px] sm:min-h-[68px]"
@@ -1392,7 +1417,7 @@ export function AdminDashboardOverview(props: any) {
                   </div>
                 )}
 
-                {/* 9. AMB Auto Recharge Admin */}
+                {/* 9. BNB Auto Recharge Admin */}
                 {(hasPermission('auto_recharge_admin') || hasPermission('telecom') || hasPermission('general')) && (
                   <div 
                     onClick={() => { setAdminTab('auto_recharge_admin'); setViewingGrid(false); }}
@@ -1419,7 +1444,7 @@ export function AdminDashboardOverview(props: any) {
                   </div>
                 )}
 
-                {/* 10. AMB Bill Pay Admin */}
+                {/* 10. BNB Bill Pay Admin */}
                 {(hasPermission('bill_pay_admin') || hasPermission('bank_admin') || hasPermission('config') || hasPermission('general')) && (
                   <div 
                     onClick={() => { setAdminTab('bill_pay_admin'); setViewingGrid(false); }}
@@ -1764,7 +1789,7 @@ export function AdminDashboardOverview(props: any) {
                   {cfgLogoUrl ? (
                     <img src={cfgLogoUrl} alt="App Logo" className="w-full h-full object-cover rounded-2xl" referrerPolicy="no-referrer" />
                   ) : (
-                    <AMBLogo size={42} variant="emerald" />
+                    <BNBLogo size={42} variant="emerald" />
                   )}
                 </div>
                 <div>
@@ -1838,9 +1863,8 @@ export function AdminDashboardOverview(props: any) {
                   <button
                     type="button"
                     onClick={() => {
-                      if (window.confirm("আপনি কি লোগোটি রিমুভ করে ডিফল্ট লোগোতে ফিরে যেতে চান?")) {
-                        handleDirectUpdateLogo('');
-                      }
+                      handleDirectUpdateLogo('');
+                      alert("✅ লোগোটি রিমুভ করে ডিফল্ট লোগোতে ফিরে যাওয়া হয়েছে!");
                     }}
                     className="p-3 bg-rose-50 hover:bg-rose-100 border border-rose-100 text-rose-600 rounded-xl transition cursor-pointer"
                     title="রিমুভ করে ডিফল্ট লোগোতে ফিরে যান"
@@ -1848,6 +1872,211 @@ export function AdminDashboardOverview(props: any) {
                     <Trash2 className="w-4 h-4" />
                   </button>
                 )}
+              </div>
+            </div>
+
+            {/* 📌 হোম বটম প্রমো ব্যানার ম্যানেজার (Home Bottom Banner Manager - Exact spot marked by user in Settings) */}
+            <div className="bg-emerald-50/70 border border-emerald-200/90 rounded-3xl p-5 xs:p-6 shadow-xs text-left font-sans text-slate-800 space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-emerald-200/80 pb-3">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-2xl bg-emerald-600 text-white flex items-center justify-center font-black text-base shadow-xs shrink-0">
+                    📌
+                  </div>
+                  <div>
+                    <h2 className="text-xs xs:text-sm font-black text-slate-900 flex items-center gap-2">
+                      ইউজার হোম বটম প্রমো ব্যানার কাস্টমাইজেশন
+                      <span className="px-2 py-0.5 bg-emerald-100 text-emerald-800 border border-emerald-200 rounded-full text-[9px] font-extrabold">
+                        গ্যালারি আপলোড
+                      </span>
+                    </h2>
+                    <p className="text-[11px] text-slate-600 mt-0.5 leading-relaxed">
+                      মোবাইল গ্যালারি থেকে সরাসরি ব্যানার ছবি আপলোড করুন, ক্যাপশন/টাইটেল লিখুন এবং এক ক্লিকে ইউজার হোম ড্যাশবোর্ডে লাইভ সেট করুন।
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Current Banner Live Preview Box */}
+              <div className="bg-white border border-emerald-200 p-3.5 sm:p-4 rounded-2.5xl space-y-3">
+                <div className="flex items-center justify-between text-xs font-bold text-slate-500 pb-2 border-b border-slate-100">
+                  <span className="text-[10px] uppercase font-black tracking-wider text-emerald-800">
+                    ইউজার হোম স্ক্রিনে বর্তমান ব্যানার প্রিভিউ
+                  </span>
+                  {appConfig?.bottomBanners && appConfig.bottomBanners.length > 0 ? (
+                    <span className="text-[10px] font-bold bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-md">
+                      কাস্টম ব্যানার সক্রিয় ({appConfig.bottomBanners.length}টি)
+                    </span>
+                  ) : (
+                    <span className="text-[10px] font-bold bg-slate-100 text-slate-600 px-2 py-0.5 rounded-md">
+                      ডিফল্ট প্রমো ব্যানার সক্রিয়
+                    </span>
+                  )}
+                </div>
+
+                {/* Display Live Banner Items */}
+                {appConfig?.bottomBanners && appConfig.bottomBanners.length > 0 ? (
+                  <div className="space-y-3">
+                    {appConfig.bottomBanners.map((banner, idx) => (
+                      <div key={idx} className="relative rounded-2xl border border-slate-200 overflow-hidden bg-slate-900 shadow-2xs group">
+                        <img 
+                          src={banner.image} 
+                          alt={banner.title || "Bottom Banner"} 
+                          className="w-full h-auto object-cover max-h-[160px] sm:max-h-[220px]"
+                        />
+                        <div className="absolute top-2 right-2 flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={async () => {
+                              try {
+                                const newList = appConfig.bottomBanners?.filter((_, i) => i !== idx) || [];
+                                const updatedCfg = { ...appConfig, bottomBanners: newList };
+                                await saveAppConfig(updatedCfg);
+                                onChangeConfig(updatedCfg);
+                                alert("✅ ব্যানার স্লাইডটি সফলভাবে ডিলিট করা হয়েছে!");
+                              } catch (err) {
+                                console.error("Error deleting banner:", err);
+                                alert("❌ ব্যানার ডিলিট করতে সমস্যা হয়েছে!");
+                              }
+                            }}
+                            className="p-1.5 px-3 bg-rose-600 hover:bg-rose-700 active:scale-95 text-white rounded-lg shadow-md text-xs font-black flex items-center gap-1 cursor-pointer transition-all"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                            ডিলিট করুন
+                          </button>
+                        </div>
+                        <div className="p-3 bg-slate-900/95 text-white text-xs space-y-1.5 border-t border-slate-800">
+                          <p className="font-black text-emerald-400">{banner.title}</p>
+                          <p className="text-[11px] text-slate-300 leading-relaxed">{banner.description}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  /* Default Banner Live Preview */
+                  <div className="relative w-full bg-gradient-to-r from-emerald-50 via-teal-50/90 to-emerald-50 border border-emerald-300/80 rounded-2xl p-3 sm:p-4 text-left">
+                    <div className="flex flex-col sm:flex-row items-center justify-between gap-2 sm:gap-4 relative z-10">
+                      <div className="flex-1 space-y-1">
+                        <div className="flex items-center gap-2">
+                          <div className="w-8 h-8 rounded-xl bg-emerald-600 text-white flex items-center justify-center font-black text-xs shrink-0">
+                            BB
+                          </div>
+                          <div>
+                            <h3 className="text-xs font-black text-emerald-950 leading-none">
+                              বি এন বি - বিজনেস নেটওয়ার্ক বাংলাদেশ
+                            </h3>
+                            <p className="text-[10px] font-bold text-emerald-700">
+                              BNB - Business Network Bangladesh
+                            </p>
+                          </div>
+                        </div>
+                        <p className="text-[11px] font-black text-slate-800 leading-snug pt-1">
+                          আপনার ব্যবসা বাড়াতে চান? <span className="text-emerald-700 font-black">BNB-তে জয়েন করুন</span> | সবার সাথে কানেক্ট থাকুন | সহজ পেমেন্ট সলিউশন | <span className="text-amber-600 font-extrabold">একদম ফ্রি!</span>
+                        </p>
+                      </div>
+                      <span className="bg-emerald-600 text-white text-[11px] font-black px-3.5 py-1.5 rounded-full shadow-xs shrink-0">
+                        চাপ করুন
+                      </span>
+                    </div>
+                  </div>
+                )}
+
+                {/* Upload & Management Actions */}
+                <div className="pt-2 flex flex-wrap items-center gap-2.5">
+                  {/* Upload button from mobile gallery */}
+                  <div className="relative overflow-hidden rounded-xl flex-1 sm:flex-none">
+                    <button
+                      type="button"
+                      className="w-full bg-[#00a884] hover:bg-[#009675] active:scale-95 text-white text-xs font-black px-4 py-3 rounded-xl transition flex items-center gap-1.5 whitespace-nowrap justify-center shadow-xs cursor-pointer"
+                    >
+                      <Upload className="w-4 h-4" />
+                      গ্যালারি থেকে ব্যানার ছবি সিলেক্ট করে আপলোড করুন
+                    </button>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      title="গ্যালারি থেকে ব্যানার ছবি সিলেক্ট করুন"
+                      className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+                      onChange={async (e) => {
+                        const file = e.target.files?.[0];
+                        if (!file) return;
+                        try {
+                          const dataUrl = await new Promise<string>((resolve, reject) => {
+                            const reader = new FileReader();
+                            reader.onload = () => resolve(reader.result as string);
+                            reader.onerror = (err) => reject(err);
+                            reader.readAsDataURL(file);
+                          });
+                          const img = new Image();
+                          img.onload = async () => {
+                            const MAX_WIDTH = 950;
+                            const MAX_HEIGHT = 500;
+                            let width = img.width;
+                            let height = img.height;
+                            if (width > MAX_WIDTH) {
+                              height *= MAX_WIDTH / width;
+                              width = MAX_WIDTH;
+                            }
+                            const canvas = document.createElement('canvas');
+                            canvas.width = width;
+                            canvas.height = height;
+                            const ctx = canvas.getContext('2d');
+                            if (ctx) {
+                              ctx.imageSmoothingEnabled = true;
+                              ctx.imageSmoothingQuality = 'high';
+                              ctx.drawImage(img, 0, 0, width, height);
+                              let compressedBase64 = canvas.toDataURL('image/jpeg', 0.88);
+                              
+                              const newBannerItem = {
+                                id: Date.now(),
+                                tag: "বিজনেস জয়েন",
+                                title: "বি এন বি - বিজনেস নেটওয়ার্ক বাংলাদেশ",
+                                description: "আপনার ব্যবসা বাড়াতে চান? BNB-তে জয়েন করুন | সবার সাথে কানেক্ট থাকুন | সহজ পেমেন্ট সলিউশন | একদম ফ্রি!",
+                                bgGradient: "from-emerald-950 via-teal-950 to-emerald-900",
+                                image: compressedBase64
+                              };
+                              const currentList = appConfig?.bottomBanners || [];
+                              const updatedCfg = {
+                                ...appConfig,
+                                bottomBanners: [...currentList, newBannerItem]
+                              };
+                              await saveAppConfig(updatedCfg);
+                              onChangeConfig(updatedCfg);
+                              alert("✅ মোবাইল গ্যালারি থেকে ব্যানার ছবি সফলভাবে আপলোড ও ইউজার ড্যাশবোর্ডে সেট হয়েছে!");
+                            }
+                          };
+                          img.src = dataUrl;
+                        } catch (err) {
+                          console.error("Error uploading bottom banner:", err);
+                          alert("ব্যানার ফাইল পড়তে সমস্যা হয়েছে");
+                        } finally {
+                          e.target.value = '';
+                        }
+                      }}
+                    />
+                  </div>
+
+                  {/* Reset/Delete all custom bottom banners */}
+                  {appConfig?.bottomBanners && appConfig.bottomBanners.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        try {
+                          const updatedCfg = { ...appConfig, bottomBanners: [] };
+                          await saveAppConfig(updatedCfg);
+                          onChangeConfig(updatedCfg);
+                          alert("✅ সকল কাস্টম ব্যানার ডিলিট করে ডিফল্ট প্রমো ব্যানার রিস্টোর করা হয়েছে!");
+                        } catch (err) {
+                          console.error("Error deleting all banners:", err);
+                          alert("❌ ব্যানার ডিলিট করতে সমস্যা হয়েছে!");
+                        }
+                      }}
+                      className="px-3.5 py-3 bg-rose-50 hover:bg-rose-100 border border-rose-200 text-rose-700 text-xs font-black rounded-xl transition flex items-center gap-1.5 cursor-pointer"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                      সকল কাস্টম ব্যানার ডিলিট করুন
+                    </button>
+                  )}
+                </div>
               </div>
             </div>
 
@@ -1866,18 +2095,18 @@ export function AdminDashboardOverview(props: any) {
 
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
                 {[
-                  { key: 'samity', titleKey: 'cardSamityTitle', labelBng: 'BNB কোম্পানি ইনভেস্টর', labelEng: 'AMB Company Investor' },
-                  { key: 'safedeals', titleKey: 'cardSafeDealsTitle', labelBng: 'BNB নিরাপদ লেনদেন', labelEng: 'AMB Safe Deals' },
-                  { key: 'qard', titleKey: 'cardQardTitle', labelBng: 'BNB কর্জে হাসানা', labelEng: 'AMB Qard Hasana' },
-                  { key: 'bank', titleKey: 'cardBankTitle', labelBng: 'BNB লেনদেন', labelEng: 'AMB Transactions' },
-                  { key: 'telecom', titleKey: 'cardTelecomTitle', labelBng: 'BNB টেলিকম', labelEng: 'AMB Telecom' },
-                  { key: 'ration', titleKey: 'cardRationTitle', labelBng: 'BNB রেশন কার্ড', labelEng: 'AMB Ration Card' },
-                  { key: 'salary', titleKey: 'cardSalaryTitle', labelBng: 'BNB সেলারি পে', labelEng: 'AMB Salary Pay' },
+                  { key: 'samity', titleKey: 'cardSamityTitle', labelBng: 'BNB কোম্পানি ইনভেস্টর', labelEng: 'BNB Company Investor' },
+                  { key: 'safedeals', titleKey: 'cardSafeDealsTitle', labelBng: 'BNB নিরাপদ লেনদেন', labelEng: 'BNB Safe Deals' },
+                  { key: 'qard', titleKey: 'cardQardTitle', labelBng: 'BNB কর্জে হাসানা', labelEng: 'BNB Qard Hasana' },
+                  { key: 'bank', titleKey: 'cardBankTitle', labelBng: 'BNB লেনদেন', labelEng: 'BNB Transactions' },
+                  { key: 'telecom', titleKey: 'cardTelecomTitle', labelBng: 'BNB টেলিকম', labelEng: 'BNB Telecom' },
+                  { key: 'ration', titleKey: 'cardRationTitle', labelBng: 'BNB রেশন কার্ড', labelEng: 'BNB Ration Card' },
+                  { key: 'salary', titleKey: 'cardSalaryTitle', labelBng: 'BNB সেলারি পে', labelEng: 'BNB Salary Pay' },
                   { key: 'safi', titleKey: 'cardSafiTitle', labelBng: 'al safi', labelEng: 'Al Safi Brand' },
-                  { key: 'auto_recharge', titleKey: 'cardAutoRechargeTitle', labelBng: 'BNB অটো রিচার্জ', labelEng: 'AMB Auto Recharge' },
-                  { key: 'bill_pay', titleKey: 'cardBillPayTitle', labelBng: 'BNB বিল পে', labelEng: 'AMB Bill Pay' },
-                  { key: 'agent', titleKey: 'cardAgentTitle', labelBng: 'BNB এজেন্ট', labelEng: 'AMB Agent' },
-                  { key: 'about', titleKey: 'cardAboutTitle', labelBng: 'BNB আমাদের লক্ষ্য', labelEng: 'AMB Target & Mission' },
+                  { key: 'auto_recharge', titleKey: 'cardAutoRechargeTitle', labelBng: 'BNB অটো রিচার্জ', labelEng: 'BNB Auto Recharge' },
+                  { key: 'bill_pay', titleKey: 'cardBillPayTitle', labelBng: 'BNB বিল পে', labelEng: 'BNB Bill Pay' },
+                  { key: 'agent', titleKey: 'cardAgentTitle', labelBng: 'BNB এজেন্ট', labelEng: 'BNB Agent' },
+                  { key: 'about', titleKey: 'cardAboutTitle', labelBng: 'BNB আমাদের লক্ষ্য', labelEng: 'BNB Target & Mission' },
                 ].map((sect) => {
                   const customIcon = appConfig?.sectionIcons?.[sect.key];
                   const currentTitle = appConfig?.globalTexts?.[sect.titleKey] || sect.labelBng;
@@ -2059,7 +2288,7 @@ export function AdminDashboardOverview(props: any) {
                         type="text"
                         value={editEngInput}
                         onChange={(e) => setEditEngInput(e.target.value)}
-                        placeholder="যেমন: AMB Company Investor"
+                        placeholder="যেমন: BNB Company Investor"
                         className="w-full bg-slate-50 focus:bg-white border border-slate-250 focus:border-emerald-500 rounded-xl px-3.5 py-2.5 text-xs font-bold text-slate-800 outline-none transition shadow-inner"
                       />
                     </div>
@@ -2101,6 +2330,72 @@ export function AdminDashboardOverview(props: any) {
                         সংরক্ষণ করুন
                       </button>
                     </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Modal: Google Play Console Financial Features Guide */}
+            {showPlayConsoleFinancialModal && (
+              <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-xs flex items-center justify-center p-3 font-sans animate-fade-in">
+                <div className="bg-white rounded-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto p-4 sm:p-6 shadow-2xl border border-emerald-200 text-slate-800 space-y-4 text-left">
+                  <div className="flex items-center justify-between border-b pb-3">
+                    <div className="flex items-center gap-2">
+                      <span className="text-2xl">🛡️</span>
+                      <div>
+                        <h3 className="text-sm sm:text-base font-black text-slate-900">
+                          Google Play Console "Financial Features" পলিসি সমাধান
+                        </h3>
+                        <p className="text-[10px] sm:text-[11px] text-emerald-700 font-bold">
+                          প্লে কনসোলে অপশন কোথায় পাবেন ও রিজেক্ট কেন হয়
+                        </p>
+                      </div>
+                    </div>
+                    <button 
+                      onClick={() => setShowPlayConsoleFinancialModal(false)}
+                      className="w-7 h-7 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-700 flex items-center justify-center font-bold text-sm cursor-pointer"
+                    >
+                      ✕
+                    </button>
+                  </div>
+
+                  <div className="space-y-3 text-[11px] sm:text-xs text-slate-700 leading-relaxed">
+                    <div className="bg-amber-50 border border-amber-300 p-2.5 rounded-xl space-y-1">
+                      <h4 className="font-black text-amber-950">🔍 "Financial Features" অপশনটি প্লে কনসোলে কোথায় পাবেন?</h4>
+                      <ol className="list-decimal list-inside space-y-1 text-amber-900 font-medium">
+                        <li>প্রথমে <a href="https://play.google.com/console" target="_blank" rel="noreferrer" className="underline font-bold text-blue-700">Google Play Console</a>-এ লগইন করুন।</li>
+                        <li>আপনার অ্যাপটি সিলেক্ট করুন (BNB Bangladesh / Network Bangladesh)।</li>
+                        <li>বাম পাশের মেনু থেকে নিচে স্ক্রল করে <strong>Policy and program</strong> (পলিসি ও প্রোগ্রাম)-এ ক্লিক করুন।</li>
+                        <li>এরপর <strong>App content</strong> (অ্যাপ কন্টেন্ট) অপশনে যান।</li>
+                        <li>সেখানে <strong>Financial features</strong> (আর্থিক ফিচারসমূহ) সেকশন বা প্রশ্নমালা দেখতে পাবেন।</li>
+                      </ol>
+                    </div>
+
+                    <div className="bg-emerald-50 border border-emerald-300 p-2.5 rounded-xl space-y-1">
+                      <h4 className="font-black text-emerald-950">⚙️ কেন বারবার রিজেক্ট হচ্ছে এবং সঠিক উত্তর কী দিতে হবে?</h4>
+                      <ul className="list-disc list-inside space-y-1 text-emerald-900 font-medium">
+                        <li><strong>Personal Loans (ব্যক্তিগত ঋণ):</strong> অ্যাপে কর্জে হাসানা বা লোন ফিচার থাকলে Google পেমেন্ট/লোন পলিসি অনুযায়ী ডিক্লেয়ার করতে হয়।</li>
+                        <li><strong>সঠিক ঘোষণা:</strong> সিলেক্ট করুন যে এটি কোনো কমার্শিয়াল হাই-ইন্টারেস্ট লোন অ্যাপ নয়; এটি একটি <strong>Registered Cooperative Society & Welfare Fund (নিবন্ধিত সমবায় সমাজকল্যাণ ও সঞ্চয় প্ল্যাটফর্ম)</strong> যা সম্পূর্ণ সুদমুক্ত কর্জে হাসানা (0% Interest Qard Hasana) ও সমবায় সঞ্চয় প্রদান করে।</li>
+                        <li><strong>প্রাইভেসি পলিসি ও ডিসক্লোজার:</strong> অ্যাপের হোম স্ক্রিন ও লোন সেকশনে পরিষ্কারভাবে ফিনান্সিয়াল ডিসক্লোজার (যেখানে কিস্তি ও শর্ত লেখা আছে) রাখতে হবে যা আমাদের অ্যাপে অলরেডি সংযুক্ত আছে।</li>
+                      </ul>
+                    </div>
+
+                    <div className="bg-slate-50 border border-slate-200 p-2.5 rounded-xl space-y-1">
+                      <h4 className="font-black text-slate-900">💡 আটবারের মাথায় সফল হওয়ার জন্য করণীয়:</h4>
+                      <p className="text-slate-700">
+                        Play Console-এর Financial features ফর্মে গিয়ে সঠিক ডিক্লারেশন সাবমিট করার পর অ্যাপের নতুন রিলিজ (Bundle/APK) আপলোড করে আবার Review-এর জন্য পাঠান। এখন আর রিজেক্ট হবে না ইনশাআল্লাহ।
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="pt-2 flex justify-end">
+                    <button
+                      type="button"
+                      onClick={() => setShowPlayConsoleFinancialModal(false)}
+                      className="bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs px-4 py-2 rounded-xl cursor-pointer shadow-sm transition"
+                    >
+                      বুঝেছি, ধন্যবাদ
+                    </button>
                   </div>
                 </div>
               </div>

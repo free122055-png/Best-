@@ -1,10 +1,27 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { User, Transaction, Notice, Offer, AppConfig, Product, UserNotification, SAMITY_MONTHS, SAMITY_YEARS, normalizePaidMonthsArray, getEffectivePaidMonthsList, getEffectiveBalance, generateAmbTrxId, formatShortTrxId } from '../types';
+import { User, Transaction, Notice, Offer, AppConfig, Product, UserNotification, SAMITY_MONTHS, SAMITY_YEARS, SAMITY_QUARTERLY_MONTHS, normalizePaidMonthsArray, getEffectivePaidMonthsList, getEffectiveBalance, generateBNBTrxId, formatShortTrxId } from '../types';
+import { isUserQuarterlyPaid } from '../lib/samitySavingsEngine';
 import { sortTransactionsNewestFirst } from '../lib/transactionUtils';
-import UserTransactionsStatement from './UserTransactionsStatement';
+import UserTransactionsStatement, { getTxTimestamp, formatTxDate, getNormalizedStatus } from './UserTransactionsStatement';
+import { BNBPaymentReceiptModal } from './BNBPaymentReceiptModal';
+import { NotificationInboxModal } from './NotificationInboxModal';
 import TransactionExchangeIcon from './TransactionExchangeIcon';
 import { filterTransactionsLast60Days, cleanupExpiredTransactions } from '../lib/transactionCleanup';
 import { db } from '../lib/firebase';
+import { 
+  SamityIcon,
+  SafeDealsIcon,
+  QardIcon,
+  BankIcon,
+  TelecomIcon,
+  RationIcon,
+  SalaryIcon,
+  SafiIcon,
+  AutoRechargeIcon,
+  BillPayIcon,
+  AgentIcon,
+  AboutIcon
+} from './SectionIcons';
 import { 
   collection, 
   addDoc, 
@@ -47,6 +64,7 @@ import {
   Megaphone,
   History,
   CheckCircle2,
+  Receipt,
   PlusCircle,
   AlertCircle,
   X,
@@ -78,12 +96,13 @@ import {
   Moon,
   Briefcase,
   QrCode,
-  Banknote
+  Banknote,
+  Zap
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { AMBLogo } from './AMBLogo';
+import { BNBLogo } from './BNBLogo';
 import SafeDealsEscrowView from './SafeDealsEscrowView';
-import AMBTelecomScreen from './AMBTelecomScreen';
+import BNBTelecomScreen from './BNBTelecomScreen';
 import SamityScreen from './SamityScreen';
 import SamityRequestForm from './SamityRequestForm';
 import QardScreen from './QardScreen';
@@ -92,14 +111,16 @@ import { QardLiveTicker } from './QardLiveTicker';
 import ProfileView from './ProfileView';
 import { formatBanglaAmount, hasCompletedSamityProfile } from '../lib/memberUtils';
 import MoneyExchangeModule from './MoneyExchangeModule';
-import { AmbMobileBankingPortal } from './AmbMobileBankingPortal';
+import { BNBMobileBankingPortal } from './BNBMobileBankingPortal';
+import { JenifyPaymentGateway } from './JenifyPaymentGateway';
 import RationCardView from './RationCardView';
-import AmbAutoSalaryPay from './AmbAutoSalaryPay';
-import AmbEducationCenter from './AmbEducationCenter';
+import BNBAutoSalaryPay from './BNBAutoSalaryPay';
+import BNBEducationCenter from './BNBEducationCenter';
 import SmartExchange from './SmartExchange';
 import SafiPremiumShop from './SafiPremiumShop';
-import AmbCorporateGuide from './AmbCorporateGuide';
+import BNBCorporateGuide from './BNBCorporateGuide';
 import { DashboardSubViews } from './dashboard/DashboardSubViews';
+import { apiUrl, getReturnOrigin } from '../config/api';
 import { useBackHandler } from '../lib/navigationManager';
 
 const cleanDescription = (desc: string, status?: string): string => {
@@ -244,13 +265,8 @@ const DashboardBannerSlider = React.memo(function DashboardBannerSlider({
 }) {
   const [currentAdSlide, setCurrentAdSlide] = useState(0);
 
-  useEffect(() => {
-    if (!activeSliders || activeSliders.length <= 1) return;
-    const timer = setInterval(() => {
-      setCurrentAdSlide((prev) => (prev + 1) % activeSliders.length);
-    }, 4500);
-    return () => clearInterval(timer);
-  }, [activeSliders]);
+  // NOTE: User requested top YouTube 16:9 banner MUST NOT auto-rotate!
+  // Customers can manually drag / swipe or click indicators to switch, but it will not slide automatically.
 
   if (!activeSliders || activeSliders.length === 0) return null;
 
@@ -277,10 +293,18 @@ const DashboardBannerSlider = React.memo(function DashboardBannerSlider({
         className += ' aspect-square';
         break;
       default:
-        className += ' aspect-[16/7.5]';
+        className += ' aspect-[16/9]';
         break;
     }
   }
+
+  const handlePrev = () => {
+    setCurrentAdSlide((prev) => (prev - 1 + activeSliders.length) % activeSliders.length);
+  };
+
+  const handleNext = () => {
+    setCurrentAdSlide((prev) => (prev + 1) % activeSliders.length);
+  };
 
   return (
     <div className="w-full">
@@ -292,20 +316,168 @@ const DashboardBannerSlider = React.memo(function DashboardBannerSlider({
           loading="lazy"
         />
         {activeSliders.length > 1 && (
-          <div className="absolute bottom-3 right-4 flex items-center gap-1 bg-black/25 px-2.5 py-1.5 rounded-full backdrop-blur-xs">
-            {activeSliders.map((_, index) => (
-              <button
-                key={index}
-                type="button"
-                aria-label={'Slide ' + (index + 1)}
-                onClick={() => setCurrentAdSlide(index)}
-                className={'h-1.5 rounded-full transition-all duration-300 cursor-pointer ' + (
-                  currentAdSlide === index ? 'w-4.5 bg-[#00a884]' : 'w-1.5 bg-white/60 hover:bg-white'
-                )}
-              />
-            ))}
-          </div>
+          <>
+            {/* Manual Navigation Arrows */}
+            <button
+              type="button"
+              onClick={handlePrev}
+              className="absolute left-2 top-1/2 -translate-y-1/2 w-7 h-7 rounded-full bg-black/30 hover:bg-black/50 text-white flex items-center justify-center backdrop-blur-xs transition-colors z-10 font-bold"
+              aria-label="Previous Slide"
+            >
+              ‹
+            </button>
+            <button
+              type="button"
+              onClick={handleNext}
+              className="absolute right-2 top-1/2 -translate-y-1/2 w-7 h-7 rounded-full bg-black/30 hover:bg-black/50 text-white flex items-center justify-center backdrop-blur-xs transition-colors z-10 font-bold"
+              aria-label="Next Slide"
+            >
+              ›
+            </button>
+
+            {/* Navigation Dots */}
+            <div className="absolute bottom-3 right-4 flex items-center gap-1 bg-black/25 px-2.5 py-1.5 rounded-full backdrop-blur-xs z-10">
+              {activeSliders.map((_, index) => (
+                <button
+                  key={index}
+                  type="button"
+                  aria-label={'Slide ' + (index + 1)}
+                  onClick={() => setCurrentAdSlide(index)}
+                  className={'h-1.5 rounded-full transition-all duration-300 cursor-pointer ' + (
+                    currentAdSlide === index ? 'w-4.5 bg-[#00a884]' : 'w-1.5 bg-white/60 hover:bg-white'
+                  )}
+                />
+              ))}
+            </div>
+          </>
         )}
+      </div>
+    </div>
+  );
+});
+
+const DashboardBottomBannerSlider = React.memo(function DashboardBottomBannerSlider({
+  appConfig,
+  onBannerClick
+}: {
+  appConfig?: AppConfig;
+  onBannerClick?: () => void;
+}) {
+  const [currentSlide, setCurrentSlide] = useState(0);
+
+  const customBanners = appConfig?.bottomBanners && appConfig.bottomBanners.length > 0
+    ? appConfig.bottomBanners
+    : null;
+
+  // Auto-rotate every 4 seconds as explicitly requested by user
+  useEffect(() => {
+    if (!customBanners || customBanners.length <= 1) return;
+    const timer = setInterval(() => {
+      setCurrentSlide((prev) => (prev + 1) % customBanners.length);
+    }, 4000);
+    return () => clearInterval(timer);
+  }, [customBanners]);
+
+  if (customBanners && customBanners.length > 0) {
+    const activeItem = customBanners[currentSlide];
+    return (
+      <div className="px-2 sm:px-3 py-2">
+        <div 
+          onClick={onBannerClick}
+          className="relative w-full rounded-2xl sm:rounded-3xl overflow-hidden border border-emerald-300/80 shadow-xs cursor-pointer group active:scale-[0.99] transition-transform bg-slate-900 aspect-[3.2/1]"
+        >
+          <img 
+            src={activeItem.image} 
+            alt={activeItem.title || "BNB Bottom Banner"} 
+            className="w-full h-full object-cover select-none"
+            loading="lazy"
+          />
+          {customBanners.length > 1 && (
+            <div className="absolute bottom-2.5 left-1/2 -translate-x-1/2 flex items-center gap-1.5 bg-emerald-950/80 px-3 py-1 rounded-full backdrop-blur-xs border border-emerald-800/50">
+              {customBanners.map((_, idx) => (
+                <button
+                  key={idx}
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setCurrentSlide(idx);
+                  }}
+                  className={`h-1.5 rounded-full transition-all duration-300 ${
+                    currentSlide === idx ? 'w-5 bg-emerald-400' : 'w-1.5 bg-white/70'
+                  }`}
+                />
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  // Default Bottom Promo Banner matching user's uploaded image 1791971457389.jpg
+  return (
+    <div className="px-2 sm:px-3 py-2">
+      <div 
+        onClick={onBannerClick}
+        className="relative w-full bg-[#f0fdf4] border border-emerald-300/90 rounded-2xl sm:rounded-3xl p-3 sm:p-4 shadow-sm cursor-pointer group hover:border-emerald-400 transition-all overflow-hidden"
+      >
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-2.5 sm:gap-4 relative z-10">
+          {/* Left / Branding & Text */}
+          <div className="flex-1 space-y-1.5 text-left">
+            {/* Header branding */}
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-br from-emerald-600 to-teal-700 text-white flex items-center justify-center font-black text-xs sm:text-sm shadow-xs shrink-0">
+                BB
+              </div>
+              <div>
+                <h3 className="text-xs sm:text-sm font-black text-emerald-950 leading-none font-sans">
+                  বি এন বি - বিজনেস নেটওয়ার্ক বাংলাদেশ
+                </h3>
+                <p className="text-[10px] sm:text-[11px] font-extrabold text-emerald-800 leading-tight">
+                  BNB - Business Network Bangladesh
+                </p>
+              </div>
+            </div>
+
+            {/* Sub-headline */}
+            <div className="pt-0.5 space-y-1">
+              <h4 className="text-xs sm:text-sm font-black text-slate-900 leading-tight">
+                আমাদের শ্রেষ্ঠত্বের প্রশংসা — <span className="text-emerald-800">BNB আপনাদের আস্থার প্রতীক</span>
+              </h4>
+              <ul className="text-[10.5px] sm:text-[11.5px] text-slate-800 font-bold space-y-0.5 leading-snug">
+                <li className="flex items-center gap-1">
+                  <span className="text-emerald-700 font-black">✓</span> শ্রেষ্ঠ বিজনেস নেটওয়ার্ক অ্যাওয়ার্ড বিজয়ী
+                </li>
+                <li className="flex items-center gap-1">
+                  <span className="text-emerald-700 font-black">✓</span> হাজার হাজার সফল উদ্যোক্তাদের পছন্দের প্ল্যাটফর্ম
+                </li>
+                <li className="flex items-center gap-1">
+                  <span className="text-emerald-700 font-black">✓</span> নির্ভরযোগ্য সার্ভিস এবং আন্তরিক সমর্থন
+                </li>
+              </ul>
+              <p className="text-[10px] sm:text-[11px] font-black text-emerald-900 pt-0.5">
+                আমরা বিশ্বাস করি আপনার সাফল্যের গল্পে BNB-তে যুক্ত হয়ে গর্বিত হোন
+              </p>
+            </div>
+          </div>
+
+          {/* Right Action Button */}
+          <div className="shrink-0 flex items-center justify-end w-full sm:w-auto">
+            <span className="bg-[#00843D] hover:bg-[#006e33] text-white text-[11px] sm:text-xs font-black px-4 py-2 rounded-full shadow-xs flex items-center gap-1 transition-colors">
+              ট্যাপ করুন
+            </span>
+          </div>
+        </div>
+
+        {/* Bottom Carousel Indicator Dots as in screenshot */}
+        <div className="flex items-center justify-center gap-1.5 mt-2.5">
+          <div className="bg-[#006e33] px-2.5 py-1 rounded-full flex items-center gap-1.5">
+            <span className="w-4 h-1.5 rounded-full bg-white" />
+            <span className="w-1.5 h-1.5 rounded-full bg-white/60" />
+            <span className="w-1.5 h-1.5 rounded-full bg-white/60" />
+            <span className="w-1.5 h-1.5 rounded-full bg-white/60" />
+          </div>
+        </div>
       </div>
     </div>
   );
@@ -539,8 +711,18 @@ export const Dashboard = React.memo(function Dashboard({
   };
 
   const [showBalance, setShowBalance] = useState(false);
-  const [balanceText, setBalanceText] = useState('ব্যালেন্স দেখতে ট্যাপ করুন');
-  const [isRevealed, setIsRevealed] = useState(false);
+  const [triggerPortalAmount, setTriggerPortalAmount] = useState(0);
+  const balanceTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  const handleTapBalance = () => {
+    if (balanceTimerRef.current) {
+      clearTimeout(balanceTimerRef.current);
+    }
+    setShowBalance(true);
+    balanceTimerRef.current = setTimeout(() => {
+      setShowBalance(false);
+    }, 3000);
+  };
 
   // Advertisement slider states
   const defaultAdSlides = [
@@ -746,6 +928,37 @@ export const Dashboard = React.memo(function Dashboard({
     }
   };
 
+  const handleClearAllNotifications = async () => {
+    try {
+      const deletedGlobalIds = JSON.parse(localStorage.getItem('deleted_global_notifications') || '[]');
+      
+      for (const n of userNotifications) {
+        if (n.userId === 'all') {
+          if (n.id && !deletedGlobalIds.includes(n.id)) deletedGlobalIds.push(n.id);
+          if (n.docId && !deletedGlobalIds.includes(n.docId)) deletedGlobalIds.push(n.docId);
+        } else {
+          const docIdToDelete = n.docId || n.id;
+          if (docIdToDelete) {
+            try {
+              await deleteDoc(doc(db, 'user_notifications', docIdToDelete));
+            } catch (e) {
+              const q = query(collection(db, 'user_notifications'), where('id', '==', n.id));
+              const snap = await getDocs(q);
+              if (!snap.empty) {
+                await deleteDoc(doc(db, 'user_notifications', snap.docs[0].id));
+              }
+            }
+          }
+        }
+      }
+      
+      localStorage.setItem('deleted_global_notifications', JSON.stringify(deletedGlobalIds));
+      setUserNotifications([]);
+    } catch (err) {
+      console.error("Error clearing all notifications:", err);
+    }
+  };
+
   // Push notifications states
   const [logoClickCount, setLogoClickCount] = useState(0);
   const [showSecretPinPrompt, setShowSecretPinPrompt] = useState(false);
@@ -900,7 +1113,7 @@ export const Dashboard = React.memo(function Dashboard({
         bill_pay: 'BNB বিল পে',
         salary: 'BNB স্যালারি পে',
         auto_recharge: 'BNB অটো রিচার্জ',
-        edu: 'AMB জ্ঞান ও শিক্ষা কেন্দ্র'
+        edu: 'BNB জ্ঞান ও শিক্ষা কেন্দ্র'
       };
       setMaintenanceServiceName(serviceNamesBengali[serviceKey] || 'চিহ্নিত সেকশন');
       setShowMaintenanceModal(true);
@@ -911,7 +1124,10 @@ export const Dashboard = React.memo(function Dashboard({
 
   useEffect(() => {
     if (selectedAction) {
-      if (selectedAction === 'deposit') setModalType('deposit');
+      if (selectedAction === 'deposit' || selectedAction === 'add_money') {
+        setActiveTab('add_money');
+        setModalType(null);
+      }
       else if (selectedAction === 'loan' || selectedAction === 'qard' || selectedAction === 'qard_hasana') setModalType('qard');
       else if (selectedAction === 'telecom') setModalType('telecom');
       else if (selectedAction === 'shop') setModalType('shop');
@@ -925,7 +1141,7 @@ export const Dashboard = React.memo(function Dashboard({
     }
   }, [selectedAction, setSelectedAction]);
 
-  // New state variables for AMB agent registration, about us and live chat
+  // New state variables for BNB agent registration, about us and live chat
   const [agentPhone, setAgentPhone] = useState('');
   const [agentDistrict, setAgentDistrict] = useState('');
   const [agentExperience, setAgentExperience] = useState('নেই');
@@ -934,7 +1150,7 @@ export const Dashboard = React.memo(function Dashboard({
   const [hasSubmittedAgent, setHasSubmittedAgent] = useState(false);
 
   const [chatMessages, setChatMessages] = useState<any[]>([
-    { id: '1', sender: 'support', text: 'আসসালামু আলাইকুম! Al Mayadin Bazar (AMB) সাপোর্ট সেন্টারে আপনাকে স্বাগতম। আমি আপনার ডিজিটাল সহকারী। আমাদের সমিতি, ঋণ, টেলিকম বা সুপার শপ সম্পর্কে যেকোনো প্রশ্ন করতে পারেন।', timestamp: '10:30 AM' }
+    { id: '1', sender: 'support', text: 'আসসালামু আলাইকুম! Al Mayadin Bazar (BNB) সাপোর্ট সেন্টারে আপনাকে স্বাগতম। আমি আপনার ডিজিটাল সহকারী। আমাদের সমিতি, ঋণ, টেলিকম বা সুপার শপ সম্পর্কে যেকোনো প্রশ্ন করতে পারেন।', timestamp: '10:30 AM' }
   ]);
   const [chatInputText, setChatInputText] = useState('');
   const [noticeSearchQuery, setNoticeSearchQuery] = useState('');
@@ -1024,7 +1240,9 @@ export const Dashboard = React.memo(function Dashboard({
     const userDocRef = doc(db, 'users', user.uid);
     const unsubUser = onSnapshot(userDocRef, (snap) => {
       if (snap.exists()) {
-        setLiveUser({ uid: snap.id, ...snap.data() } as User);
+        const uData = snap.data();
+        const effectiveBal = getEffectiveBalance(uData);
+        setLiveUser({ uid: snap.id, ...uData, balance: effectiveBal, mainBalance: effectiveBal } as User);
       }
     }, (err) => {
       console.error("Dashboard User subscription error:", err);
@@ -1555,7 +1773,7 @@ export const Dashboard = React.memo(function Dashboard({
   const [withdrawAmount, setWithdrawAmount] = useState('');
   const [investAmount, setInvestAmount] = useState('');
 
-  // AMB Bank Transfer States
+  // BNB Bank Transfer States
   const [transferType, setTransferType] = useState<'member' | 'bank' | 'mobile_fs'>('member');
   const [transferSector, setTransferSector] = useState<'telecom' | 'shop' | 'samity'>('telecom');
   const [selfTransferTarget, setSelfTransferTarget] = useState<'telecom' | 'shop' | 'savings'>('telecom');
@@ -1570,6 +1788,7 @@ export const Dashboard = React.memo(function Dashboard({
   const [searchedMember, setSearchedMember] = useState<User | null>(null);
   const [searchStatusMsg, setSearchStatusMsg] = useState('');
   const [sendMoneySelectedMonths, setSendMoneySelectedMonths] = useState<string[]>([]);
+  const [sendMoneySelectedQuarterly, setSendMoneySelectedQuarterly] = useState<string[]>([]);
   const [sendMoneySelectedYear, setSendMoneySelectedYear] = useState<number>(new Date().getFullYear() > 2050 ? 2050 : Math.max(2026, new Date().getFullYear()));
   const [cvvRevealed, setCvvRevealed] = useState(false);
 
@@ -1621,7 +1840,7 @@ export const Dashboard = React.memo(function Dashboard({
         
         try {
           const res = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&accept-language=bn`, {
-            headers: { 'User-Agent': 'AMB-Cooperative-App' }
+            headers: { 'User-Agent': 'BNB-Cooperative-App' }
           });
           if (res.ok) {
             const data = await res.json();
@@ -1671,7 +1890,7 @@ export const Dashboard = React.memo(function Dashboard({
   // Shop Gadgets items definition
   const shopItems = [
     { id: 'item-1', name: 'Premium Airpods Max', price: 1200, icon: '🎧', description: 'হাই-ফাই নয়েজ ক্যানসেলিং হেডফোন' },
-    { id: 'item-2', name: 'AMB Smart-Watch v5', price: 2500, icon: '⌚', description: 'হার্ট রেট এবং হেলথ ট্র্যাকার' },
+    { id: 'item-2', name: 'BNB Smart-Watch v5', price: 2500, icon: '⌚', description: 'হার্ট রেট এবং হেলথ ট্র্যাকার' },
     { id: 'item-3', name: 'Virtual VR Glass Pro', price: 4500, icon: '🥽', description: 'কো-অপারেটিভ 3ডি মেটাভার্স ভিউয়ার' },
   ];
 
@@ -2034,6 +2253,8 @@ export const Dashboard = React.memo(function Dashboard({
   const handleSearchTransferMember = async () => {
     setSearchedMember(null);
     setSearchStatusMsg('');
+    setSendMoneySelectedMonths([]);
+    setSendMoneySelectedQuarterly([]);
     const input = transferTargetPhoneorId.trim();
     if (!input) {
       setSearchStatusMsg('অনুগ্রহ করে আইডি বা মোবাইল নাম্বার টাইপ করুন।');
@@ -2113,7 +2334,7 @@ export const Dashboard = React.memo(function Dashboard({
     try {
       const currentBalance = liveUser.balance || 0;
       if (currentBalance < due) {
-        setFormError(`পর্যাপ্ত ওয়ালেট ব্যালেন্স নেই! আপনার বর্তমান ওয়ালেট ব্যালেন্স ৳ ${currentBalance.toLocaleString('bn-BD')} BDT।`);
+        setFormError(`পর্যাপ্ত ওয়ালেট ব্যালেন্স নেই! আপনার বর্তমান ওয়ালেট ব্যালেন্স ৳ ${currentBalance.toLocaleString('en-US')} BDT।`);
         setLoading(false);
         return;
       }
@@ -2140,14 +2361,14 @@ export const Dashboard = React.memo(function Dashboard({
         typeLabel: 'করযে হাসানা পরিশোধ',
         amount: due,
         status: 'success',
-        description: `ওয়ালেট ব্যালেন্স হতে সুদমুক্ত করযে হাসানা ঋণ পরিশোধ সফল সম্পন্ন (3 মাসের কুলডাউন কাউন্ট শুরু)।`,
+        description: `ওয়ালেট ব্যালেন্স হতে সুদমুক্ত করযে হাসানা ঋণ পরিশোধ সফল সম্পন্ন (1 মাসের কুলডাউন কাউন্ট শুরু)।`,
         createdAt: nowIso,
         paymentMethod: 'Al Mayadin Wallet',
         receiptNo: `REC-${Math.floor(100000 + Math.random() * 900000)}`
       };
 
       await addDoc(collection(db, 'transactions'), newTx);
-      setFormSuccess(`অভিনন্দন! সফলভাবে আপনার বকেয়া সুদমুক্ত করযে হাসানা ঋণ ৳ ${due.toLocaleString('bn-BD')} টাকা সম্পূর্ণ পরিশোধ সম্পন্ন হয়েছে।`);
+      setFormSuccess(`অভিনন্দন! সফলভাবে আপনার বকেয়া সুদমুক্ত করযে হাসানা ঋণ ৳ ${due.toLocaleString('en-US')} টাকা সম্পূর্ণ পরিশোধ সম্পন্ন হয়েছে।`);
       syncLiveProfile();
     } catch (e) {
       setFormError('ঋণ পরিশোধ ব্যর্থ হয়েছে। দয়া করে ইন্টারনেট কানেকশন চেক করুন।');
@@ -2192,7 +2413,7 @@ export const Dashboard = React.memo(function Dashboard({
         typeLabel: 'সমিতি নতুন লোন আবেদন',
         amount: amt,
         status: 'pending',
-        description: `সমবায় লোন আবেদনঃ ৳${amt.toLocaleString('bn-BD')} টাকা ঋণের রিকোয়েস্ট (ড্যাশবোর্ড আবেদন)`,
+        description: `সমবায় লোন আবেদনঃ ৳${amt.toLocaleString('en-US')} টাকা ঋণের রিকোয়েস্ট (ড্যাশবোর্ড আবেদন)`,
         createdAt: new Date().toISOString(),
         paymentMethod: 'Samity Fund',
         receiptNo: `REC-${Math.floor(100000 + Math.random() * 900000)}`
@@ -2260,7 +2481,7 @@ export const Dashboard = React.memo(function Dashboard({
           if (transferSector === 'samity') {
             const currentBalance = liveUser.balance || 0;
             if (currentBalance < amt) {
-              setFormError(`পর্যাপ্ত মেইন ব্যালেন্স নেই! আপনার বর্তমান ওয়ালেট ব্যালেন্স ৳ ${currentBalance.toLocaleString('bn-BD')} BDT।`);
+              setFormError(`পর্যাপ্ত মেইন ব্যালেন্স নেই! আপনার বর্তমান ওয়ালেট ব্যালেন্স ৳ ${currentBalance.toLocaleString('en-US')} BDT।`);
               setLoading(false);
               return;
             }
@@ -2290,7 +2511,7 @@ export const Dashboard = React.memo(function Dashboard({
                 transferSector: 'telecom'
               };
               await addDoc(collection(db, 'transactions'), newTx);
-              setFormSuccess(`অভিনন্দন! সফলভাবে নিজের মেইন ওয়ালেট হতে ৳ ${amt.toLocaleString('bn-BD')} টাকা টেলিকম ওয়ালেটে স্থানান্তর করা হয়েছে।`);
+              setFormSuccess(`অভিনন্দন! সফলভাবে নিজের মেইন ওয়ালেট হতে ৳ ${amt.toLocaleString('en-US')} টাকা টেলিকম ওয়ালেটে স্থানান্তর করা হয়েছে।`);
 
             } else if (selfTransferTarget === 'shop') {
               const currentShop = liveUser.superShopBalance || 0;
@@ -2317,7 +2538,7 @@ export const Dashboard = React.memo(function Dashboard({
                 transferSector: 'shop'
               };
               await addDoc(collection(db, 'transactions'), newTx);
-              setFormSuccess(`অভিনন্দন! সফলভাবে নিজের মেইন ওয়ালেট হতে ৳ ${amt.toLocaleString('bn-BD')} টাকা সুপার শপ ওয়ালেটে স্থানান্তর করা হয়েছে।`);
+              setFormSuccess(`অভিনন্দন! সফলভাবে নিজের মেইন ওয়ালেট হতে ৳ ${amt.toLocaleString('en-US')} টাকা সুপার শপ ওয়ালেটে স্থানান্তর করা হয়েছে।`);
 
             } else if (selfTransferTarget === 'savings') {
               const currentSavings = liveUser.savings || 0;
@@ -2344,13 +2565,13 @@ export const Dashboard = React.memo(function Dashboard({
                 transferSector: 'samity'
               };
               await addDoc(collection(db, 'transactions'), newTxSel);
-              setFormSuccess(`অভিনন্দন! সফলভাবে নিজের মেইন ওয়ালেট হতে ৳ ${amt.toLocaleString('bn-BD')} টাকা কো-অপারেটিভ সঞ্চয় ব্যালেন্সে স্থানান্তর করা হয়েছে।`);
+              setFormSuccess(`অভিনন্দন! সফলভাবে নিজের মেইন ওয়ালেট হতে ৳ ${amt.toLocaleString('en-US')} টাকা কো-অপারেটিভ সঞ্চয় ব্যালেন্সে স্থানান্তর করা হয়েছে।`);
             }
           } else if (transferSector === 'telecom') {
             const currentTelecom = liveUser.telecomBalance || 0;
             const currentBalance = liveUser.balance || 0;
             if (currentTelecom < amt) {
-              setFormError(`পর্যাপ্ত টেলিকম ব্যালেন্স নেই! আপনার বর্তমান টেলিকম ব্যালেন্স ৳ ${currentTelecom.toLocaleString('bn-BD')} BDT।`);
+              setFormError(`পর্যাপ্ত টেলিকম ব্যালেন্স নেই! আপনার বর্তমান টেলিকম ব্যালেন্স ৳ ${currentTelecom.toLocaleString('en-US')} BDT।`);
               setLoading(false);
               return;
             }
@@ -2378,13 +2599,13 @@ export const Dashboard = React.memo(function Dashboard({
             };
 
             await addDoc(collection(db, 'transactions'), newTxT);
-            setFormSuccess(`অভিনন্দন! সফলভাবে নিজের টেলিকম ওয়ালেট হতে ৳ ${amt.toLocaleString('bn-BD')} টাকা ড্যাশবোর্ড মেইন ব্যালেন্সে স্থানান্তর করা হয়েছে।`);
+            setFormSuccess(`অভিনন্দন! সফলভাবে নিজের টেলিকম ওয়ালেট হতে ৳ ${amt.toLocaleString('en-US')} টাকা ড্যাশবোর্ড মেইন ব্যালেন্সে স্থানান্তর করা হয়েছে।`);
 
           } else if (transferSector === 'shop') {
             const currentShop = liveUser.superShopBalance || 0;
             const currentBalance = liveUser.balance || 0;
             if (currentShop < amt) {
-              setFormError(`পর্যাপ্ত সুপার শপ ব্যালেন্স নেই! আপনার বর্তমান সুপার শপ ব্যালেন্স ৳ ${currentShop.toLocaleString('bn-BD')} BDT।`);
+              setFormError(`পর্যাপ্ত সুপার শপ ব্যালেন্স নেই! আপনার বর্তমান সুপার শপ ব্যালেন্স ৳ ${currentShop.toLocaleString('en-US')} BDT।`);
               setLoading(false);
               return;
             }
@@ -2412,13 +2633,13 @@ export const Dashboard = React.memo(function Dashboard({
             };
 
             await addDoc(collection(db, 'transactions'), newTxS);
-            setFormSuccess(`অভিনন্দন! সফলভাবে নিজের সুপার শপ ওয়ালেট হতে ৳ ${amt.toLocaleString('bn-BD')} টাকা ড্যাশবোর্ড মেইন ব্যালেন্সে স্থানান্তর করা হয়েছে।`);
+            setFormSuccess(`অভিনন্দন! সফলভাবে নিজের সুপার শপ ওয়ালেট হতে ৳ ${amt.toLocaleString('en-US')} টাকা ড্যাশবোর্ড মেইন ব্যালেন্সে স্থানান্তর করা হয়েছে।`);
           }
         } else {
           // CASE B: Transfer to another member
           const receiverRef = doc(db, 'users', searchedMember.uid);
           if (transferSector === 'telecom') {
-            const cleanTrxId = generateAmbTrxId('BN');
+            const cleanTrxId = generateBNBTrxId('BN');
             const now = new Date();
             const formattedTime = `${now.getDate().toString().padStart(2, '0')}/${(now.getMonth() + 1).toString().padStart(2, '0')}/${now.getFullYear()} ${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
 
@@ -2439,7 +2660,7 @@ export const Dashboard = React.memo(function Dashboard({
               const currentTelecomReceiver = rData.telecomBalance || 0;
 
               if (currentTelecomSender < amt) {
-                throw new Error(`পর্যাপ্ত টেলিকম ব্যালেন্স নেই! আপনার বর্তমান টেলিকম ব্যালেন্স ৳ ${currentTelecomSender.toLocaleString('bn-BD')} BDT।`);
+                throw new Error(`পর্যাপ্ত টেলিকম ব্যালেন্স নেই! আপনার বর্তমান টেলিকম ব্যালেন্স ৳ ${currentTelecomSender.toLocaleString('en-US')} BDT।`);
               }
 
               senderNewBal = currentTelecomSender - amt;
@@ -2519,10 +2740,10 @@ export const Dashboard = React.memo(function Dashboard({
               });
             });
 
-            setFormSuccess(`অভিনন্দন! সফলভাবে সদস্য ${searchedMember.name} কে ৳ ${amt.toLocaleString('bn-BD')} টেলিকম ব্যালেন্স স্থানান্তর করা হয়েছে।`);
+            setFormSuccess(`অভিনন্দন! সফলভাবে সদস্য ${searchedMember.name} কে ৳ ${amt.toLocaleString('en-US')} টেলিকম ব্যালেন্স স্থানান্তর করা হয়েছে।`);
 
           } else if (transferSector === 'shop') {
-            const cleanTrxId = generateAmbTrxId('BN');
+            const cleanTrxId = generateBNBTrxId('BN');
             const now = new Date();
             const formattedTime = `${now.getDate().toString().padStart(2, '0')}/${(now.getMonth() + 1).toString().padStart(2, '0')}/${now.getFullYear()} ${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
 
@@ -2543,7 +2764,7 @@ export const Dashboard = React.memo(function Dashboard({
               const currentShopReceiver = rData.superShopBalance || 0;
 
               if (currentShopSender < amt) {
-                throw new Error(`পর্যাপ্ত সুপার শপ ব্যালেন্স নেই! আপনার বর্তমান সুপার শপ ব্যালেন্স ৳ ${currentShopSender.toLocaleString('bn-BD')} BDT।`);
+                throw new Error(`পর্যাপ্ত সুপার শপ ব্যালেন্স নেই! আপনার বর্তমান সুপার শপ ব্যালেন্স ৳ ${currentShopSender.toLocaleString('en-US')} BDT।`);
               }
 
               senderNewBal = currentShopSender - amt;
@@ -2621,7 +2842,7 @@ export const Dashboard = React.memo(function Dashboard({
               });
             });
 
-            setFormSuccess(`অভিনন্দন! সফলভাবে সদস্য ${searchedMember.name} কে ৳ ${amt.toLocaleString('bn-BD')} সুপার শপ ব্যালেন্স স্থানান্তর করা হয়েছে।`);
+            setFormSuccess(`অভিনন্দন! সফলভাবে সদস্য ${searchedMember.name} কে ৳ ${amt.toLocaleString('en-US')} সুপার শপ ব্যালেন্স স্থানান্তর করা হয়েছে।`);
 
           } else {
             // BNB to BNB Transfer: Automatic direct transfer based on destination account!
@@ -2633,7 +2854,7 @@ export const Dashboard = React.memo(function Dashboard({
               cleanDigits.length === 12 && cleanDigits.endsWith('0')
             );
 
-            const cleanTrxId = generateAmbTrxId('BN');
+            const cleanTrxId = generateBNBTrxId('BN');
             const now = new Date();
             const formattedTime = `${now.getDate().toString().padStart(2, '0')}/${(now.getMonth() + 1).toString().padStart(2, '0')}/${now.getFullYear()} ${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
 
@@ -2653,7 +2874,7 @@ export const Dashboard = React.memo(function Dashboard({
               const currentBalanceSender = getEffectiveBalance(sData);
 
               if (currentBalanceSender < amt) {
-                throw new Error(`পর্যাপ্ত মেইন ব্যালেন্স নেই! আপনার বর্তমান ওয়ালেট ব্যালেন্স ৳ ${currentBalanceSender.toLocaleString('bn-BD')} BDT।`);
+                throw new Error(`পর্যাপ্ত মেইন ব্যালেন্স নেই! আপনার বর্তমান ওয়ালেট ব্যালেন্স ৳ ${currentBalanceSender.toLocaleString('en-US')} BDT।`);
               }
 
               senderNewBal = currentBalanceSender - amt;
@@ -2666,13 +2887,35 @@ export const Dashboard = React.memo(function Dashboard({
                 const existingPaidMonths: string[] = rData.samityPaidMonths || [];
                 const targetRate = Number(rData.monthlySavingsTarget) || 1000;
                 const updatedPaidMonths = normalizePaidMonthsArray([...existingPaidMonths, ...sendMoneySelectedMonths], receiverNewBal, targetRate);
-                transaction.update(receiverRef, { savings: receiverNewBal, dpsBalance: receiverNewBal, samityPaidMonths: updatedPaidMonths });
+                
+                const existingQuarterlyPaid: string[] = Array.isArray(rData.samityQuarterlyPaidMonths) ? rData.samityQuarterlyPaidMonths : [];
+                const updatedQuarterlyPaid = [...new Set([...existingQuarterlyPaid, ...sendMoneySelectedQuarterly])];
+                const newShares = Math.floor(receiverNewBal / 1000);
+
+                transaction.update(receiverRef, { 
+                  savings: receiverNewBal, 
+                  dpsBalance: receiverNewBal, 
+                  shares: newShares,
+                  samityPaidMonths: updatedPaidMonths,
+                  samityQuarterlyPaidMonths: updatedQuarterlyPaid,
+                  updatedAt: now.toISOString()
+                });
               } else {
                 // Credit to Receiver's MAIN balance!
                 const currentBalanceReceiver = getEffectiveBalance(rData);
                 receiverNewBal = currentBalanceReceiver + amt;
-                transaction.update(receiverRef, { balance: receiverNewBal, mainBalance: receiverNewBal });
+                transaction.update(receiverRef, { balance: receiverNewBal, mainBalance: receiverNewBal, updatedAt: now.toISOString() });
               }
+
+              let extraItemsDesc = '';
+              if (sendMoneySelectedQuarterly.length > 0) {
+                extraItemsDesc += `${sendMoneySelectedQuarterly.length}টি ত্রৈমাসিক কিস্তি`;
+              }
+              if (sendMoneySelectedMonths.length > 0) {
+                if (extraItemsDesc) extraItemsDesc += ' ও ';
+                extraItemsDesc += `${sendMoneySelectedMonths.length} মাসের নিয়মিত কিস্তি`;
+              }
+              const descSuffix = extraItemsDesc ? ` (${extraItemsDesc})` : '';
 
               const txIdSender = `tx-transfer-out-${Date.now()}`;
               const txIdReceiver = `tx-transfer-in-${Date.now()}`;
@@ -2693,7 +2936,7 @@ export const Dashboard = React.memo(function Dashboard({
                 totalDeducted: amt,
                 status: 'success',
                 description: isSamityVirtualTarget 
-                  ? `সদস্য ${searchedMember.name} (আইডি: ${searchedMember.memberId}) এর সমিতি সঞ্চয় একাউন্টে (লাস্টে 0) ৳${amt} পাঠানো সফল। TrxID: ${cleanTrxId}`
+                  ? `সদস্য ${searchedMember.name} (আইডি: ${searchedMember.memberId}) এর সমিতি সঞ্চয় একাউন্টে ৳${amt}${descSuffix} পাঠানো সফল। TrxID: ${cleanTrxId}`
                   : `সদস্য ${searchedMember.name} (আইডি: ${searchedMember.memberId}) কে মেইন ব্যালেন্সে ৳${amt} পাঠানো সফল। TrxID: ${cleanTrxId}`,
                 createdAt: now.toISOString(),
                 paymentMethod: 'Al Mayadin Wallet',
@@ -2717,7 +2960,7 @@ export const Dashboard = React.memo(function Dashboard({
                 amount: amt,
                 status: 'success',
                 description: isSamityVirtualTarget
-                  ? `সদস্য ${liveUser.name} (আইডি: ${liveUser.memberId}) হতে সমিতি সঞ্চয় একাউন্টে জমা প্রাপ্তি। TrxID: ${cleanTrxId}`
+                  ? `সদস্য ${liveUser.name} (আইডি: ${liveUser.memberId}) হতে সমিতি সঞ্চয় একাউন্টে ৳${amt}${descSuffix} জমা প্রাপ্তি। TrxID: ${cleanTrxId}`
                   : `সদস্য ${liveUser.name} (আইডি: ${liveUser.memberId}) হতে মেইন ব্যালেন্সে জমা প্রাপ্তি। TrxID: ${cleanTrxId}`,
                 createdAt: now.toISOString(),
                 paymentMethod: 'Al Mayadin Wallet',
@@ -2731,7 +2974,7 @@ export const Dashboard = React.memo(function Dashboard({
                 userId: liveUser.uid,
                 memberId: liveUser.memberId || '',
                 title: '💸 টাকা পাঠানো সফল (Money Sent)',
-                body: `You have sent Tk ${amt.toFixed(2)} to ${searchedMember.phone || ''}. Fee Tk 0.00. Balance Tk ${senderNewBal.toFixed(2)}. TrxID ${cleanTrxId} at ${formattedTime}`,
+                body: `You have sent Tk ${amt.toFixed(2)} to ${searchedMember.phone || ''}${descSuffix}. Fee Tk 0.00. Balance Tk ${senderNewBal.toFixed(2)}. TrxID ${cleanTrxId} at ${formattedTime}`,
                 read: false,
                 isPersonal: true,
                 isTransactionHistory: true,
@@ -2745,7 +2988,7 @@ export const Dashboard = React.memo(function Dashboard({
                 memberId: searchedMember.memberId || '',
                 title: isSamityVirtualTarget ? '📥 সমিতি একাউন্টে সঞ্চয় জমা সফল' : '📥 টাকা গ্রহণ সফল (Money Received)',
                 body: isSamityVirtualTarget
-                  ? `You have received Tk ${amt.toFixed(2)} from ${liveUser.phone || ''} into your Samity Savings Account. Ref 0. Fee Tk 0.00. Savings Balance Tk ${receiverNewBal.toFixed(2)}. TrxID ${cleanTrxId} at ${formattedTime}`
+                  ? `You have received Tk ${amt.toFixed(2)} from ${liveUser.phone || ''} into your Samity Savings Account${descSuffix}. Ref 0. Fee Tk 0.00. Savings Balance Tk ${receiverNewBal.toFixed(2)}. TrxID ${cleanTrxId} at ${formattedTime}`
                   : `You have received Tk ${amt.toFixed(2)} from ${liveUser.phone || ''} into your Main Wallet Balance. Ref 0. Fee Tk 0.00. Main Balance Tk ${receiverNewBal.toFixed(2)}. TrxID ${cleanTrxId} at ${formattedTime}`,
                 read: false,
                 isPersonal: true,
@@ -2756,9 +2999,9 @@ export const Dashboard = React.memo(function Dashboard({
             });
 
             if (isSamityVirtualTarget) {
-              setFormSuccess(`অভিনন্দন! সফলভাবে সদস্য ${searchedMember.name}-এর সমিতি ভার্চুয়াল একাউন্টে (লাস্টে 0) ৳ ${amt.toLocaleString('bn-BD')} সঞ্চয় জমা স্থানান্তর সম্পন্ন হয়েছে।`);
+              setFormSuccess(`অভিনন্দন! সফলভাবে সদস্য ${searchedMember.name}-এর সমিতি ভার্চুয়াল একাউন্টে (লাস্টে 0) ৳ ${amt.toLocaleString('en-US')} সঞ্চয় জমা স্থানান্তর সম্পন্ন হয়েছে।`);
             } else {
-              setFormSuccess(`অভিনন্দন! সফলভাবে সদস্য ${searchedMember.name}-এর মেইন ব্যালেন্সে ৳ ${amt.toLocaleString('bn-BD')} স্থানান্তর সম্পন্ন হয়েছে।`);
+              setFormSuccess(`অভিনন্দন! সফলভাবে সদস্য ${searchedMember.name}-এর মেইন ব্যালেন্সে ৳ ${amt.toLocaleString('en-US')} স্থানান্তর সম্পন্ন হয়েছে।`);
             }
           }
         }
@@ -2772,7 +3015,7 @@ export const Dashboard = React.memo(function Dashboard({
 
         const currentBalanceSender = getEffectiveBalance(liveUser);
         if (currentBalanceSender < amt) {
-          setFormError(`পর্যাপ্ত মেইন ব্যালেন্স নেই! আপনার বর্তমান ওয়ালেট ব্যালেন্স ৳ ${currentBalanceSender.toLocaleString('bn-BD')} BDT।`);
+          setFormError(`পর্যাপ্ত মেইন ব্যালেন্স নেই! আপনার বর্তমান ওয়ালেট ব্যালেন্স ৳ ${currentBalanceSender.toLocaleString('en-US')} BDT।`);
           setLoading(false);
           return;
         }
@@ -2797,7 +3040,7 @@ export const Dashboard = React.memo(function Dashboard({
           };
 
         await addDoc(collection(db, 'transactions'), newTx);
-        setFormSuccess(`আপনার ৳ ${amt.toLocaleString('bn-BD')} ব্যাংক/MFS উত্তোলনের আবেদনটি সফলভাবে দাখিল করা হয়েছে এবং এর স্ট্যাটাস অপেক্ষমাণ (Pending)। এডমিন এপ্রুভ করার সাথে সাথে আপনার পেমেন্ট সম্পন্ন হবে।`);
+        setFormSuccess(`আপনার ৳ ${amt.toLocaleString('en-US')} ব্যাংক/MFS উত্তোলনের আবেদনটি সফলভাবে দাখিল করা হয়েছে এবং এর স্ট্যাটাস অপেক্ষমাণ (Pending)। এডমিন এপ্রুভ করার সাথে সাথে আপনার পেমেন্ট সম্পন্ন হবে।`);
       }
 
       setTransferAmountInput('');
@@ -2807,6 +3050,7 @@ export const Dashboard = React.memo(function Dashboard({
       setSearchedMember(null);
       setSearchStatusMsg('');
       setSendMoneySelectedMonths([]);
+      setSendMoneySelectedQuarterly([]);
 
       await syncLiveProfile();
     } catch (e) {
@@ -2845,7 +3089,7 @@ export const Dashboard = React.memo(function Dashboard({
       }
 
       // Generate virtual card number
-      const cardNo = `AMB-RC-${Math.floor(100000 + Math.random() * 900000)}`;
+      const cardNo = `BNB-RC-${Math.floor(100000 + Math.random() * 900000)}`;
 
       const newCard = {
         userId: liveUser.uid,
@@ -2986,7 +3230,7 @@ export const Dashboard = React.memo(function Dashboard({
       } else if (textLower.includes('এজেন্ট') || textLower.includes('কাজ')) {
         replyText = 'আমাদের সম্মানিত এজেন্ট হিসেবে কাজ শুরু করতে চাইলে সার্ভিস গ্রিডের "এজেন্ট রেজিস্টার" অপশনে গিয়ে আপনার আবেদনটি দাখিল করুন। এডমিন প্যানেল আপনার আবেদনটি রিভিও করে যোগাযোগ করবে।';
       } else {
-        replyText = 'আসসালামু আলাইকুম! আপনার মেসেজটি সফলভাবে বাংলাদেশ নেটওয়ার্ক (AMB) সাপোর্ট সেন্টারে রেকর্ড করা হয়েছে। যেকোনো তথ্যের জন্য আমাদের সাপোর্ট নম্বরে যোগাযোগ করতে পারেন অথবা এডমিনের ফিরতি উত্তরের জন্য অপেক্ষা করুন।';
+        replyText = 'আসসালামু আলাইকুম! আপনার মেসেজটি সফলভাবে বাংলাদেশ নেটওয়ার্ক (BNB) সাপোর্ট সেন্টারে রেকর্ড করা হয়েছে। যেকোনো তথ্যের জন্য আমাদের সাপোর্ট নম্বরে যোগাযোগ করতে পারেন অথবা এডমিনের ফিরতি উত্তরের জন্য অপেক্ষা করুন।';
       }
 
       const replyMsg = { 
@@ -3147,7 +3391,7 @@ export const Dashboard = React.memo(function Dashboard({
         typeLabel: "সুপার শপ ফান্ড ট্রান্সফার",
         amount: amountNum,
         status: "success",
-        description: `মেইন ব্যালেন্স থেকে সুপার শপ ব্যালেন্সে ৳ ${amountNum.toLocaleString('bn-BD')} ফান্ড স্থানান্তরিত করা হয়েছে।`,
+        description: `মেইন ব্যালেন্স থেকে সুপার শপ ব্যালেন্সে ৳ ${amountNum.toLocaleString('en-US')} ফান্ড স্থানান্তরিত করা হয়েছে।`,
         createdAt: new Date().toISOString()
       });
       
@@ -3166,7 +3410,7 @@ export const Dashboard = React.memo(function Dashboard({
   const handleBuyPremiumSafi = async (itemName: string, itemPrice: number) => {
     if (!liveUser) return;
     
-    const confirmBuy = confirm(`আপনি কি ৳ ${itemPrice.toLocaleString('bn-BD')} টাকা দিয়ে "${itemName}" পণ্যটি কিনতে চান?`);
+    const confirmBuy = confirm(`আপনি কি ৳ ${itemPrice.toLocaleString('en-US')} টাকা দিয়ে "${itemName}" পণ্যটি কিনতে চান?`);
     if (!confirmBuy) return;
     
     const pin = prompt(`ক্রয় সম্পন্ন করতে আপনার 4 ডিজিটের সিকিউরিটি পিন নাম্বার টাইপ করুনঃ`);
@@ -3264,7 +3508,7 @@ export const Dashboard = React.memo(function Dashboard({
         createdAt: new Date().toISOString(),
         description: withdrawMethod === 'DBBL_Bank'
           ? `Bank Transfer - Dutch-Bangla Bank PLC. (DBBL) | অ্যাকাউন্টের নাম: ${withdrawAccName || liveUser.name} | অ্যাকাউন্ট নম্বর: ${withdrawAccNo}${withdrawBranch ? ` | শাখা: ${withdrawBranch}` : ''}${withdrawRouting ? ` | Routing Number: ${withdrawRouting}` : ''}`
-          : `${withdrawMethod} (${withdrawRecipientNumber || withdrawAccNo}) নম্বরে ৳${amountNum.toLocaleString('bn-BD')} উত্তোলন আবেদন`
+          : `${withdrawMethod} (${withdrawRecipientNumber || withdrawAccNo}) নম্বরে ৳${amountNum.toLocaleString('en-US')} উত্তোলন আবেদন`
       });
       
       alert("আপনার উত্তোলন আবেদনটি সফলভাবে জমা হয়েছে। এডমিন প্যানেল এটি যাচাই করে 2 ঘণ্টার মধ্যে অনুমোদন করবে।");
@@ -3332,7 +3576,7 @@ export const Dashboard = React.memo(function Dashboard({
         txId: qardDonationTxId || "",
         purpose: qardDonationPurpose,
         createdAt: new Date().toISOString(),
-        description: `হাসানাত তহবিলে ৳ ${amountNum.toLocaleString('bn-BD')} অনুদান প্রদান (${qardDonationPayMethod === 'balance' ? 'মেইন ওয়ালেট' : 'ম্যানুয়াল ডিপোজিট'})`
+        description: `হাসানাত তহবিলে ৳ ${amountNum.toLocaleString('en-US')} অনুদান প্রদান (${qardDonationPayMethod === 'balance' ? 'মেইন ওয়ালেট' : 'ম্যানুয়াল ডিপোজিট'})`
       });
       
       alert("হাসানাত তহবিলে আপনার অনুদানটি সফলভাবে জমা হয়েছে। আল্লাহ আপনাকে উত্তম প্রতিদান দান করুন। আমীন।");
@@ -3363,7 +3607,7 @@ export const Dashboard = React.memo(function Dashboard({
     
     const maxLimit = liveUser.role === 'admin' ? 10000 : liveUser.memberGroup === 'need' ? 2000 : 5000;
     if (amountNum > maxLimit) {
-      alert(`আপনার বর্তমান গ্রুপ অনুযায়ী সর্বোচ্চ ঋণসীমা ৳ ${maxLimit.toLocaleString('bn-BD')} BDT।`);
+      alert(`আপনার বর্তমান গ্রুপ অনুযায়ী সর্বোচ্চ ঋণসীমা ৳ ${maxLimit.toLocaleString('en-US')} BDT।`);
       return;
     }
     
@@ -3388,7 +3632,7 @@ export const Dashboard = React.memo(function Dashboard({
         durationMonths: qardLoanDuration || 1,
         whatsapp: qardLoanWhatsapp || "",
         createdAt: new Date().toISOString(),
-        description: `সুদমুক্ত কর্জে হাসানা ঋণ আবেদন: ৳ ${amountNum.toLocaleString('bn-BD')} (${qardLoanDuration} মাস মেয়াদি)`
+        description: `সুদমুক্ত কর্জে হাসানা ঋণ আবেদন: ৳ ${amountNum.toLocaleString('en-US')} (${qardLoanDuration} মাস মেয়াদি)`
       });
       
       alert("আপনার কর্জে হাসানা সুদমুক্ত ঋণ আবেদনটি সফলভাবে জমা হয়েছে। এডমিন প্যানেল আবেদনপত্রটি যাচাই করে অনুমোদন করবে।");
@@ -3564,372 +3808,283 @@ export const Dashboard = React.memo(function Dashboard({
 
   return (
     <div className="bg-slate-50 min-h-screen flex flex-col relative text-slate-800 font-sans" id="dashboard-root">
-      {/* 1. Header */}
-      <header className="bg-white text-slate-800 px-3 xs:px-4 py-2 flex items-center justify-between sticky top-0 z-40 shadow-sm border-b border-slate-100 h-[64px] xs:h-[68px] shrink-0 font-sans">
-        <div className="flex items-center gap-2 xs:gap-3">
-          {/* Menu button - light mint circle with green icon */}
-          <button 
-            type="button"
-            onClick={onOpenDrawer}
-            aria-label="Open Menu"
-            className="w-10 h-10 xs:w-11 h-11 rounded-full bg-[#e6f7f4] hover:bg-[#d5f3ed] active:scale-95 text-[#00b57e] transition-transform duration-75 flex items-center justify-center shrink-0 border-none cursor-pointer shadow-3xs touch-manipulation"
-          >
-            <Menu className="w-5.5 h-5.5 xs:w-6 h-6 text-[#00b57e]" />
-          </button>
-          
-          {/* Vertical stacked title with user name */}
-          <div className="flex flex-col text-left">
-            <span className="text-[9.5px] xs:text-[10.5px] font-black text-slate-850 leading-none tracking-tight uppercase">
-              BUSINESS NETWORK
-            </span>
-            <span className="text-[9.5px] xs:text-[10.5px] font-black text-slate-850 leading-none tracking-tight uppercase mt-0.5">
-              BANGLADESH
-            </span>
-            <span className="text-[8.5px] xs:text-[9.5px] font-semibold text-slate-450 lowercase mt-0.5 leading-none">
-              {(liveUser?.name || 'md rasel mia').toLowerCase()}
-            </span>
-          </div>
-        </div>
-
-        {/* Middle Portion: Dual Balance / Due interactive Pill Container (Exact white/mint/pink replica layout, made even larger & bolder as requested) */}
-        <div 
-          onClick={() => {
-            setShowBalance(!showBalance);
-          }}
-          className="flex items-center border border-slate-300 bg-white rounded-full overflow-hidden h-[48px] xs:h-[56px] select-none cursor-pointer shadow-3xs transition-all duration-300 hover:border-slate-400 mx-1 flex-grow max-w-[54%] xs:max-w-[58%]"
-        >
-          {/* Left Portion: Total Balance (Teal bg) */}
-          <div className="bg-[#00b57e] px-2 xs:px-3.5 py-1 flex flex-col justify-center items-center h-full flex-grow rounded-l-full transition-all duration-300 active:opacity-90 min-w-0">
-            <span className="text-[9px] xs:text-[10px] sm:text-[11px] font-black text-emerald-100 uppercase tracking-tight leading-none">মোট ব্যালেন্স</span>
-            <span className="text-[13.5px] xs:text-[16.5px] sm:text-[19px] font-black text-white mt-0.5 leading-none transition-all duration-300 tracking-tight truncate">
-              {showBalance ? '৳' + (liveUser?.balance || 0).toLocaleString('bn-BD', { minimumFractionDigits: 2 }) : 'ট্যাপ করুন'}
-            </span>
-          </div>
-
-          {/* Right Portion: Due / বকেয়া (Light Pink bg) */}
-          <div className="bg-[#fff1f2] px-2.5 xs:px-3 py-1 flex flex-col justify-center items-center h-full min-w-[76px] xs:min-w-[92px] sm:min-w-[102px] rounded-r-full border-l border-white/60 transition-all duration-300">
-            <span className="text-[9px] xs:text-[10px] sm:text-[11px] font-black text-[#e11d48] uppercase tracking-tight leading-none">বকেয়া</span>
-            <span className="text-[13.5px] xs:text-[16.5px] sm:text-[19px] font-black text-[#e11d48] mt-0.5 leading-none tracking-tight">
-              ৳{(liveUser?.dueLoan || 0).toLocaleString('bn-BD', { minimumFractionDigits: 2 })}
-            </span>
-          </div>
-        </div>
-
-        {/* Right tools: Notification Bell & Admin Button */}
-        <div className="flex items-center gap-1.5 xs:gap-2 shrink-0">
-          {/* Notification Icon */}
-          {(() => {
-            const unreadCount = userNotifications.filter(n => !isNotificationRead(n)).length;
-            const hasUnread = unreadCount > 0;
-            return (
-              <button 
-                type="button"
-                onClick={() => {
-                  setShowNotificationsModal(true);
-                  handleMarkAllAsRead();
-                }}
-                className={`w-10 h-10 xs:w-11 h-11 rounded-full transition relative cursor-pointer active:scale-95 flex items-center justify-center ${
-                  hasUnread
-                    ? 'bg-rose-600 text-white border-2 border-rose-400 shadow-md animate-pulse'
-                    : 'bg-amber-400 text-slate-950 border-2 border-amber-500 shadow-sm hover:bg-amber-300'
-                }`}
-                title={hasUnread ? `${unreadCount}টি অপঠিত নোটিফিকেশন` : 'নোটিফিকেশন সেন্টার (সকল পঠিত)'}
-              >
-                <Bell className={`w-5 h-5 ${hasUnread ? 'text-white' : 'text-slate-950'}`} />
-                {hasUnread && (
-                  <span className="absolute -top-1 -right-1 bg-yellow-300 text-rose-950 font-black text-[10px] w-5 h-5 rounded-full flex items-center justify-center border-2 border-white shadow-sm font-mono">
-                    {unreadCount > 9 ? '9+' : unreadCount}
-                  </span>
-                )}
-              </button>
-            );
-          })()}
-
-          {/* Admin panel launcher for authorized roles */}
-          {(user?.role === 'admin' || user?.role === 'sub_admin') && (
+      {/* 1. Unified Deep Green Header containing Header controls + Announcement Ticker seamlessly */}
+      <header className="bg-[#0b6623] text-white sticky top-0 z-40 shadow-md font-sans select-none w-full max-w-full overflow-x-hidden box-border">
+        {/* Top Row: Navigation, Title, Balance/Due Pills, Tools */}
+        <div className="px-2 xs:px-3 pt-2 pb-1 flex items-center justify-between gap-1 xs:gap-1.5 min-h-[60px] w-full max-w-full overflow-x-hidden box-border">
+          {/* Left: Menu & Name */}
+          <div className="flex items-center gap-1 xs:gap-1.5 shrink-0 max-w-[120px] xs:max-w-[145px]">
             <button 
               type="button"
-              onClick={onTriggerAdmin}
-              className="px-2 py-1 bg-amber-500 hover:bg-amber-600 text-slate-950 font-black rounded-lg transition text-[9px] xs:text-[10px] cursor-pointer shadow-3xs hover:shadow-2xs active:scale-95"
+              onClick={onOpenDrawer}
+              aria-label="Open Menu"
+              className="w-8 h-8 xs:w-9 xs:h-9 rounded-full hover:bg-white/10 active:scale-95 text-white transition-all flex items-center justify-center border-none cursor-pointer touch-manipulation shrink-0"
             >
-              ADMIN
+              <Menu className="w-5 h-5 xs:w-6 xs:h-6 text-white" />
             </button>
-          )}
+            <div className="flex flex-col text-left leading-tight overflow-hidden">
+              <span className="text-[10px] xs:text-[11px] font-bold text-white leading-none tracking-tight truncate">
+                Business Network
+              </span>
+              <span className="text-[10px] xs:text-[11px] font-bold text-white leading-none tracking-tight mt-0.5 truncate">
+                Bangladesh
+              </span>
+              <span className="text-[9px] xs:text-[10px] font-normal text-emerald-100 leading-none mt-0.5 capitalize truncate">
+                {liveUser?.name || 'Md Rasel Mia'}
+              </span>
+            </div>
+          </div>
+
+          {/* Center: Dual Pill Buttons Container (Yellow Balance & Red Due) - Guaranteed Mobile Screen Containment */}
+          <div className="flex items-center rounded-full overflow-hidden shadow-lg shrink-0 mx-auto border-0 bg-transparent max-w-[46%] xs:max-w-none">
+            {/* Yellow Main Balance Pill (Displays 'Balance' in English, Tap reveals amount for 3 seconds) */}
+            <button
+              type="button"
+              onClick={handleTapBalance}
+              title="Tap to view main balance for 3 seconds"
+              className="bg-amber-400 hover:bg-amber-500 px-2.5 xs:px-4 py-2 flex items-center justify-center text-slate-950 font-black text-[13px] xs:text-[15.5px] sm:text-[18px] transition-all cursor-pointer min-w-[75px] xs:min-w-[105px] sm:min-w-[135px] h-9 xs:h-11 rounded-l-full active:scale-98 shadow-xs border-0 truncate"
+            >
+              <span className="whitespace-nowrap tracking-tight font-black font-sans truncate">
+                {showBalance 
+                  ? '৳' + (liveUser?.balance || 0).toLocaleString('bn-BD', { minimumFractionDigits: 2 }) 
+                  : 'Balance'}
+              </span>
+            </button>
+
+            {/* Red Due Loan Pill (Always Visible - Prominent Outstanding Amount) */}
+            <div className="bg-rose-600 px-2.5 xs:px-4 py-2 flex items-center justify-center text-white font-black text-[13px] xs:text-[15.5px] sm:text-[18px] min-w-[75px] xs:min-w-[105px] sm:min-w-[135px] h-9 xs:h-11 rounded-r-full shadow-xs border-0 truncate">
+              <span className="whitespace-nowrap tracking-tight font-black font-sans">
+                ৳{(liveUser?.dueLoan || 0).toLocaleString('bn-BD', { minimumFractionDigits: 2 })}
+              </span>
+            </div>
+          </div>
+
+          {/* Right: Bell & Admin Button */}
+          <div className="flex items-center gap-1.5 shrink-0">
+            {(() => {
+              const unreadCount = userNotifications.filter(n => !isNotificationRead(n)).length;
+              const hasUnread = unreadCount > 0;
+              return (
+                <button 
+                  type="button"
+                  onClick={() => {
+                    setShowNotificationsModal(true);
+                    handleMarkAllAsRead();
+                  }}
+                  className="w-9 h-9 rounded-full bg-emerald-800/80 hover:bg-emerald-700 transition relative cursor-pointer active:scale-95 flex items-center justify-center border border-white/20"
+                  title="নোটিফিকেশন সেন্টার"
+                >
+                  <Bell className="w-5 h-5 text-white" />
+                  {hasUnread && (
+                    <span className="absolute -top-1 -right-1 bg-red-500 text-white font-black text-[9px] w-4 h-4 rounded-full flex items-center justify-center border border-white font-mono">
+                      {unreadCount > 9 ? '9+' : unreadCount}
+                    </span>
+                  )}
+                </button>
+              );
+            })()}
+
+            {(user?.role === 'admin' || user?.role === 'sub_admin') && (
+              <button 
+                type="button"
+                onClick={onTriggerAdmin}
+                className="px-2 py-1 bg-amber-400 text-slate-950 font-black rounded text-[9px] uppercase cursor-pointer"
+              >
+                ADMIN
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Bottom Row: Seamless Announcement Ticker (ঘোষণা) - Integrated directly in the exact same green container with no gap or line */}
+        <div className="bg-[#0b6623] px-3.5 pb-2 pt-0.5 flex items-center gap-2 text-white">
+          <span className="text-[12.5px] font-bold text-white shrink-0 tracking-wide">ঘোষণা</span>
+          <div className="flex-grow overflow-hidden relative flex items-center">
+            <marquee className="text-[11.5px] font-normal text-emerald-100 leading-none py-0.5" behavior="scroll" direction="left" scrollamount="4">
+              {appConfig?.tickerText || "ব্যবসা নেটওয়ার্ক বাংলাদেশ সমবায় ও রিচার্জ পোর্টাল-এ আপনাকে স্বাগতম। আমাদের সাথে আপনার ব্যবসায়িক লেনদেন নিরাপদ ও 100% বিশ্বস্ত।"}
+            </marquee>
+          </div>
         </div>
       </header>
 
       <div className="flex-grow overflow-y-auto pb-24">
         {activeTab === 'home' && (
-          <div className="space-y-4 pb-6">
-            {/* Box-shaped Announcement Ticker (ঘোষণা) - Now above the banner slider */}
-            <div className="px-4 pt-2">
-              <div className="bg-white border-2 border-[#00a884]/85 rounded-[20px] p-2 flex items-center gap-3 overflow-hidden shadow-3xs">
-                <div className="bg-[#00a884] text-white text-[11px] font-black px-3.5 py-1 rounded-[12px] shrink-0 shadow-3xs flex items-center gap-1">
-                  📢 <span>ঘোষণা</span>
-                </div>
-                <div className="flex-grow overflow-hidden relative h-5 flex items-center">
-                  <marquee className="text-[12px] font-black text-slate-800 leading-none py-0.5" behavior="scroll" direction="left" scrollamount="4">
-                    {appConfig?.tickerText || "ব্যবসা নেটওয়ার্ক বাংলাদেশ সমবায় ও রিচার্জ পোর্টাল-এ আপনাকে স্বাগতম। আমাদের সাথে আপনার ব্যবসায়িক লেনদেন নিরাপদ ও 100% বিশ্বস্ত।"}
-                  </marquee>
-                </div>
-              </div>
-            </div>
+          <div className="space-y-3 pb-6 pt-2">
 
-            {/* 2. Banner Slider (Isolated memoized component to prevent full Dashboard re-render) */}
+            {/* 2. Banner Slider (YouTube Thumbnail 16:9 ratio) */}
             <DashboardBannerSlider 
               activeSliders={activeSliders} 
               bannerType={bannerType} 
               bannerVal={bannerVal} 
             />
 
-            {/* Main Content Area with padding px-4 */}
-            <div className="px-4 space-y-4">
-              <div className="flex justify-between items-center px-1 py-1.5 select-none font-sans">
-                <h3 className="text-[14px] xs:text-[15px] font-black text-[#374151] tracking-tight">সকল সার্ভিস</h3>
-                <span className="text-[9.5px] xs:text-[10.5px] font-extrabold text-[#00a884] bg-[#e6f7f4] border border-[#00a884]/80 px-2.5 py-0.5 rounded-full leading-none shrink-0 shadow-3xs">
-                  ১২টি লাইভ সেবা ও প্যানেল
-                </span>
-              </div>
-
-              <div className="grid grid-cols-4 gap-1 xs:gap-1.5 sm:gap-2.5 md:gap-3">
+            {/* 12 Live Services Grid - Exact 4 columns layout, custom vector icons with NO circular background */}
+            <div className="px-2 pt-2 pb-2">
+              <div className="grid grid-cols-4 gap-x-1.5 sm:gap-x-3 gap-y-5">
                 {/* 1. BNB কোম্পানি ইনভেস্টর */}
                 <div 
                   onClick={() => handleServiceClick('samity', () => setModalType('samity'))}
-                  className="p-0.5 xs:p-1 sm:p-1.5 flex flex-col justify-start items-center text-center cursor-pointer transition-all duration-200 active:scale-95 min-h-[86px] xs:min-h-[98px] sm:min-h-[125px] md:min-h-[140px] relative group"
+                  className="flex flex-col items-center text-center cursor-pointer active:scale-95 transition-transform group"
                 >
-                  <div className="w-12 h-12 xs:w-14 xs:h-14 sm:w-17 sm:h-17 md:w-20 md:h-20 rounded-full bg-white border border-slate-100 flex items-center justify-center text-slate-800 shadow-sm group-hover:scale-105 transition-transform duration-200 shrink-0 overflow-hidden">
-                    {appConfig?.sectionIcons?.samity ? (
-                      <img src={appConfig.sectionIcons.samity} alt="Samity Icon" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-                    ) : (
-                      <img src="/samity_logo.svg" alt="Samity Icon" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-                    )}
+                  <div className="w-12 h-12 sm:w-14 sm:h-14 flex items-center justify-center shrink-0">
+                    <SamityIcon className="w-11 h-11 sm:w-13 sm:h-13 transition-transform group-hover:scale-105" />
                   </div>
-                  <div className="w-full mt-2 sm:mt-2.5 font-sans">
-                    <h4 className="text-[9px] xs:text-[10px] sm:text-[12px] md:text-[13.5px] font-black text-slate-800 leading-tight tracking-tight line-clamp-2 text-center">
-                      {getTxt('cardSamityTitle', 'BNB কোম্পানি ইনভেস্টর')}
-                    </h4>
-                  </div>
+                  <h4 className="text-[10.5px] sm:text-[11.5px] font-black text-slate-900 leading-tight mt-1 line-clamp-2 text-center tracking-tight font-sans">
+                    {getTxt('cardSamityTitle', 'BNB কোম্পানি ইনভেস্টর')}
+                  </h4>
                 </div>
 
                 {/* 2. BNB নিরাপদ লেনদেন */}
                 <div 
                   onClick={() => handleServiceClick('safedeals', () => setModalType('safedeals'))}
-                  className="p-0.5 xs:p-1 sm:p-1.5 flex flex-col justify-start items-center text-center cursor-pointer transition-all duration-200 active:scale-95 min-h-[86px] xs:min-h-[98px] sm:min-h-[125px] md:min-h-[140px] relative group"
+                  className="flex flex-col items-center text-center cursor-pointer active:scale-95 transition-transform group"
                 >
-                  <div className="w-12 h-12 xs:w-14 xs:h-14 sm:w-17 sm:h-17 md:w-20 md:h-20 rounded-full bg-[#00d29d] bg-gradient-to-br from-[#00d29d] via-[#00bda0] to-[#cbfef4]/20 flex items-center justify-center text-white shadow-[0_0_20px_rgba(0,210,157,0.2)] group-hover:scale-105 transition-transform duration-200 shrink-0 overflow-hidden">
-                    {appConfig?.sectionIcons?.safedeals ? (
-                      <img src={appConfig.sectionIcons.safedeals} alt="SafeDeals Icon" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-                    ) : (
-                      <CheckCircle2 className="w-6 h-6 xs:w-7 xs:h-7 sm:w-8 sm:h-8 md:w-10 md:h-10 text-white stroke-[2]" />
-                    )}
+                  <div className="w-12 h-12 sm:w-14 sm:h-14 flex items-center justify-center shrink-0">
+                    <SafeDealsIcon className="w-11 h-11 sm:w-13 sm:h-13 transition-transform group-hover:scale-105" />
                   </div>
-                  <div className="w-full mt-2 sm:mt-2.5 font-sans">
-                    <h4 className="text-[9px] xs:text-[10px] sm:text-[12px] md:text-[13.5px] font-black text-slate-800 leading-tight tracking-tight line-clamp-2 text-center">
-                      {getTxt('cardSafeDealsTitle', 'BNB নিরাপদ লেনদেন')}
-                    </h4>
-                  </div>
+                  <h4 className="text-[10.5px] sm:text-[11.5px] font-black text-slate-900 leading-tight mt-1 line-clamp-2 text-center tracking-tight font-sans">
+                    {getTxt('cardSafeDealsTitle', 'BNB নিরাপদ লেনদেন')}
+                  </h4>
                 </div>
 
-                {/* 3. BNB কর্জে হাসানা */}
+                {/* 3. BNB কার্জ হাসানা */}
                 <div 
                   onClick={() => handleServiceClick('qard', () => setModalType('qard'))}
-                  className="p-0.5 xs:p-1 sm:p-1.5 flex flex-col justify-start items-center text-center cursor-pointer transition-all duration-200 active:scale-95 min-h-[86px] xs:min-h-[98px] sm:min-h-[125px] md:min-h-[140px] relative group"
+                  className="flex flex-col items-center text-center cursor-pointer active:scale-95 transition-transform group"
                 >
-                  <div className="w-12 h-12 xs:w-14 xs:h-14 sm:w-17 sm:h-17 md:w-20 md:h-20 rounded-full bg-[#f43f5e] bg-gradient-to-br from-[#f43f5e] via-[#e11d48] to-[#ffe4e6]/20 flex items-center justify-center text-white shadow-[0_0_20px_rgba(244,63,94,0.2)] group-hover:scale-105 transition-transform duration-200 shrink-0 overflow-hidden">
-                    {appConfig?.sectionIcons?.qard ? (
-                      <img src={appConfig.sectionIcons.qard} alt="Qard Icon" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-                    ) : (
-                      <Heart className="w-6 h-6 xs:w-7 xs:h-7 sm:w-8 sm:h-8 md:w-10 md:h-10 text-white stroke-[2]" />
-                    )}
+                  <div className="w-12 h-12 sm:w-14 sm:h-14 flex items-center justify-center shrink-0">
+                    <QardIcon className="w-11 h-11 sm:w-13 sm:h-13 transition-transform group-hover:scale-105" />
                   </div>
-                  <div className="w-full mt-2 sm:mt-2.5 font-sans">
-                    <h4 className="text-[9px] xs:text-[10px] sm:text-[12px] md:text-[13.5px] font-black text-slate-800 leading-tight tracking-tight line-clamp-2 text-center">
-                      {getTxt('cardQardTitle', 'BNB কর্জে হাসানা')}
-                    </h4>
-                  </div>
+                  <h4 className="text-[10.5px] sm:text-[11.5px] font-black text-slate-900 leading-tight mt-1 line-clamp-2 text-center tracking-tight font-sans">
+                    {getTxt('cardQardTitle', 'BNB কার্জ হাসানা')}
+                  </h4>
                 </div>
 
-                {/* 4. BNB লেনদেন */}
+                {/* 4. MY BNB লেনদেন */}
                 <div 
                   onClick={() => handleServiceClick('bank', () => setModalType('bank'))}
-                  className="p-0.5 xs:p-1 sm:p-1.5 flex flex-col justify-start items-center text-center cursor-pointer transition-all duration-200 active:scale-95 min-h-[86px] xs:min-h-[98px] sm:min-h-[125px] md:min-h-[140px] relative group"
+                  className="flex flex-col items-center text-center cursor-pointer active:scale-95 transition-transform group"
                 >
-                  <div className="w-12 h-12 xs:w-14 xs:h-14 sm:w-17 sm:h-17 md:w-20 md:h-20 rounded-full bg-[#f97316] bg-gradient-to-br from-[#ff9e3b] via-[#ea580c] to-[#ffedd5]/20 flex items-center justify-center text-white shadow-[0_0_20px_rgba(249,115,22,0.2)] group-hover:scale-105 transition-transform duration-200 shrink-0 overflow-hidden">
-                    {appConfig?.sectionIcons?.bank ? (
-                      <img src={appConfig.sectionIcons.bank} alt="Bank Icon" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-                    ) : (
-                      <RefreshCw className="w-6 h-6 xs:w-7 xs:h-7 sm:w-8 sm:h-8 md:w-10 md:h-10 text-white shrink-0 stroke-[2]" />
-                    )}
+                  <div className="w-12 h-12 sm:w-14 sm:h-14 flex items-center justify-center shrink-0">
+                    <BankIcon className="w-11 h-11 sm:w-13 sm:h-13 transition-transform group-hover:scale-105" />
                   </div>
-                  <div className="w-full mt-2 sm:mt-2.5 font-sans">
-                    <h4 className="text-[9px] xs:text-[10px] sm:text-[12px] md:text-[13.5px] font-black text-slate-800 leading-tight tracking-tight line-clamp-2 text-center">
-                      {getTxt('cardBankTitle', 'BNB লেনদেন')}
-                    </h4>
-                  </div>
+                  <h4 className="text-[10.5px] sm:text-[11.5px] font-black text-slate-900 leading-tight mt-1 line-clamp-2 text-center tracking-tight font-sans">
+                    {getTxt('cardBankTitle', 'MY BNB লেনদেন')}
+                  </h4>
                 </div>
 
                 {/* 5. BNB টেলিকম */}
                 <div 
                   onClick={() => handleServiceClick('telecom', () => setModalType('telecom'))}
-                  className="p-0.5 xs:p-1 sm:p-1.5 flex flex-col justify-start items-center text-center cursor-pointer transition-all duration-200 active:scale-95 min-h-[86px] xs:min-h-[98px] sm:min-h-[125px] md:min-h-[140px] relative group"
+                  className="flex flex-col items-center text-center cursor-pointer active:scale-95 transition-transform group"
                 >
-                  <div className="w-12 h-12 xs:w-14 xs:h-14 sm:w-17 sm:h-17 md:w-20 md:h-20 rounded-full bg-[#06b6d4] bg-gradient-to-br from-[#22d3ee] via-[#0891b2] to-[#ecfeff]/20 flex items-center justify-center text-white shadow-[0_0_20px_rgba(6,182,212,0.2)] group-hover:scale-105 transition-transform duration-200 shrink-0 overflow-hidden">
-                    {appConfig?.sectionIcons?.telecom ? (
-                      <img src={appConfig.sectionIcons.telecom} alt="Telecom Icon" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-                    ) : (
-                      <Smartphone className="w-6 h-6 xs:w-7 xs:h-7 sm:w-8 sm:h-8 md:w-10 md:h-10 text-white stroke-[2]" />
-                    )}
+                  <div className="w-12 h-12 sm:w-14 sm:h-14 flex items-center justify-center shrink-0">
+                    <TelecomIcon className="w-11 h-11 sm:w-13 sm:h-13 transition-transform group-hover:scale-105" />
                   </div>
-                  <div className="w-full mt-2 sm:mt-2.5 font-sans">
-                    <h4 className="text-[9px] xs:text-[10px] sm:text-[12px] md:text-[13.5px] font-black text-slate-800 leading-tight tracking-tight line-clamp-2 text-center">
-                      {getTxt('cardTelecomTitle', 'BNB টেলিকম')}
-                    </h4>
-                  </div>
+                  <h4 className="text-[10.5px] sm:text-[11.5px] font-black text-slate-900 leading-tight mt-1 line-clamp-2 text-center tracking-tight font-sans">
+                    {getTxt('cardTelecomTitle', 'BNB টেলিকম')}
+                  </h4>
                 </div>
 
                 {/* 6. BNB রেশন কার্ড */}
                 <div 
                   onClick={() => handleServiceClick('ration', () => setModalType('ration'))}
-                  className="p-0.5 xs:p-1 sm:p-1.5 flex flex-col justify-start items-center text-center cursor-pointer transition-all duration-200 active:scale-95 min-h-[86px] xs:min-h-[98px] sm:min-h-[125px] md:min-h-[140px] relative group"
+                  className="flex flex-col items-center text-center cursor-pointer active:scale-95 transition-transform group"
                 >
-                  <div className="w-12 h-12 xs:w-14 xs:h-14 sm:w-17 sm:h-17 md:w-20 md:h-20 rounded-full bg-[#f59e0b] bg-gradient-to-br from-[#fbbf24] via-[#ea580c] to-[#fffbeb]/20 flex items-center justify-center text-white shadow-[0_0_20px_rgba(245,158,11,0.2)] group-hover:scale-105 transition-transform duration-200 shrink-0 overflow-hidden">
-                    {appConfig?.sectionIcons?.ration ? (
-                      <img src={appConfig.sectionIcons.ration} alt="Ration Icon" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-                    ) : (
-                      <CreditCard className="w-6 h-6 xs:w-7 xs:h-7 sm:w-8 sm:h-8 md:w-10 md:h-10 text-white stroke-[2]" />
-                    )}
+                  <div className="w-12 h-12 sm:w-14 sm:h-14 flex items-center justify-center shrink-0">
+                    <RationIcon className="w-11 h-11 sm:w-13 sm:h-13 transition-transform group-hover:scale-105" />
                   </div>
-                  <div className="w-full mt-2 sm:mt-2.5 font-sans">
-                    <h4 className="text-[9px] xs:text-[10px] sm:text-[12px] md:text-[13.5px] font-black text-slate-800 leading-tight tracking-tight line-clamp-2 text-center">
-                      {getTxt('cardRationTitle', 'BNB রেশন কার্ড')}
-                    </h4>
-                  </div>
+                  <h4 className="text-[10.5px] sm:text-[11.5px] font-black text-slate-900 leading-tight mt-1 line-clamp-2 text-center tracking-tight font-sans">
+                    {getTxt('cardRationTitle', 'BNB রেশন কার্ড')}
+                  </h4>
                 </div>
 
-                {/* 7. BNB সেলারি পে */}
+                {/* 7. BNB আটা সেলারি পে */}
                 <div 
                   onClick={() => handleServiceClick('salary', () => setModalType('salary'))}
-                  className="p-0.5 xs:p-1 sm:p-1.5 flex flex-col justify-start items-center text-center cursor-pointer transition-all duration-200 active:scale-95 min-h-[86px] xs:min-h-[98px] sm:min-h-[125px] md:min-h-[140px] relative group"
+                  className="flex flex-col items-center text-center cursor-pointer active:scale-95 transition-transform group"
                 >
-                  <div className="w-12 h-12 xs:w-14 xs:h-14 sm:w-17 sm:h-17 md:w-20 md:h-20 rounded-full bg-[#0d9488] bg-gradient-to-br from-[#14b8a6] via-[#0f766e] to-[#ccfbf1]/20 flex items-center justify-center text-white shadow-[0_0_20px_rgba(13,148,136,0.2)] group-hover:scale-105 transition-transform duration-200 shrink-0 overflow-hidden">
-                    {appConfig?.sectionIcons?.salary ? (
-                       <img src={appConfig.sectionIcons.salary} alt="Salary Icon" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-                    ) : (
-                      <Briefcase className="w-6 h-6 xs:w-7 xs:h-7 sm:w-8 sm:h-8 md:w-10 md:h-10 text-white stroke-[2]" />
-                    )}
+                  <div className="w-12 h-12 sm:w-14 sm:h-14 flex items-center justify-center shrink-0">
+                    <SalaryIcon className="w-11 h-11 sm:w-13 sm:h-13 transition-transform group-hover:scale-105" />
                   </div>
-                  <div className="w-full mt-2 sm:mt-2.5 font-sans">
-                    <h4 className="text-[9px] xs:text-[10px] sm:text-[12px] md:text-[13.5px] font-black text-slate-800 leading-tight tracking-tight line-clamp-2 text-center">
-                      {getTxt('cardSalaryTitle', 'BNB সেলারি পে')}
-                    </h4>
-                  </div>
+                  <h4 className="text-[10.5px] sm:text-[11.5px] font-black text-slate-900 leading-tight mt-1 line-clamp-2 text-center tracking-tight font-sans">
+                    {getTxt('cardSalaryTitle', 'BNB আটা সেলারি পে')}
+                  </h4>
                 </div>
 
                 {/* 8. al safi */}
                 <div 
                   onClick={() => handleServiceClick('safi', () => setModalType('safi'))}
-                  className="p-0.5 xs:p-1 sm:p-1.5 flex flex-col justify-start items-center text-center cursor-pointer transition-all duration-200 active:scale-95 min-h-[86px] xs:min-h-[98px] sm:min-h-[125px] md:min-h-[140px] relative group"
+                  className="flex flex-col items-center text-center cursor-pointer active:scale-95 transition-transform group"
                 >
-                  <div className="w-12 h-12 xs:w-14 xs:h-14 sm:w-17 sm:h-17 md:w-20 md:h-20 rounded-full bg-[#fbbf24] bg-gradient-to-br from-[#fbbf24] via-[#d97706] to-[#fef3c7]/20 flex items-center justify-center text-white shadow-[0_0_20px_rgba(251,191,36,0.2)] group-hover:scale-105 transition-transform duration-200 shrink-0 overflow-hidden">
-                    {appConfig?.sectionIcons?.safi ? (
-                      <img src={appConfig.sectionIcons.safi} alt="Safi Icon" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-                    ) : (
-                      <Sparkles className="w-6 h-6 xs:w-7 xs:h-7 sm:w-8 sm:h-8 md:w-10 md:h-10 text-white stroke-[2]" />
-                    )}
+                  <div className="w-12 h-12 sm:w-14 sm:h-14 flex items-center justify-center shrink-0">
+                    <SafiIcon className="w-11 h-11 sm:w-13 sm:h-13 transition-transform group-hover:scale-105" />
                   </div>
-                  <div className="w-full mt-2 sm:mt-2.5 font-sans">
-                    <h4 className="text-[9px] xs:text-[10px] sm:text-[12px] md:text-[13.5px] font-black text-slate-800 leading-tight tracking-tight line-clamp-2 text-center">
-                      {getTxt('cardSafiTitle', 'al safi')}
-                    </h4>
-                  </div>
+                  <h4 className="text-[10.5px] sm:text-[11.5px] font-black text-slate-900 leading-tight mt-1 line-clamp-2 text-center tracking-tight font-sans">
+                    {getTxt('cardSafiTitle', 'al safi')}
+                  </h4>
                 </div>
 
-                {/* 9. BNB অটো রিচার্জ */}
+                {/* 9. BNB ডাটা রিচার্জ */}
                 <div 
                   onClick={() => handleServiceClick('auto_recharge', () => setModalType('auto_recharge'))}
-                  className="p-0.5 xs:p-1 sm:p-1.5 flex flex-col justify-start items-center text-center cursor-pointer transition-all duration-200 active:scale-95 min-h-[86px] xs:min-h-[98px] sm:min-h-[125px] md:min-h-[140px] relative group"
+                  className="flex flex-col items-center text-center cursor-pointer active:scale-95 transition-transform group"
                 >
-                  <div className="w-12 h-12 xs:w-14 xs:h-14 sm:w-17 sm:h-17 md:w-20 md:h-20 rounded-full bg-[#0284c7] bg-gradient-to-br from-[#38bdf8] via-[#0284c7] to-[#e0f2fe]/20 flex items-center justify-center text-white shadow-[0_0_20px_rgba(2,132,199,0.2)] group-hover:scale-105 transition-transform duration-200 shrink-0 overflow-hidden">
-                    {appConfig?.sectionIcons?.auto_recharge ? (
-                      <img src={appConfig.sectionIcons.auto_recharge} alt="Auto Recharge Icon" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-                    ) : (
-                      <Smartphone className="w-6 h-6 xs:w-7 xs:h-7 sm:w-8 sm:h-8 md:w-10 md:h-10 text-white stroke-[2]" />
-                    )}
+                  <div className="w-12 h-12 sm:w-14 sm:h-14 flex items-center justify-center shrink-0">
+                    <AutoRechargeIcon className="w-11 h-11 sm:w-13 sm:h-13 transition-transform group-hover:scale-105" />
                   </div>
-                  <div className="w-full mt-2 sm:mt-2.5 font-sans">
-                    <h4 className="text-[9px] xs:text-[10px] sm:text-[12px] md:text-[13.5px] font-black text-slate-800 leading-tight tracking-tight line-clamp-2 text-center">
-                      {getTxt('cardAutoRechargeTitle', 'BNB অটো রিচার্জ')}
-                    </h4>
-                  </div>
+                  <h4 className="text-[10.5px] sm:text-[11.5px] font-black text-slate-900 leading-tight mt-1 line-clamp-2 text-center tracking-tight font-sans">
+                    {getTxt('cardAutoRechargeTitle', 'BNB ডাটা রিচার্জ')}
+                  </h4>
                 </div>
 
                 {/* 10. BNB বিল পে */}
                 <div 
                   onClick={() => handleServiceClick('bill_pay', () => setModalType('bill_pay'))}
-                  className="p-0.5 xs:p-1 sm:p-1.5 flex flex-col justify-start items-center text-center cursor-pointer transition-all duration-200 active:scale-95 min-h-[86px] xs:min-h-[98px] sm:min-h-[125px] md:min-h-[140px] relative group"
+                  className="flex flex-col items-center text-center cursor-pointer active:scale-95 transition-transform group"
                 >
-                  <div className="w-12 h-12 xs:w-14 xs:h-14 sm:w-17 sm:h-17 md:w-20 md:h-20 rounded-full bg-[#8b5cf6] bg-gradient-to-br from-[#a78bfa] via-[#7c3aed] to-[#ede9fe]/20 flex items-center justify-center text-white shadow-[0_0_20px_rgba(139,92,246,0.2)] group-hover:scale-105 transition-transform duration-200 shrink-0 overflow-hidden">
-                    {appConfig?.sectionIcons?.bill_pay ? (
-                      <img src={appConfig.sectionIcons.bill_pay} alt="Bill Pay Icon" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-                    ) : (
-                      <Banknote className="w-6 h-6 xs:w-7 xs:h-7 sm:w-8 sm:h-8 md:w-10 md:h-10 text-white stroke-[2]" />
-                    )}
+                  <div className="w-12 h-12 sm:w-14 sm:h-14 flex items-center justify-center shrink-0">
+                    <BillPayIcon className="w-11 h-11 sm:w-13 sm:h-13 transition-transform group-hover:scale-105" />
                   </div>
-                  <div className="w-full mt-2 sm:mt-2.5 font-sans">
-                    <h4 className="text-[9px] xs:text-[10px] sm:text-[12px] md:text-[13.5px] font-black text-slate-800 leading-tight tracking-tight line-clamp-2 text-center">
-                      {getTxt('cardBillPayTitle', 'BNB বিল পে')}
-                    </h4>
-                  </div>
+                  <h4 className="text-[10.5px] sm:text-[11.5px] font-black text-slate-900 leading-tight mt-1 line-clamp-2 text-center tracking-tight font-sans">
+                    {getTxt('cardBillPayTitle', 'BNB বিল পে')}
+                  </h4>
                 </div>
 
                 {/* 11. BNB এজেন্ট */}
                 <div 
                   onClick={() => handleServiceClick('agent', () => setModalType('agent'))}
-                  className="p-0.5 xs:p-1 sm:p-1.5 flex flex-col justify-start items-center text-center cursor-pointer transition-all duration-200 active:scale-95 min-h-[86px] xs:min-h-[98px] sm:min-h-[125px] md:min-h-[140px] relative group"
+                  className="flex flex-col items-center text-center cursor-pointer active:scale-95 transition-transform group"
                 >
-                  <div className="w-12 h-12 xs:w-14 xs:h-14 sm:w-17 sm:h-17 md:w-20 md:h-20 rounded-full bg-[#fbbf24] bg-gradient-to-br from-[#fbbf24] via-[#d97706] to-[#fffbeb]/20 flex items-center justify-center text-white shadow-[0_0_20px_rgba(251,191,36,0.2)] group-hover:scale-105 transition-transform duration-200 shrink-0 overflow-hidden">
-                    {appConfig?.sectionIcons?.agent ? (
-                      <img src={appConfig.sectionIcons.agent} alt="Agent Icon" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-                    ) : (
-                      <Store className="w-6 h-6 xs:w-7 xs:h-7 sm:w-8 sm:h-8 md:w-10 md:h-10 text-white stroke-[2]" />
-                    )}
+                  <div className="w-12 h-12 sm:w-14 sm:h-14 flex items-center justify-center shrink-0">
+                    <AgentIcon className="w-11 h-11 sm:w-13 sm:h-13 transition-transform group-hover:scale-105" />
                   </div>
-                  <div className="w-full mt-2 sm:mt-2.5 font-sans">
-                    <h4 className="text-[9px] xs:text-[10px] sm:text-[12px] md:text-[13.5px] font-black text-slate-800 leading-tight tracking-tight line-clamp-2 text-center">
-                      {getTxt('cardAgentTitle', 'BNB এজেন্ট')}
-                    </h4>
-                  </div>
+                  <h4 className="text-[10.5px] sm:text-[11.5px] font-black text-slate-900 leading-tight mt-1 line-clamp-2 text-center tracking-tight font-sans">
+                    {getTxt('cardAgentTitle', 'BNB এজেন্ট')}
+                  </h4>
                 </div>
 
                 {/* 12. BNB আমাদের লক্ষ্য */}
                 <div 
                   onClick={() => handleServiceClick('about', () => setModalType('about'))}
-                  className="p-0.5 xs:p-1 sm:p-1.5 flex flex-col justify-start items-center text-center cursor-pointer transition-all duration-200 active:scale-95 min-h-[86px] xs:min-h-[98px] sm:min-h-[125px] md:min-h-[140px] relative group"
+                  className="flex flex-col items-center text-center cursor-pointer active:scale-95 transition-transform group"
                 >
-                  <div className="w-12 h-12 xs:w-14 xs:h-14 sm:w-17 sm:h-17 md:w-20 md:h-20 rounded-full bg-[#6366f1] bg-gradient-to-br from-[#818cf8] via-[#4f46e5] to-[#e0e7ff]/20 flex items-center justify-center text-white shadow-[0_0_20px_rgba(99,102,241,0.2)] group-hover:scale-105 transition-transform duration-200 shrink-0 overflow-hidden">
-                    {appConfig?.sectionIcons?.about ? (
-                      <img src={appConfig.sectionIcons.about} alt="About Icon" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-                    ) : (
-                      <BookOpen className="w-6 h-6 xs:w-7 xs:h-7 sm:w-8 sm:h-8 md:w-10 md:h-10 text-white stroke-[2]" />
-                    )}
+                  <div className="w-12 h-12 sm:w-14 sm:h-14 flex items-center justify-center shrink-0">
+                    <AboutIcon className="w-11 h-11 sm:w-13 sm:h-13 transition-transform group-hover:scale-105" />
                   </div>
-                  <div className="w-full mt-2 sm:mt-2.5 font-sans">
-                    <h4 className="text-[9px] xs:text-[10px] sm:text-[12px] md:text-[13.5px] font-black text-slate-800 leading-tight tracking-tight line-clamp-2 text-center">
-                      {getTxt('cardAboutTitle', 'BNB আমাদের লক্ষ্য')}
-                    </h4>
-                  </div>
-                </div>
-              </div>
-
-              {/* Dashed Live Database Notice exact replica */}
-              <div className="mt-5 px-1 select-none font-sans">
-                <div className="border border-dashed border-slate-300/80 bg-[#fbfbfb] rounded-2xl py-3.5 px-4 text-center shadow-3xs">
-                  <p className="text-[11px] xs:text-[12px] font-black text-slate-550 tracking-tight">
-                    *এই ড্যাশবোর্ডটি সরাসরি লাইভ ডাটাবেজ দ্বারা পরিচালিত হচ্ছে।
-                  </p>
+                  <h4 className="text-[10.5px] sm:text-[11.5px] font-black text-slate-900 leading-tight mt-1 line-clamp-2 text-center tracking-tight font-sans">
+                    {getTxt('cardAboutTitle', 'BNB আমাদের লক্ষ্য')}
+                  </h4>
                 </div>
               </div>
             </div>
+
+            {/* Bottom Promo Banner Section (Matching User's Screenshot & Editable from Admin) */}
+            <DashboardBottomBannerSlider 
+              appConfig={appConfig} 
+              onBannerClick={() => setModalType('about')} 
+            />
+
           </div>
         )}
 
@@ -3965,7 +4120,7 @@ export const Dashboard = React.memo(function Dashboard({
                   আপনার বর্তমান BNB ওয়ালেট ব্যালেন্স
                 </span>
                 <span className="text-xl font-black font-mono tracking-tight block">
-                  ৳ {(liveUser?.balance || 0).toLocaleString('bn-BD')} BDT
+                  ৳ {(liveUser?.balance || 0).toLocaleString('en-US')} BDT
                 </span>
               </div>
               <div className="w-10 h-10 rounded-xl bg-white/10 backdrop-blur-md flex items-center justify-center border border-white/20">
@@ -4018,7 +4173,7 @@ export const Dashboard = React.memo(function Dashboard({
                       setTransferTargetPhoneorId(e.target.value);
                       if (searchedMember) setSearchedMember(null);
                     }}
-                    placeholder="যেমনঃ AMB102030 অথবা 017xxxxxxxx"
+                    placeholder="যেমনঃ BNB102030 অথবা 017xxxxxxxx"
                     className="w-full bg-white border border-slate-200 rounded-xl pl-9 pr-3 py-2.5 text-xs font-mono font-bold focus:outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600 text-slate-800"
                   />
                 </div>
@@ -4219,12 +4374,12 @@ export const Dashboard = React.memo(function Dashboard({
                                       }
                                       setSendMoneySelectedMonths(updated);
 
-                                      if (updated.length > 0) {
-                                        const targetMonthly = searchedMember.monthlySavingsTarget || 1000;
-                                        setTransferAmountInput(String(updated.length * targetMonthly));
-                                      } else {
-                                        setTransferAmountInput('');
-                                      }
+                                      const targetMonthly = searchedMember.monthlySavingsTarget || 1000;
+                                      const isOwner = searchedMember.memberCategory === 'owner';
+                                      const isShareholder = searchedMember.memberCategory === 'shareholder';
+                                      const qRate = isOwner ? 10000 : isShareholder ? 5000 : 0;
+                                      const grandTotal = (updated.length * targetMonthly) + (sendMoneySelectedQuarterly.length * qRate);
+                                      setTransferAmountInput(grandTotal > 0 ? String(grandTotal) : '');
                                     }}
                                     className={`p-1.5 rounded-xl border text-center transition flex flex-col items-center justify-between min-h-[52px] ${
                                       isPaid
@@ -4260,15 +4415,177 @@ export const Dashboard = React.memo(function Dashboard({
                             {sendMoneySelectedMonths.length > 0 && (
                               <div className="bg-emerald-100/90 border border-emerald-300 p-2 rounded-xl flex items-center justify-between text-[10.5px] font-bold text-emerald-950 animate-slide-down">
                                 <span>
-                                  🎯 <strong>{sendMoneySelectedMonths.length} মাস</strong> জমা নির্বাচন করা হয়েছে
+                                  🎯 <strong>{sendMoneySelectedMonths.length} মাস</strong> নিয়মিত জমা নির্বাচন করা হয়েছে
                                 </span>
                                 <span className="font-mono text-emerald-950 font-black text-xs bg-emerald-200/80 px-2 py-0.5 rounded-lg border border-emerald-400/60">
-                                  মোট: ৳ {(sendMoneySelectedMonths.length * (searchedMember.monthlySavingsTarget || 1000)).toLocaleString('bn-BD')}
+                                  মোট: ৳ {(sendMoneySelectedMonths.length * (searchedMember.monthlySavingsTarget || 1000)).toLocaleString('en-US')}
                                 </span>
                               </div>
                             )}
 
                           </div>
+
+                          {/* 📅 ১২ মাসের কিস্তির নিচে: ৩ মাস পর পর অতিরিক্ত ৪ কিস্তি (শেয়ার হোল্ডার ও ওনার সদস্যদের কিস্তি অন্যজনের একাউন্ট থেকে দেওয়ার সিস্টেম) */}
+                          <div className="bg-gradient-to-r from-amber-50/95 via-rose-50/70 to-amber-50/95 border border-amber-300 rounded-2xl p-3 shadow-2xs space-y-2">
+                            <div className="flex items-center justify-between border-b border-amber-200/80 pb-1.5 flex-wrap gap-1">
+                              <div className="flex items-center gap-1.5">
+                                <span className="text-sm">📅</span>
+                                <div>
+                                  <div className="flex items-center gap-1 flex-wrap">
+                                    <h4 className="text-[11px] font-black text-amber-950 uppercase tracking-tight">
+                                      ৩ মাস পর পর কিস্তি — বছরে ৪ বার (১ লাইনে)
+                                    </h4>
+                                    <span className="text-[7.5px] bg-rose-600 text-white px-1.5 py-0.2 rounded-full font-bold">
+                                      অন্যের কিস্তি পরিশোধ
+                                    </span>
+                                  </div>
+                                  <p className="text-[8.5px] text-amber-800 font-bold">
+                                    জানুয়ারি • এপ্রিল • জুলাই • অক্টোবর ({sendMoneySelectedYear})
+                                  </p>
+                                </div>
+                              </div>
+
+                              <div className="text-right shrink-0">
+                                <span className="text-[8.5px] font-black px-2 py-0.5 rounded-full font-mono shadow-3xs inline-block bg-amber-500 text-slate-950">
+                                  {searchedMember.memberCategory === 'owner' 
+                                    ? '🔴 ওনার: ৳১০,০০০/কিস্তি'
+                                    : searchedMember.memberCategory === 'shareholder'
+                                    ? '🔵 শেয়ার হোল্ডার: ৳৫,০০০/কিস্তি'
+                                    : searchedMember.memberCategory === 'investor'
+                                    ? '🟢 ইনভেস্টার: প্রযোজ্য নয়'
+                                    : '⚪ সাধারণ সদস্য: অতিরিক্ত নেই'}
+                                </span>
+                              </div>
+                            </div>
+
+                            <div className="space-y-1.5">
+                              {/* ৪টি কিস্তি এক লাইনে এক সিরিয়ালে (grid-cols-4) */}
+                              <div className="grid grid-cols-4 gap-1 w-full">
+                                {SAMITY_QUARTERLY_MONTHS.map((q) => {
+                                  const isEligible = 
+                                    searchedMember.memberCategory === 'owner' || 
+                                    searchedMember.memberCategory === 'shareholder';
+                                    
+                                  const qAmount = 
+                                    searchedMember.memberCategory === 'owner'
+                                    ? 10000 
+                                    : 5000;
+                                  const isQuarterPaid = isEligible && isUserQuarterlyPaid(searchedMember, sendMoneySelectedYear, q.id);
+                                  const uniqueQKey = `${sendMoneySelectedYear}-${q.id}`;
+                                  const isSelected = sendMoneySelectedQuarterly.includes(uniqueQKey);
+
+                                  return (
+                                    <button
+                                      key={q.id}
+                                      type="button"
+                                      disabled={isQuarterPaid}
+                                      onClick={() => {
+                                        if (!isEligible) {
+                                          alert(`প্রাপক সদস্য (${searchedMember.name}) ${searchedMember.memberCategory === 'investor' ? 'ইনভেস্টার' : 'সাধারণ'} ক্যাটাগরির। ৩ মাস পর পর অতিরিক্ত কিস্তি শুধুমাত্র ওনার (৳১০,০০০) ও শেয়ার হোল্ডার (৳৫,০০০) সদস্যদের জন্য প্রযোজ্য।`);
+                                          return;
+                                        }
+
+                                        let updatedQ: string[];
+                                        if (isSelected) {
+                                          updatedQ = sendMoneySelectedQuarterly.filter(id => id !== uniqueQKey);
+                                        } else {
+                                          updatedQ = [...sendMoneySelectedQuarterly, uniqueQKey];
+                                        }
+                                        setSendMoneySelectedQuarterly(updatedQ);
+
+                                        // Re-calculate transfer amount (monthly + quarterly)
+                                        const targetMonthly = searchedMember.monthlySavingsTarget || 1000;
+                                        const monthlyTotal = sendMoneySelectedMonths.length * targetMonthly;
+                                        const quarterlyTotal = updatedQ.length * qAmount;
+                                        const grandTotal = monthlyTotal + quarterlyTotal;
+                                        setTransferAmountInput(grandTotal > 0 ? String(grandTotal) : '');
+                                      }}
+                                      className={`p-1 rounded-xl border text-center transition flex flex-col items-center justify-between min-h-[50px] relative ${
+                                        isQuarterPaid
+                                          ? 'bg-emerald-500/10 border-emerald-300 text-emerald-950 font-black shadow-3xs cursor-not-allowed opacity-90'
+                                          : isSelected
+                                          ? 'bg-emerald-700 text-white border-emerald-800 ring-2 ring-emerald-500 shadow-sm font-black scale-102 cursor-pointer'
+                                          : isEligible
+                                          ? 'bg-white border-amber-200/90 hover:border-amber-400 text-slate-800 font-bold hover:shadow-2xs cursor-pointer'
+                                          : 'bg-slate-50 border-slate-200 text-slate-500 opacity-80 cursor-pointer'
+                                      }`}
+                                    >
+                                      <div className="flex items-center justify-between w-full px-0.5">
+                                        <span className={`text-[7px] font-black px-1 py-0.2 rounded font-mono ${
+                                          isSelected ? 'bg-white/20 text-white' : 'text-amber-800 bg-amber-100/90'
+                                        }`}>
+                                          {q.quarter}
+                                        </span>
+                                        {isEligible && !isQuarterPaid && (
+                                          <span className={`text-[7.5px] font-bold ${isSelected ? 'text-white font-black' : 'text-amber-700'}`}>
+                                            {isSelected ? '✓' : '○'}
+                                          </span>
+                                        )}
+                                      </div>
+
+                                      <span className={`text-[8.5px] font-black truncate mt-0.5 leading-tight ${isSelected ? 'text-white' : 'text-slate-900'}`}>
+                                        {q.name}
+                                      </span>
+
+                                      <span className={`text-[8px] font-mono font-black my-0.5 ${isSelected ? 'text-amber-200' : 'text-amber-950'}`}>
+                                        ৳{qAmount.toLocaleString('en-US')}
+                                      </span>
+
+                                      {isQuarterPaid ? (
+                                        <span className="inline-flex items-center gap-0.5 text-[7px] bg-emerald-600 text-white px-1 py-0.2 rounded font-mono font-bold w-full justify-center shadow-3xs">
+                                          <CheckCircle2 className="w-2 h-2" /> পরিশোধিত
+                                        </span>
+                                      ) : isSelected ? (
+                                        <span className="inline-flex items-center gap-0.5 text-[7px] bg-white text-emerald-900 px-1 py-0.2 rounded font-mono font-black w-full justify-center shadow-3xs">
+                                          ✓ নির্বাচিত
+                                        </span>
+                                      ) : isEligible ? (
+                                        <span className="inline-flex items-center gap-0.5 text-[7px] bg-rose-600 text-white px-1 py-0.2 rounded font-mono font-bold w-full justify-center shadow-3xs">
+                                          <PlusCircle className="w-2 h-2" /> বকেয়া (জমা)
+                                        </span>
+                                      ) : (
+                                        <span className="text-[6.5px] text-slate-400 font-bold">
+                                          প্রযোজ্য নয়
+                                        </span>
+                                      )}
+                                    </button>
+                                  );
+                                })}
+                              </div>
+
+                                {/* Quick multi-quarterly selection buttons */}
+
+                                {/* Selected Quarterly Summary */}
+                                {sendMoneySelectedQuarterly.length > 0 && (
+                                  <div className="bg-amber-100 border border-amber-300 p-2 rounded-xl flex items-center justify-between text-[10.5px] font-bold text-amber-950 animate-slide-down">
+                                    <span>
+                                      🎯 <strong>{sendMoneySelectedQuarterly.length}টি ত্রৈমাসিক কিস্তি</strong> নির্বাচন করা হয়েছে
+                                    </span>
+                                    <span className="font-mono text-amber-950 font-black text-xs bg-amber-200/80 px-2 py-0.5 rounded-lg border border-amber-400/60">
+                                      মোট: ৳ {(sendMoneySelectedQuarterly.length * (searchedMember.memberCategory === 'owner' ? 10000 : 5000)).toLocaleString('en-US')}
+                                    </span>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+
+                          {/* Combined Total Summary Banner */}
+                          {(sendMoneySelectedMonths.length > 0 || sendMoneySelectedQuarterly.length > 0) && (
+                            <div className="bg-emerald-950 text-white p-2.5 rounded-2xl flex items-center justify-between text-xs font-bold shadow-xs border border-emerald-800">
+                              <div className="space-y-0.5">
+                                <span className="text-[10px] text-emerald-300 block uppercase font-black">প্রাপকের মোট প্রদেয় কিস্তি</span>
+                                <span className="text-[11px] text-slate-200">
+                                  {[
+                                    sendMoneySelectedMonths.length > 0 ? `${sendMoneySelectedMonths.length} মাস নিয়মিত` : null,
+                                    sendMoneySelectedQuarterly.length > 0 ? `${sendMoneySelectedQuarterly.length}টি ত্রৈমাসিক` : null
+                                  ].filter(Boolean).join(' + ')}
+                                </span>
+                              </div>
+                              <span className="font-mono text-amber-300 font-black text-sm bg-emerald-900/90 px-2.5 py-1 rounded-xl border border-emerald-700/80">
+                                ৳ {Number(transferAmountInput || 0).toLocaleString('en-US')}
+                              </span>
+                            </div>
+                          )}
                         </div>
                       )}
                     </div>
@@ -4308,7 +4625,7 @@ export const Dashboard = React.memo(function Dashboard({
 
                 {/* Quick amount preset chips */}
                 <div className="flex flex-wrap gap-2 pt-1">
-                  {['100', '200', '500', '1000', '2000', '5000'].map((preset, idx) => (
+                  {['100', '200', '500', '1000'].map((preset, idx) => (
                     <button
                       key={`${preset}-${idx}`}
                       type="button"
@@ -4319,7 +4636,7 @@ export const Dashboard = React.memo(function Dashboard({
                           : 'bg-slate-50 hover:bg-slate-100 text-slate-700 border-slate-200'
                       }`}
                     >
-                      ৳ {Number(preset).toLocaleString('bn-BD')}
+                      ৳ {Number(preset).toLocaleString('en-US')}
                     </button>
                   ))}
                 </div>
@@ -4363,40 +4680,43 @@ export const Dashboard = React.memo(function Dashboard({
             </form>
           </motion.div>
         )}
-        {/* Active AMB Add Money Segment Tab */}
+        {/* Active BNB Add Money Segment Tab */}
         {activeTab === 'add_money' && (
           <motion.div
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
             className="bg-white border border-slate-150 p-3 sm:p-5 rounded-3xl shadow-sm space-y-4 font-sans text-left"
           >
-            {/* Header */}
-            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-2xl bg-emerald-50 border border-emerald-100 flex items-center justify-center text-emerald-600 shrink-0">
-                  <PlusCircle className="w-5 h-5 stroke-[2.5]" />
-                </div>
-                <div>
-                  <h3 className="text-sm font-black text-slate-900 flex items-center gap-1.5">
-                    BNB এড মানি (Add Money)
-                    <span className="text-[9px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200/60 px-2 py-0.5 rounded-full">
-                      মেইন ওয়ালেট ফান্ড
-                    </span>
-                  </h3>
-                  <p className="text-[10.5px] text-slate-500 font-medium leading-tight">
-                    বিকাশ, নগদ, রকেট, উপায় বা ব্যাংক ডিপোজিটের মাধ্যমে সরাসরি মেইন ওয়ালেটে এড মানি করুন
-                  </p>
-                </div>
-              </div>
-            </div>
+            {/* BNB Payment Gateway (Tick Image) */}
 
-            {/* Integrated AmbMobileBankingPortal directly set to Add Money tab */}
-            <AmbMobileBankingPortal 
-              user={liveUser}
-              onClose={() => setActiveTab('home')}
-              syncLiveProfile={syncLiveProfile}
-              appConfig={appConfig}
-              initialTab="auto_add_money"
+            <JenifyPaymentGateway 
+              onConfirm={async (amount) => {
+                if (loading) return;
+                setLoading(true);
+                try {
+                  const res = await fetch(apiUrl('/api/payment/create'), {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                      amount,
+                      userId: liveUser?.uid,
+                      phone: liveUser?.phone || '',
+                      origin: getReturnOrigin()
+                    })
+                  });
+                  const data = await res.json();
+                  if (data && data.success && data.payment_url) {
+                    window.location.href = data.payment_url;
+                  } else {
+                    alert(data.error || 'পেমেন্ট গেটওয়ে সচল নেই। আবার চেষ্টা করুন।');
+                  }
+                } catch (err) {
+                  alert('সার্ভার সংযোগ ত্রুটি। আপনার ইন্টারনেট চেক করুন।');
+                } finally {
+                  setLoading(false);
+                }
+              }}
+              isLoading={loading}
             />
           </motion.div>
         )}
@@ -4420,7 +4740,7 @@ export const Dashboard = React.memo(function Dashboard({
                 <div className="bg-rose-50/50 border border-rose-100/75 p-4 rounded-2xl space-y-3">
                   <div className="flex justify-between items-center text-xs">
                     <span className="text-slate-600 font-bold">বর্তমান মোট বকেয়া ঋণঃ</span>
-                    <span className="font-mono text-rose-700 font-bold text-base">৳ {liveUser.dueLoan?.toLocaleString('bn-BD')}</span>
+                    <span className="font-mono text-rose-700 font-bold text-base">৳ {liveUser.dueLoan?.toLocaleString('en-US')}</span>
                   </div>
                   <p className="text-[10px] text-slate-500 leading-relaxed">
                     *নিচে আপনার বকেয়া কিস্তির পেমেন্ট চ্যানেল সিলেক্ট করে পেমেন্ট বিবরণ সহ ট্রানজেকশন আইডি প্রদান করুন।
@@ -4660,7 +4980,8 @@ export const Dashboard = React.memo(function Dashboard({
           <div className="space-y-4 font-sans text-left pb-12">
             <ProfileView user={liveUser} onUpdate={syncLiveProfile} onTriggerAdmin={onTriggerAdmin} appConfig={appConfig} />
 
-            {/* Smart Virtual Debit Card & Live Transfer Panel */}
+            {/* Smart Virtual Debit Card & Live Transfer Panel (Disabled from Profile view per user request) */}
+            {false && (
             <motion.div
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
@@ -4689,7 +5010,7 @@ export const Dashboard = React.memo(function Dashboard({
 
                 <div className="flex items-center justify-between bg-black/40 p-2.5 rounded-xl border border-white/10 my-1 text-center">
                   <span className="font-mono text-xs tracking-wider font-extrabold text-amber-305 text-amber-300">
-                    Account: {liveUser.memberId || 'AMB00000000'}
+                    Account: {liveUser.memberId || 'BNB00000000'}
                   </span>
                   <span className="font-mono text-[9px] text-slate-350">CVV: <strong className="text-slate-100 font-bold">{cvvRevealed ? '582' : '•••'}</strong></span>
                 </div>
@@ -4760,7 +5081,7 @@ export const Dashboard = React.memo(function Dashboard({
                     লাইভ টাকা স্থানান্তর (Transfer)
                   </h4>
                   <span className="text-[10px] bg-emerald-100 text-emerald-955 border border-emerald-250 px-2.5 py-1 rounded-full font-bold">
-                    ব্যালেন্সঃ ৳ {liveUser.balance?.toLocaleString('bn-BD')}
+                    ব্যালেন্সঃ ৳ {liveUser.balance?.toLocaleString('en-US')}
                   </span>
                 </div>
 
@@ -4814,9 +5135,9 @@ export const Dashboard = React.memo(function Dashboard({
                       <p className="text-[9px] text-emerald-700 font-bold">BNB সদস্য থেকে সদস্য (মেইন ব্যালেন্স ও সমিতি ভার্চুয়াল একাউন্ট) এবং টেলিকম/শপ ওয়ালেটে সরাসরি ইনস্ট্যান্ট স্থানান্তরিত হয় (100% অটোমেটিক)।</p>
                       <div className="grid grid-cols-3 gap-2 mt-2">
                         {[
-                          { id: 'samity', label: 'সমিতি', desc: `৳ ${(liveUser.balance || 0).toLocaleString('bn-BD')}` },
-                          { id: 'telecom', label: 'টেলিকম', desc: `৳ ${(liveUser.telecomBalance || 0).toLocaleString('bn-BD')}` },
-                          { id: 'shop', label: 'সুপার শপ', desc: `৳ ${(liveUser.superShopBalance || 0).toLocaleString('bn-BD')}` }
+                          { id: 'samity', label: 'সমিতি', desc: `৳ ${(liveUser.balance || 0).toLocaleString('en-US')}` },
+                          { id: 'telecom', label: 'টেলিকম', desc: `৳ ${(liveUser.telecomBalance || 0).toLocaleString('en-US')}` },
+                          { id: 'shop', label: 'সুপার শপ', desc: `৳ ${(liveUser.superShopBalance || 0).toLocaleString('en-US')}` }
                         ].map((sect, idx) => (
                           <button
                             key={`${sect.id}-${idx}`}
@@ -4836,7 +5157,7 @@ export const Dashboard = React.memo(function Dashboard({
                     </div>
                   )}
 
-                  {/* 2. To AMB Cooperative member */}
+                  {/* 2. To BNB Cooperative member */}
                   {transferType === 'member' && (
                     <div className="space-y-2">
                       <label className="block text-xs font-bold text-slate-705">ডিজিটাল আইডি বা মোবাইল নম্বর</label>
@@ -4845,7 +5166,7 @@ export const Dashboard = React.memo(function Dashboard({
                           type="text"
                           value={transferTargetPhoneorId}
                           onChange={(e) => setTransferTargetPhoneorId(e.target.value)}
-                          placeholder="সদস্য মোবাইল বা অ্যাকাউন্ট নম্বর যেমনঃ AMB00005327"
+                          placeholder="সদস্য মোবাইল বা অ্যাকাউন্ট নম্বর যেমনঃ BNB00005327"
                           className="flex-1 px-3 py-1.5 bg-white border border-slate-205 rounded-xl text-xs font-mono text-slate-850"
                         />
                         <button
@@ -4888,7 +5209,7 @@ export const Dashboard = React.memo(function Dashboard({
                           ) : (
                             <div className="mt-1.5 text-center">
                               <span className="inline-block text-[10.5px] font-black text-emerald-800 bg-white border border-emerald-150 py-2 px-3.5 rounded-xl uppercase tracking-wider leading-none">
-                                🎯 গন্তব্যঃ মেইন ব্যালেন্স (৳${(liveUser.balance || 0).toLocaleString('bn-BD')})
+                                🎯 গন্তব্যঃ মেইন ব্যালেন্স (৳${(liveUser.balance || 0).toLocaleString('en-US')})
                               </span>
                             </div>
                           )}
@@ -5006,6 +5327,7 @@ export const Dashboard = React.memo(function Dashboard({
                       </form>
                     </div>
                   </motion.div>
+                )}
                 </div>
               )}
 
@@ -5134,132 +5456,152 @@ export const Dashboard = React.memo(function Dashboard({
         />
       </div>
 
-      {/* Bottom Fixed Navigation bar matching bKash app structure */}
-      <nav className={bottomNavClass}>
-        <div className="max-w-md w-full mx-auto flex justify-around items-center">
+      {/* Bottom Fixed Navigation bar matching uploaded reference image */}
+      <nav className="fixed bottom-0 inset-x-0 bg-[#0b6623] text-white z-30 shadow-2xl h-[60px] border-t border-emerald-800/80 flex items-center">
+        <div className="max-w-md w-full mx-auto flex justify-around items-center px-3">
           
           {/* Tab Home */}
-          {isTabActive('home') && (
-            <button 
-              onClick={() => { setActiveTab('home'); setSelectedAction(null); }}
-              className="flex flex-col items-center gap-0.5 cursor-pointer relative z-10 transition-all duration-200 active:scale-95 group"
-            >
-              <div className={`p-1.5 rounded-xl transition-all duration-300 flex items-center justify-center ${
-                activeTab === 'home' 
-                  ? 'bg-emerald-50 text-emerald-600 scale-105 shadow-xs' 
-                  : 'text-slate-400 hover:text-emerald-500/70 hover:bg-slate-50'
-              }`}>
-                <Home className={`w-5 h-5 transition-transform duration-200 ${activeTab === 'home' ? 'stroke-[2.5]' : 'stroke-[1.8]'}`} />
+          <button 
+            onClick={() => { setActiveTab('home'); setSelectedAction(null); }}
+            className="flex items-center justify-center cursor-pointer transition-transform active:scale-90"
+          >
+            {activeTab === 'home' ? (
+              <div className="w-10 h-10 rounded-full bg-white text-[#0b6623] flex items-center justify-center shadow-md">
+                <Home className="w-5.5 h-5.5 stroke-[2.5]" />
               </div>
-              <span className={`text-[9.5px] sm:text-[10px] transition-colors duration-200 ${
-                activeTab === 'home' ? 'text-emerald-700 font-black' : 'text-slate-500 font-bold'
-              }`}>
-                {t('হোম')}
-              </span>
-            </button>
-          )}
+            ) : (
+              <Home className="w-6 h-6 text-white stroke-[2]" />
+            )}
+          </button>
 
-          {/* Tab Send Money (BNB to BNB Transfer) */}
-          {(isTabActive('deposit') || isTabActive('send_money')) && (
-            <button 
-              onClick={() => { setActiveTab('deposit'); setSelectedAction(null); }}
-              className="flex flex-col items-center gap-0.5 cursor-pointer relative z-10 transition-all duration-200 active:scale-95 group"
-            >
-              <div className={`p-1.5 rounded-xl transition-all duration-300 flex items-center justify-center ${
-                activeTab === 'deposit' || activeTab === 'send_money'
-                  ? 'bg-emerald-50 text-emerald-600 scale-105 shadow-xs' 
-                  : 'text-slate-400 hover:text-emerald-500/70 hover:bg-slate-50'
-              }`}>
-                <Send className={`w-5 h-5 transition-transform duration-200 ${activeTab === 'deposit' || activeTab === 'send_money' ? 'stroke-[2.5] text-emerald-600' : 'stroke-[1.8]'}`} />
-              </div>
-              <span className={`text-[9.5px] sm:text-[10px] transition-colors duration-200 ${
-                activeTab === 'deposit' || activeTab === 'send_money' ? 'text-emerald-700 font-black' : 'text-slate-500 font-bold'
-              }`}>
-                {t('সেন্ড মানি')}
-              </span>
-            </button>
-          )}
+          {/* Tab Send Money */}
+          <button 
+            onClick={() => { setActiveTab('deposit'); setSelectedAction(null); }}
+            className="flex items-center justify-center cursor-pointer transition-transform active:scale-90"
+          >
+            <Send className="w-6 h-6 text-white stroke-[2]" />
+          </button>
 
-          {/* Tab Scan & Pay QR */}
-          {isTabActive('scan_pay') && (
-            <button 
-              onClick={() => { setSelectedAction('deposit'); }}
-              className="flex flex-col items-center gap-0.5 cursor-pointer relative z-10 transition-all duration-200 active:scale-95 group"
-            >
-              <div className="p-1.5 rounded-xl bg-gradient-to-tr from-amber-500 to-orange-500 text-slate-950 shadow-xs flex items-center justify-center">
-                <QrCode className="w-5 h-5 text-slate-950 stroke-[2.5]" />
+          {/* Tab Add Money / Plus (Instant Online Add Money) */}
+          <button 
+            onClick={() => { 
+              setActiveTab('add_money'); 
+              setSelectedAction(null); 
+            }}
+            title="এড মানি (Add Money)"
+            className="flex items-center justify-center cursor-pointer transition-transform active:scale-90"
+          >
+            {activeTab === 'add_money' ? (
+              <div className="w-10 h-10 rounded-full bg-white text-[#0b6623] flex items-center justify-center shadow-lg ring-2 ring-emerald-300">
+                <Plus className="w-6 h-6 stroke-[3]" />
               </div>
-              <span className="text-[9.5px] sm:text-[10px] text-amber-800 font-extrabold">
-                {t('কিউআর পে')}
-              </span>
-            </button>
-          )}
+            ) : (
+              <div className="w-9 h-9 rounded-full border-2 border-white flex items-center justify-center text-white hover:bg-white/10 transition-colors">
+                <Plus className="w-5 h-5 stroke-[2.5]" />
+              </div>
+            )}
+          </button>
 
-          {/* Tab Add Money */}
-          {isTabActive('add_money') && (
-            <button 
-              onClick={() => { setSelectedAction('deposit'); }}
-              className="flex flex-col items-center gap-0.5 cursor-pointer relative z-10 transition-all duration-200 active:scale-95 group"
-            >
-              <div className={`p-1.5 rounded-xl transition-all duration-300 flex items-center justify-center ${
-                activeTab === 'add_money' 
-                  ? 'bg-emerald-50 text-emerald-700 scale-105 shadow-xs' 
-                  : 'text-slate-400 hover:text-emerald-500/70 hover:bg-slate-50'
-              }`}>
-                <PlusCircle className={`w-5 h-5 transition-transform duration-200 ${activeTab === 'add_money' ? 'stroke-[2.5]' : 'stroke-[1.8]'}`} />
-              </div>
-              <span className={`text-[9.5px] sm:text-[10px] transition-colors duration-200 ${
-                activeTab === 'add_money' ? 'text-emerald-700 font-black' : 'text-emerald-800 font-extrabold'
-              }`}>
-                {t('BNB এড মানি')}
-              </span>
-            </button>
-          )}
+          {/* Tab Transactions / Exchange */}
+          <button 
+            onClick={() => { setActiveTab('history'); setSelectedAction(null); }}
+            className="flex items-center justify-center cursor-pointer transition-transform active:scale-90"
+          >
+            <TransactionExchangeIcon className="w-6 h-6 text-white" strokeWidth={4} />
+          </button>
 
-          {/* Tab Statements / History */}
-          {isTabActive('history') && (
-            <button 
-              onClick={() => { setActiveTab('history'); setSelectedAction(null); }}
-              className="flex flex-col items-center gap-0.5 cursor-pointer relative z-10 transition-all duration-200 active:scale-95 group"
-            >
-              <div className={`p-1.5 rounded-xl transition-all duration-300 flex items-center justify-center ${
-                activeTab === 'history' 
-                  ? 'bg-blue-50 text-blue-600 scale-105 shadow-xs' 
-                  : 'text-slate-400 hover:text-blue-500/70 hover:bg-slate-50'
-              }`}>
-                <TransactionExchangeIcon className={`w-5 h-5 transition-transform duration-200 ${activeTab === 'history' ? 'scale-105 text-blue-600' : 'text-slate-400'}`} strokeWidth={activeTab === 'history' ? 5 : 4} />
-              </div>
-              <span className={`text-[9.5px] sm:text-[10px] transition-colors duration-200 ${
-                activeTab === 'history' ? 'text-blue-600 font-black' : 'text-slate-500 font-bold'
-              }`}>
-                {t('লেনদেন')}
-              </span>
-            </button>
-          )}
-
-          {/* Tab profile switching button */}
-          {isTabActive('profile') && (
-            <button 
-              onClick={() => { setActiveTab('profile'); setSelectedAction(null); }}
-              className="flex flex-col items-center gap-0.5 cursor-pointer relative z-10 transition-all duration-200 active:scale-95 group"
-            >
-              <div className={`p-1.5 rounded-xl transition-all duration-300 flex items-center justify-center ${
-                activeTab === 'profile' 
-                  ? 'bg-purple-50 text-purple-600 scale-105 shadow-xs' 
-                  : 'text-slate-400 hover:text-purple-500/70 hover:bg-slate-50'
-              }`}>
-                <UserCircle className={`w-5 h-5 transition-transform duration-200 ${activeTab === 'profile' ? 'stroke-[2.5]' : 'stroke-[1.8]'}`} />
-              </div>
-              <span className={`text-[9.5px] sm:text-[10px] transition-colors duration-200 ${
-                activeTab === 'profile' ? 'text-purple-600 font-black' : 'text-slate-500 font-bold'
-              }`}>
-                {t('প্রোফাইল')}
-              </span>
-            </button>
-          )}
+          {/* Tab Profile */}
+          <button 
+            onClick={() => { setActiveTab('profile'); setSelectedAction(null); }}
+            className="flex items-center justify-center cursor-pointer transition-transform active:scale-90"
+          >
+            <UserCircle className="w-6 h-6 text-white stroke-[2]" />
+          </button>
 
         </div>
       </nav>
+
+      {/* Selected Transaction Digital Receipt Modal */}
+      {selectedReceiptTx && (
+        <BNBPaymentReceiptModal
+          isOpen={!!selectedReceiptTx}
+          onClose={() => setSelectedReceiptTx(null)}
+          data={{
+            transactionId: selectedReceiptTx.trxId || (selectedReceiptTx as any).transactionId || (selectedReceiptTx as any).receiptNo || selectedReceiptTx.id,
+            typeLabel: selectedReceiptTx.typeLabel || 'BNB ওয়ালেট লেনদেন',
+            amount: Number(selectedReceiptTx.amount) || 0,
+            fee: Number(selectedReceiptTx.fee) || 0,
+            totalAmount: Number(selectedReceiptTx.totalDeducted || selectedReceiptTx.amount) || 0,
+            status: (getNormalizedStatus(selectedReceiptTx) as any),
+            beneficiaryName: selectedReceiptTx.receiverName || (selectedReceiptTx as any).partyName || (selectedReceiptTx as any).userName,
+            beneficiaryAccount: selectedReceiptTx.receiverId || (selectedReceiptTx as any).memberId,
+            senderPhone: selectedReceiptTx.senderPhone || (selectedReceiptTx as any).senderInfo || selectedReceiptTx.phone,
+            phone: selectedReceiptTx.phone,
+            paymentMethod: selectedReceiptTx.paymentMethod || 'BNB Wallet',
+            createdAt: selectedReceiptTx.createdAt,
+            description: selectedReceiptTx.description,
+            adminNotice: (selectedReceiptTx as any).adminNote || (selectedReceiptTx as any).note
+          }}
+          appLogo={appConfig?.appLogoUrl || appConfig?.logoUrl}
+          onViewHistory={() => {
+            setSelectedReceiptTx(null);
+            setActiveTab('history');
+          }}
+        />
+      )}
+
+      {/* Real-time Floating Notification Toast */}
+      <AnimatePresence>
+        {livePushToast && (
+          <motion.div
+            initial={{ opacity: 0, y: -50, scale: 0.9 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -20, scale: 0.9 }}
+            onClick={() => {
+              setLivePushToast(null);
+              setShowNotificationsModal(true);
+            }}
+            className="fixed top-4 left-3 right-3 sm:left-auto sm:right-4 sm:max-w-md z-[150] bg-gradient-to-r from-slate-900 via-slate-900 to-amber-950 text-white p-3.5 rounded-2xl shadow-2xl border-2 border-amber-500/80 cursor-pointer backdrop-blur-md flex items-start gap-3"
+          >
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-rose-500 to-amber-500 flex items-center justify-center text-white shrink-0 shadow-md">
+              <Bell className="w-5 h-5 animate-bounce" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center justify-between gap-1">
+                <span className="text-[10px] font-black uppercase text-amber-400 tracking-wider">🔔 নতুন নোটিফিকেশন</span>
+                <span className="text-[9px] text-slate-400 font-mono">এখনই</span>
+              </div>
+              <h4 className="text-xs sm:text-sm font-black text-white leading-snug font-sans mt-0.5">
+                {livePushToast.title}
+              </h4>
+              <p className="text-[11px] text-slate-300 line-clamp-2 mt-0.5 font-sans">
+                {livePushToast.body}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                setLivePushToast(null);
+              }}
+              className="p-1 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-white"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Full Notification & Inbox Modal */}
+      <NotificationInboxModal
+        isOpen={showNotificationsModal}
+        onClose={() => setShowNotificationsModal(false)}
+        userNotifications={userNotifications}
+        user={liveUser}
+        onMarkAllAsRead={handleMarkAllAsRead}
+        onDeleteNotification={handleDeleteNotification}
+        onClearAllNotifications={handleClearAllNotifications}
+      />
     </div>
   );
 });

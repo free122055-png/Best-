@@ -1,38 +1,41 @@
 {
-  "timestamp": "2026-08-16T09:11:12.190Z",
+  "timestamp": "2026-10-14T12:49:22.640Z",
   "frontend_payload": {
-    "amount": 10,
-    "userId": "admin_master",
-    "phone": "01700000000"
+    "amount": 15,
+    "userId": "test_user_playstore_check",
+    "phone": "01812345678",
+    "origin": "https://localhost"
   },
   "user_profile_data": {
-    "fetched_name": "Bangladesh BNB Administrator",
-    "fetched_phone": "+8800011112222",
-    "fetched_email": "networkbangladeshbnbbusiness@gmail.com"
+    "error": "User document not found in firestore"
   },
-  "outgoing_nagorikpay_payload": {
-    "amount": 10,
-    "cus_name": "Bangladesh BNB Administrator",
-    "cus_phone": "+8800011112222",
-    "cus_email": "networkbangladeshbnbbusiness@gmail.com",
-    "success_url": "http://localhost:3000/api/payment/nagorikpay-callback?userId=admin_master&amount=10",
-    "cancel_url": "http://localhost:3000/api/payment/nagorikpay-cancel?userId=admin_master&amount=10",
-    "webhook_url": "http://localhost:3000/api/payment/nagorikpay-webhook",
+  "outgoing_zinipay_payload": {
+    "cus_name": "BNB Customer",
+    "cus_email": "customer@bnbbusiness.com",
+    "amount": 15,
     "metadata": {
-      "userId": "admin_master",
-      "amount": 10,
-      "phone": "+8800011112222"
-    }
+      "order_id": "ORD-ZINI_1791982162672_5951",
+      "customer_id": "test_user_playstore_check",
+      "userId": "test_user_playstore_check",
+      "phone": "01812345678",
+      "memberId": "BNB000000",
+      "purpose": "add_money"
+    },
+    "redirect_url": "https://ais-dev-lcpzj4h5d5mm2it3dw6e57-969303088573.asia-southeast1.run.app/api/payment/zinipay-callback?val_id=ZINI_1791982162672_5951&userId=test_user_playstore_check&returnOrigin=https%3A%2F%2Fais-dev-lcpzj4h5d5mm2it3dw6e57-969303088573.asia-southeast1.run.app",
+    "cancel_url": "https://ais-dev-lcpzj4h5d5mm2it3dw6e57-969303088573.asia-southeast1.run.app/api/payment/zinipay-cancel?val_id=ZINI_1791982162672_5951&userId=test_user_playstore_check&returnOrigin=https%3A%2F%2Fais-dev-lcpzj4h5d5mm2it3dw6e57-969303088573.asia-southeast1.run.app",
+    "val_id": "ZINI_1791982162672_5951",
+    "webhook_url": "https://ais-dev-lcpzj4h5d5mm2it3dw6e57-969303088573.asia-southeast1.run.app/api/payment/zinipay-webhook?val_id=ZINI_1791982162672_5951&userId=test_user_playstore_check"
   },
   "outgoing_headers": {
     "Content-Type": "application/json",
-    "api_key": "vk5JYpiHRbSG7QYfMDeOdMQddh2L54jmhtAGki1dFea9yrmVjD"
+    "zini-api-key": "95f4bae1906bfd060176e99fa1747c98c8ff6b1b3252d81c"
   },
-  "nagorikpay_response_status": 200,
-  "nagorikpay_response_body": {
-    "status": 1,
-    "message": "Payment Link",
-    "payment_url": "https://secure-pay.nagorikpay.com/api/execute/e6fa8d32a3b44f256c4fea0c389e47ee"
+  "zinipay_response_status": 201,
+  "zinipay_response_body": {
+    "status": true,
+    "message": "Invoice created successfully.",
+    "payment_url": "https://secure.zinipay.com/bnb-business-network-bangladesh/payment/ed8b87b0-3bd8-44be-9e50-6ac2951ac015",
+    "val_id": "ZINI_1791982162672_5951"
   },
   "error": null
 }

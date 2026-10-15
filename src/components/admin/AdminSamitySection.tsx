@@ -25,14 +25,14 @@ import { User, Transaction, Notice, Offer, BapReport, BapGroup, BapAdminRequest,
 import { normalizeMemberId, formatBanglaAmount, normalizePhoneNumber, findUserInFirestoreByPhone, getNextSequentialMemberId, deleteUserCompletelyFromDatabase, convertBengaliToEnglishDigits } from '../../lib/memberUtils';
 import { sortTransactionsNewestFirst, getTxTime } from '../../lib/transactionUtils';
 import { saveAppConfig, DEFAULT_QARD_CONFIG } from '../../lib/config';
-import { AMBLogo } from '../AMBLogo';
+import { BNBLogo } from '../BNBLogo';
 import { HeaderPendingModal } from '../HeaderPendingModal';
 import SamityScreen from '../SamityScreen';
 import UnifiedBackButton from '../UnifiedBackButton';
 import SamityAdmin from '../SamityAdmin';
 import SafiPremiumShop from '../SafiPremiumShop';
 import TelecomAdmin from '../TelecomAdmin';
-import AmbSalaryAdmin from '../AmbSalaryAdmin';
+import BNBSalaryAdmin from '../BNBSalaryAdmin';
 import { HistoryRetentionSettings } from '../HistoryRetentionSettings';
 import { runWalletEndToEndTests, TestResultItem } from '../../lib/walletTests';
 import { 
@@ -702,6 +702,11 @@ export function AdminSamitySection(props: any) {
                 u.isSubAdmin === true
               );
 
+              const isOwnerUser = (u: any) => Boolean(
+                u.memberCategory === 'owner' ||
+                u.memberGroup === 'owner'
+              );
+
               const isInvestorUser = (u: any) => Boolean(
                 u.memberCategory === 'investor' ||
                 u.memberGroup === 'investor' ||
@@ -717,7 +722,9 @@ export function AdminSamitySection(props: any) {
                 u.isSamityMember === true ||
                 (Number(u.savings) > 0) ||
                 u.memberCategory === 'shareholder' ||
+                u.memberCategory === 'owner' ||
                 u.memberGroup === 'shareholder' ||
+                u.memberGroup === 'owner' ||
                 u.memberGroup === 'samity'
               );
 
@@ -741,8 +748,9 @@ export function AdminSamitySection(props: any) {
               );
 
               const subAdminUsers = users.filter(isSubAdminUser);
+              const ownerUsers = users.filter(isOwnerUser);
               const investorUsers = users.filter(u => isInvestorUser(u) && !isSubAdminUser(u));
-              const samityShareholderUsers = users.filter(u => isSamityMemberUser(u) && !isInvestorUser(u) && !isSubAdminUser(u));
+              const samityShareholderUsers = users.filter(u => (isSamityMemberUser(u) || u.memberCategory === 'shareholder') && !isInvestorUser(u) && !isSubAdminUser(u));
               const generalAppUsers = users.filter(u => !isSamityMemberUser(u) && !isInvestorUser(u) && !isSubAdminUser(u) && u.role !== 'admin');
               const switchOffUsers = users.filter(isSwitchOffUser);
               const switchOnUsers = users.filter(isSwitchOnUser);
@@ -772,6 +780,85 @@ export function AdminSamitySection(props: any) {
                         </span>
                       </button>
                     )}
+                  </div>
+
+                  {/* 🔴🟡⚪ সদস্য ক্যাটাগরি — ৪টি সেকশন এক লাইনে (UI-তে এক লাইনের মূল প্রদর্শন) */}
+                  <div className="bg-slate-950/90 border border-slate-800 rounded-xl p-1 shadow-sm space-y-1">
+                    <div className="flex items-center justify-between px-1 text-[9px] font-black text-slate-300">
+                      <span>🔴🟡⚪ সদস্য ক্যাটাগরি ফিল্টার ও নিয়ন্ত্রণ (এক লাইনে ৪টি সেকশন):</span>
+                      <span className="text-[8px] font-mono text-emerald-400">রিয়েল-টাইম সিঙ্ক</span>
+                    </div>
+                    <div className="grid grid-cols-4 gap-1 p-0.5 bg-slate-900 rounded-lg border border-slate-800">
+                      {/* 1. 🔴 ওনার */}
+                      <button
+                        type="button"
+                        onClick={() => setGeneralMemberFilterTab(generalMemberFilterTab === 'owner' ? 'all' : 'owner')}
+                        className={`py-1 px-0.5 rounded-lg transition-all flex flex-col items-center justify-center text-center cursor-pointer min-h-[52px] ${
+                          generalMemberFilterTab === 'owner'
+                            ? 'bg-rose-700 text-white ring-2 ring-rose-400 shadow-md'
+                            : 'bg-slate-800 hover:bg-rose-950/60 text-slate-200 border border-slate-700'
+                        }`}
+                      >
+                        <span className="text-[10px] font-black leading-tight">🔴 ওনার</span>
+                        <span className="text-[8px] font-mono font-bold text-rose-300">৳৪,০০০/মাস</span>
+                        <span className="text-[7.5px] bg-black/40 text-rose-200 px-1 py-0.2 rounded mt-0.5">
+                          {ownerUsers.length} জন • নমিনি ৩
+                        </span>
+                      </button>
+
+                      {/* 2. 🟡 শেয়ার হোল্ডার */}
+                      <button
+                        type="button"
+                        onClick={() => setGeneralMemberFilterTab(generalMemberFilterTab === 'shareholder' ? 'all' : 'shareholder')}
+                        className={`py-1 px-0.5 rounded-lg transition-all flex flex-col items-center justify-center text-center cursor-pointer min-h-[52px] ${
+                          generalMemberFilterTab === 'shareholder'
+                            ? 'bg-amber-600 text-white ring-2 ring-amber-400 shadow-md'
+                            : 'bg-slate-800 hover:bg-amber-950/60 text-slate-200 border border-slate-700'
+                        }`}
+                      >
+                        <span className="text-[10px] font-black leading-tight">🟡 শেয়ার হোল্ডার</span>
+                        <span className="text-[8px] font-mono font-bold text-amber-300">৳২,০০০/মাস</span>
+                        <span className="text-[7.5px] bg-black/40 text-amber-200 px-1 py-0.2 rounded mt-0.5">
+                          {samityShareholderUsers.length} জন • নমিনি ২
+                        </span>
+                      </button>
+
+                      {/* 3. ⚪ ইনভেস্টার */}
+                      <button
+                        type="button"
+                        onClick={() => setGeneralMemberFilterTab(generalMemberFilterTab === 'investor' ? 'all' : 'investor')}
+                        className={`py-1 px-0.5 rounded-lg transition-all flex flex-col items-center justify-center text-center cursor-pointer min-h-[52px] ${
+                          generalMemberFilterTab === 'investor'
+                            ? 'bg-slate-600 text-white ring-2 ring-slate-400 shadow-md'
+                            : 'bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700'
+                        }`}
+                      >
+                        <span className="text-[10px] font-black leading-tight">⚪ ইনভেস্টার</span>
+                        <span className="text-[8px] font-mono font-bold text-slate-300">৳১,০০০/মাস</span>
+                        <span className="text-[7.5px] bg-black/40 text-slate-300 px-1 py-0.2 rounded mt-0.5">
+                          {investorUsers.length} জন • নমিনি ১
+                        </span>
+                      </button>
+
+                      {/* 4. 🔘 ON/OFF */}
+                      <button
+                        type="button"
+                        onClick={() => setGeneralMemberFilterTab(generalMemberFilterTab === 'switch_off' ? 'switch_on' : 'switch_off')}
+                        className={`py-1 px-0.5 rounded-lg transition-all flex flex-col items-center justify-center text-center cursor-pointer min-h-[52px] ${
+                          generalMemberFilterTab === 'switch_off' || generalMemberFilterTab === 'switch_on'
+                            ? 'bg-teal-700 text-white ring-2 ring-teal-400 shadow-md'
+                            : 'bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700'
+                        }`}
+                      >
+                        <span className="text-[10px] font-black leading-tight">🔘 ON/OFF</span>
+                        <span className="text-[8px] font-mono font-bold text-teal-300">
+                          {generalMemberFilterTab === 'switch_off' ? '🔴 অফ তালিকা' : generalMemberFilterTab === 'switch_on' ? '🟢 অন তালিকা' : 'PIN নিয়ন্ত্রণ'}
+                        </span>
+                        <span className="text-[7.5px] bg-black/40 text-teal-200 px-1 py-0.2 rounded mt-0.5">
+                          {switchOffUsers.length} বন্ধ / {switchOnUsers.length} চালু
+                        </span>
+                      </button>
+                    </div>
                   </div>
 
                   {/* 8 Sections STRICTLY in 4-per-row grid (Row 1: 4 Cards, Row 2: 4 Cards) */}
@@ -1064,7 +1151,7 @@ export function AdminSamitySection(props: any) {
                   <span>📌 সদস্য সিরিয়াল ও রেজিষ্ট্রেশন কন্ট্রোল</span>
                 </h4>
                 <p className="text-[10px] text-slate-500 truncate">
-                  সদস্যদের সিরিয়াল আইডি 1 থেকে পরপর (AMB00000001 - 1,00,000) সুবিন্যস্ত রাখুন বা নতুন সদস্য যোগ করুন।
+                  সদস্যদের সিরিয়াল আইডি 1 থেকে পরপর (BNB00000001 - 1,00,000) সুবিন্যস্ত রাখুন বা নতুন সদস্য যোগ করুন।
                 </p>
               </div>
               <div className="flex items-center gap-1.5 w-full sm:w-auto shrink-0">
@@ -1156,14 +1243,14 @@ export function AdminSamitySection(props: any) {
                   {/* Row 2: Member ID Normalization & Groups */}
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
                     <div>
-                      <label className="block text-[11px] font-semibold text-slate-600 mb-1">সদস্য আইডি (AMB ফরম্যাট)</label>
+                      <label className="block text-[11px] font-semibold text-slate-600 mb-1">সদস্য আইডি (BNB ফরম্যাট)</label>
                       <div className="flex gap-1.5">
                         <input
                           type="text"
                           required
                           value={newMemberId}
                           onChange={(e) => setNewMemberId(e.target.value.toUpperCase())}
-                          placeholder="AMB00000001"
+                          placeholder="BNB00000001"
                           className="flex-1 bg-white border border-slate-250 rounded-xl px-2.5 py-1.5 text-xs font-mono font-bold text-slate-850 outline-none focus:border-[#00a884]"
                         />
                         <button
@@ -1297,7 +1384,7 @@ export function AdminSamitySection(props: any) {
                             e.target.scrollIntoView({ behavior: 'smooth', block: 'start' });
                           }, 250);
                         }}
-                        placeholder="সদস্যের নাম, মোবাইল নাম্বার অথবা মেম্বার আইডি (যেমন: AMB00000030) দিয়ে খুঁজুন..."
+                        placeholder="সদস্যের নাম, মোবাইল নাম্বার অথবা মেম্বার আইডি (যেমন: BNB00000030) দিয়ে খুঁজুন..."
                         className="w-full pl-9 pr-9 py-2 bg-slate-50 border border-slate-200 focus:border-[#00a884] focus:bg-white rounded-xl text-xs font-bold text-slate-800 outline-none transition shadow-2xs"
                       />
                       {generalMemberSearch && (
@@ -1333,6 +1420,11 @@ export function AdminSamitySection(props: any) {
                         u.role === 'sub_admin' ||
                         (Array.isArray(u.subAdminPermissions) && u.subAdminPermissions.length > 0) ||
                         u.isSubAdmin === true
+                      );
+
+                      const isOwnerUser = (u: any) => Boolean(
+                        u.memberCategory === 'owner' ||
+                        u.memberGroup === 'owner'
                       );
 
                       const isInvestorUser = (u: any) => Boolean(
@@ -1390,9 +1482,11 @@ export function AdminSamitySection(props: any) {
                           if (generalMemberFilterTab === 'switch_off' && !isSwOff) return false;
                           if (generalMemberFilterTab === 'switch_on' && !isSwOn) return false;
                           if (generalMemberFilterTab === 'sub_admin' && !isSubAdmin) return false;
+                          if (generalMemberFilterTab === 'owner' && !isOwnerUser(u)) return false;
+                          if (generalMemberFilterTab === 'shareholder' && (!isSamityMemberUser(u) && u.memberCategory !== 'shareholder')) return false;
                           if (generalMemberFilterTab === 'investor' && !isInvestor) return false;
                           if (generalMemberFilterTab === 'samity' && !isSamity) return false;
-                          if (generalMemberFilterTab === 'general' && (isSamity || isInvestor || isSubAdmin || u.role === 'admin')) return false;
+                          if (generalMemberFilterTab === 'general' && (isSamity || isInvestor || isSubAdmin || u.role === 'admin' || isOwnerUser(u))) return false;
 
                           if (!generalMemberSearch.trim()) return true;
                           const q = generalMemberSearch.toLowerCase();
@@ -1527,7 +1621,7 @@ export function AdminSamitySection(props: any) {
                                           </span>
                                         ) : isSamityUser ? (
                                           <span className="text-[8.5px] font-black bg-emerald-600 text-white border border-emerald-700 px-1.5 py-0.2 rounded inline-flex items-center gap-0.5 shadow-2xs">
-                                            🏢 সমবায় সমিতি সদস্য (ফরম ফিলাপকৃত)
+                                            🏢 সমবায় সমিতি সদস্য
                                           </span>
                                         ) : isPendingUser ? (
                                           <span className="text-[8.5px] font-black bg-orange-600 text-white border border-orange-700 px-1.5 py-0.2 rounded inline-flex items-center gap-0.5 shadow-2xs">
@@ -1535,7 +1629,39 @@ export function AdminSamitySection(props: any) {
                                           </span>
                                         ) : (
                                           <span className="text-[8.5px] font-black bg-sky-600 text-white border border-sky-700 px-1.5 py-0.2 rounded inline-flex items-center gap-0.5 shadow-2xs">
-                                            📱 নরমাল সদস্য (BNB কোম্পানি ইনভেস্টার)
+                                            📱 নরমাল সদস্য
+                                          </span>
+                                        )}
+
+                                        {/* 🔴🟡⚪ সদস্য ক্যাটাগরি ব্যাজ */}
+                                        {u.memberCategory === 'owner' ? (
+                                          <span className="text-[8.5px] font-black bg-rose-600 text-white border border-rose-700 px-1.5 py-0.2 rounded inline-flex items-center gap-0.5 shadow-2xs">
+                                            🔴 ওনার (৳৪,০০০/মাস)
+                                          </span>
+                                        ) : u.memberCategory === 'shareholder' ? (
+                                          <span className="text-[8.5px] font-black bg-amber-600 text-white border border-amber-700 px-1.5 py-0.2 rounded inline-flex items-center gap-0.5 shadow-2xs">
+                                            🟡 শেয়ার হোল্ডার (৳২,০০০/মাস)
+                                          </span>
+                                        ) : u.memberCategory === 'investor' ? (
+                                          <span className="text-[8.5px] font-black bg-slate-700 text-white border border-slate-800 px-1.5 py-0.2 rounded inline-flex items-center gap-0.5 shadow-2xs">
+                                            ⚪ ইনভেস্টার (৳১,০০০/মাস)
+                                          </span>
+                                        ) : null}
+
+                                        {/* 🔘 সুইচ অবস্থা ও নমিনি ব্যাজ */}
+                                        <span className={`text-[8px] font-black px-1.5 py-0.2 rounded border shadow-2xs ${
+                                          (u.samityAutoSavingsActive === false || u.samitySwitchStatus === 'OFF' || u.samityDeactivateStatus === 'self_opted_out')
+                                            ? 'bg-rose-950 text-rose-200 border-rose-500'
+                                            : 'bg-emerald-950 text-emerald-200 border-emerald-600'
+                                        }`}>
+                                          {(u.samityAutoSavingsActive === false || u.samitySwitchStatus === 'OFF' || u.samityDeactivateStatus === 'self_opted_out')
+                                            ? '🔴 সুইচ OFF'
+                                            : '🟢 সুইচ ON'}
+                                        </span>
+
+                                        {(Array.isArray(u.nominees) ? u.nominees.length : (u.nomineeName ? 1 : 0)) > 0 && (
+                                          <span className="text-[8px] font-bold bg-slate-100 text-slate-700 border border-slate-300 px-1.5 py-0.2 rounded shadow-2xs">
+                                            👥 নমিনি {Array.isArray(u.nominees) ? u.nominees.length : 1} জন
                                           </span>
                                         )}
 

@@ -166,7 +166,7 @@ export const HeaderPendingModal: React.FC<HeaderPendingModalProps> = ({
       ? 'বাতিল (Rejected)'
       : 'পেন্ডিং (Pending)';
 
-    return `📋 লেনদেন আবেদন বিবরণী (AMB Network)
+    return `📋 লেনদেন আবেদন বিবরণী (BNB Network)
 ━━━━━━━━━━━━━━━━━━━━━
 👤 মেম্বার নাম: ${userName}
 🆔 মেম্বার আইডি: ${memberId}
@@ -1520,7 +1520,7 @@ export const HeaderPendingModal: React.FC<HeaderPendingModalProps> = ({
                         <div className="bg-white p-2 rounded-lg border border-slate-200 shadow-2xs">
                           <span className="text-slate-400 block text-[9.5px]">সদস্য আইডি:</span>
                           <span className="font-black text-slate-800 font-mono text-xs sm:text-sm">
-                            {u?.memberId || tx.userMemberId || 'AMB00000000'}
+                            {u?.memberId || tx.userMemberId || 'BNB00000000'}
                           </span>
                         </div>
                       </div>

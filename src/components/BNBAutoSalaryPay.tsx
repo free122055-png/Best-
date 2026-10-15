@@ -72,14 +72,14 @@ interface SalaryConfig {
   payTime: string;
 }
 
-interface AmbAutoSalaryPayProps {
+interface BNBAutoSalaryPayProps {
   user: User | null;
   onBack: () => void;
   syncLiveProfile: () => void;
   appConfig: AppConfig | null;
 }
 
-export default function AmbAutoSalaryPay({ user, onBack, syncLiveProfile, appConfig }: AmbAutoSalaryPayProps) {
+export default function BNBAutoSalaryPay({ user, onBack, syncLiveProfile, appConfig }: BNBAutoSalaryPayProps) {
   // Current tab inside Salary Pay
   // tabs: 'dashboard' | 'employees' | 'payment' | 'reports' | 'settings'
   const [activeTab, setActiveTab] = useState<'dashboard' | 'employees' | 'payment' | 'reports' | 'settings'>('dashboard');
@@ -89,7 +89,7 @@ export default function AmbAutoSalaryPay({ user, onBack, syncLiveProfile, appCon
   const [loading, setLoading] = useState(true);
   const [config, setConfig] = useState<SalaryConfig>({
     companyName: 'ABC Trading Limited',
-    companyId: 'AMBC12345',
+    companyId: 'BNBC12345',
     overtimeRate: 200,
     payDate: '25 জুন, 2026',
     payTime: 'সকাল 10:00 AM'
@@ -218,7 +218,7 @@ export default function AmbAutoSalaryPay({ user, onBack, syncLiveProfile, appCon
 
   // Format money to Bengali locale style with comma
   const formatMoney = (amount: number) => {
-    return amount.toLocaleString('bn-BD');
+    return amount.toLocaleString('en-US');
   };
 
   // Load sample demo staff
@@ -319,7 +319,7 @@ export default function AmbAutoSalaryPay({ user, onBack, syncLiveProfile, appCon
         userPhone: user.phone,
         type: 'debit',
         amount: totalDue,
-        description: `AMB অটো স্যালারি পে - ${config.companyName} স্টাফ "${emp.name}" (${emp.employeeId}) এর বেতন বিতরণ`,
+        description: `BNB অটো স্যালারি পে - ${config.companyName} স্টাফ "${emp.name}" (${emp.employeeId}) এর বেতন বিতরণ`,
         category: 'Salary',
         status: 'approved',
         createdAt: new Date().toISOString()
@@ -328,7 +328,7 @@ export default function AmbAutoSalaryPay({ user, onBack, syncLiveProfile, appCon
       // 4. Add Payment Log
       addDoc(collection(db, 'admin_notifications'), {
         title: '💼 নতুন অটো সেলারি পে সম্পন্ন',
-        message: `${user.name || 'সদস্য'} (${user.memberId || 'N/A'}) মোট ৳${totalPendingSalary.toLocaleString('bn-BD')} টাকা অটো সেলারি পে সম্পন্ন করেছেন।`,
+        message: `${user.name || 'সদস্য'} (${user.memberId || 'N/A'}) মোট ৳${totalPendingSalary.toLocaleString('en-US')} টাকা অটো সেলারি পে সম্পন্ন করেছেন।`,
         userId: user.uid,
         userName: user.name || '',
         memberId: (user as any).memberId || '',
@@ -493,7 +493,7 @@ export default function AmbAutoSalaryPay({ user, onBack, syncLiveProfile, appCon
         userPhone: user.phone,
         type: 'debit',
         amount: totalPendingSalary,
-        description: `AMB অটো স্যালারি পে - ${config.companyName} প্রতিষ্ঠানের ${pendingEmployeesCount} জন কর্মচারীর মাসিক স্যালারি পেমেন্ট সম্পন্ন`,
+        description: `BNB অটো স্যালারি পে - ${config.companyName} প্রতিষ্ঠানের ${pendingEmployeesCount} জন কর্মচারীর মাসিক স্যালারি পেমেন্ট সম্পন্ন`,
         category: 'Salary',
         status: 'approved',
         createdAt: new Date().toISOString()
@@ -502,7 +502,7 @@ export default function AmbAutoSalaryPay({ user, onBack, syncLiveProfile, appCon
       // 4. Create internal payment log
       addDoc(collection(db, 'admin_notifications'), {
         title: '💼 নতুন অটো সেলারি পে সম্পন্ন',
-        message: `${user.name || 'সদস্য'} (${user.memberId || 'N/A'}) মোট ৳${totalPendingSalary.toLocaleString('bn-BD')} টাকা অটো সেলারি পে সম্পন্ন করেছেন।`,
+        message: `${user.name || 'সদস্য'} (${user.memberId || 'N/A'}) মোট ৳${totalPendingSalary.toLocaleString('en-US')} টাকা অটো সেলারি পে সম্পন্ন করেছেন।`,
         userId: user.uid,
         userName: user.name || '',
         memberId: (user as any).memberId || '',
@@ -608,14 +608,14 @@ export default function AmbAutoSalaryPay({ user, onBack, syncLiveProfile, appCon
   const handleShareWhatsApp = (emp: Employee) => {
     const overtimeVal = emp.overtimeHours * config.overtimeRate;
     const totalDue = emp.basicSalary + overtimeVal + emp.otherAllowance;
-    const text = `*AMB অটো স্যালারি পে*\n\nপ্রিয় ${emp.name},\nআপনার ${config.payDate} তারিখের বেতন পাঠানো হয়েছে।\n\nবেসিক বেতন: ৳ ${formatMoney(emp.basicSalary)}\nওভারটাইম: ${emp.overtimeHours} ঘণ্টা = ৳ ${formatMoney(overtimeVal)}\nঅন্যান্য ভাতা: ৳ ${formatMoney(emp.otherAllowance)}\n*মোট পরিশোধিত:* ৳ ${formatMoney(totalDue)}\nতারিখ ও সময়: ${config.payDate} ${config.payTime}\n\nধন্যবাদান্তে,\n${config.companyName}\nAMB স্যালারি ম্যানেজমেন্ট সিস্টেম`;
+    const text = `*BNB অটো স্যালারি পে*\n\nপ্রিয় ${emp.name},\nআপনার ${config.payDate} তারিখের বেতন পাঠানো হয়েছে।\n\nবেসিক বেতন: ৳ ${formatMoney(emp.basicSalary)}\nওভারটাইম: ${emp.overtimeHours} ঘণ্টা = ৳ ${formatMoney(overtimeVal)}\nঅন্যান্য ভাতা: ৳ ${formatMoney(emp.otherAllowance)}\n*মোট পরিশোধিত:* ৳ ${formatMoney(totalDue)}\nতারিখ ও সময়: ${config.payDate} ${config.payTime}\n\nধন্যবাদান্তে,\n${config.companyName}\nBNB স্যালারি ম্যানেজমেন্ট সিস্টেম`;
     window.open(`https://api.whatsapp.com/send?phone=${emp.phone}&text=${encodeURIComponent(text)}`, '_blank');
   };
 
   return (
-    <div className="w-full min-h-screen bg-[#f3f4f6] pb-24 font-sans select-none relative" id="amb-salary-pay-root">
+    <div className="w-full min-h-screen bg-[#f3f4f6] pb-24 font-sans select-none relative" id="bnb-salary-pay-root">
       
-      {/* Dynamic Upper Top Green bar like AMB Layout */}
+      {/* Dynamic Upper Top Green bar like BNB Layout */}
       <div className="bg-[#00a884] bg-gradient-to-r from-[#00a884] via-[#05c39b] to-[#00a884] px-4 pt-4 pb-20 text-white rounded-b-[2rem] shadow-md relative">
         <div className="flex items-center justify-between max-w-4xl mx-auto">
           <button 
@@ -628,7 +628,7 @@ export default function AmbAutoSalaryPay({ user, onBack, syncLiveProfile, appCon
           
           <div className="text-center flex-1">
             <h1 className="text-lg xs:text-xl font-black tracking-tight" id="salary-main-title">
-              AMB অটো স্যালারি পে
+              BNB অটো স্যালারি পে
             </h1>
             <p className="text-[10px] xs:text-[11px] font-bold text-[#cbfef4]/80 tracking-wide mt-0.5">
               কোম্পানি স্যালারি ম্যানেজমেন্ট সিস্টেম
@@ -1060,9 +1060,9 @@ export default function AmbAutoSalaryPay({ user, onBack, syncLiveProfile, appCon
                         <div className="flex items-center gap-1.5 mb-1 justify-between">
                           <div className="flex items-center gap-1">
                             <div className="w-3.5 h-3.5 rounded-full bg-[#00a884] flex items-center justify-center text-[7px] font-black text-white">
-                              AMB
+                              BNB
                             </div>
-                            <span className="text-[8px] font-black text-slate-300">AMB অ্যাপ</span>
+                            <span className="text-[8px] font-black text-slate-300">BNB অ্যাপ</span>
                           </div>
                           <span className="text-[7px] text-slate-400 font-bold">Just now</span>
                         </div>
@@ -1097,7 +1097,7 @@ export default function AmbAutoSalaryPay({ user, onBack, syncLiveProfile, appCon
                   {/* Green-accent receipt panel exact replica */}
                   <div className="bg-[#e6f7f4]/40 border border-[#00a884]/20 rounded-xl p-4 flex-1 flex flex-col justify-between font-mono relative overflow-hidden">
                     
-                    {/* Watermark badge icon of AMB */}
+                    {/* Watermark badge icon of BNB */}
                     <div className="absolute -right-6 -bottom-6 w-24 h-24 text-[#00a884]/5 pointer-events-none select-none">
                       <BookOpen className="w-full h-full" />
                     </div>
@@ -1143,7 +1143,7 @@ export default function AmbAutoSalaryPay({ user, onBack, syncLiveProfile, appCon
                     </div>
 
                     <div className="mt-4 pt-3 border-t border-dashed border-[#00a884]/20 flex items-center justify-between text-[10px] text-slate-500">
-                      <span>ধন্যবাদ! AMB অটো স্যালারি পে সিস্টেম</span>
+                      <span>ধন্যবাদ! BNB অটো স্যালারি পে সিস্টেম</span>
                       
                       {/* Send via WhatsApp action */}
                       <button 
@@ -1289,7 +1289,7 @@ export default function AmbAutoSalaryPay({ user, onBack, syncLiveProfile, appCon
                 বেতন বিতরণ পেমেন্ট গেটওয়ে
               </h4>
               <p className="text-[11px] text-slate-500 mb-4 leading-relaxed">
-                আপনার প্রতিষ্ঠানের মোট {totalEmployees} জন কর্মচারীর মধ্যে পেন্ডিং থাকা সকল কর্মচারীর মাসিক স্যালারি পেমেন্ট এক ক্লিকে সরাসরি আপনার AMB ওয়ালেট থেকে পরিশোধ করুন।
+                আপনার প্রতিষ্ঠানের মোট {totalEmployees} জন কর্মচারীর মধ্যে পেন্ডিং থাকা সকল কর্মচারীর মাসিক স্যালারি পেমেন্ট এক ক্লিকে সরাসরি আপনার BNB ওয়ালেট থেকে পরিশোধ করুন।
               </p>
 
               <div className="bg-slate-50 border border-slate-100 rounded-xl p-4 space-y-3.5 mb-4">

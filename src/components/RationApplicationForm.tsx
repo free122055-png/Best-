@@ -4,13 +4,12 @@ import { db } from '../lib/firebase';
 import UnifiedBackButton from './UnifiedBackButton';
 import { collection, addDoc, doc, updateDoc } from 'firebase/firestore';
 
-export default function RationApplicationForm({ liveUser, onClose }: any) {
+export default function RationApplicationForm({ liveUser, onClose, appConfig }: any) {
   const [name, setName] = useState(liveUser?.name || '');
   const [phone, setPhone] = useState(liveUser?.phone || '');
   const [address, setAddress] = useState((liveUser as any)?.address || '');
   const [duration, setDuration] = useState('1');
-  const [cardType, setCardType] = useState('Premium'); // Defaulting to Premium (Golden) for users
-  const [photoBase64, setPhotoBase64] = useState<string>('');
+  const [cardType, setCardType] = useState('red_white'); // Defaulting to highest
   const [submitting, setSubmitting] = useState(false);
 
   const isInitialized = React.useRef(false);
@@ -26,70 +25,43 @@ export default function RationApplicationForm({ liveUser, onClose }: any) {
 
   const cardCategories = [
     {
-      id: 'Standard',
-      name: '🥈 রেগুলার সিলভার কার্ড',
-      fee: 100,
-      badge: 'সাধারণ মেম্বার',
-      desc: 'সকল সাধারণ সদস্যরা আবেদন করতে পারবেন। বছরে একবার ফি প্রদান করতে হয়।',
-      benefit: '1 সেট মানসম্মত সাবসিডি রেশন সুবিধা।',
-      bgClass: 'from-slate-50 to-slate-200 border-slate-300 text-slate-800',
-      activeBorderClass: 'ring-4 ring-slate-400 border-slate-500'
+      id: 'red_white',
+      name: appConfig?.rationCardConfigs?.red_white?.label || 'গোল্ডেন প্রিমিয়াম',
+      fee: appConfig?.rationCardConfigs?.red_white?.price || 500,
+      color: 'bg-red-500',
+      activeBorderClass: 'ring-2 ring-red-400 border-red-600'
     },
     {
-      id: 'Premium',
-      name: '👑 প্রিমিয়াম গোল্ডেন কার্ড',
-      fee: 150,
-      badge: 'ডাবল রেশন সুবিধা',
-      desc: 'নিবন্ধিত সাধারণ ও বিশেষ সদস্যরা আবেদন করতে পারেন। ডাবল রেশন কোটা পাবেন।',
-      benefit: 'ডাবল কোটায় 2 সেট সাবসিডি রেশন সামগ্রী সংগ্রহের সুযোগ।',
-      bgClass: 'from-amber-50 to-yellow-100/60 border-amber-300 text-amber-900',
-      activeBorderClass: 'ring-4 ring-amber-400 border-amber-600'
+      id: 'blue_white',
+      name: appConfig?.rationCardConfigs?.blue_white?.label || 'গোল্ডেন',
+      fee: appConfig?.rationCardConfigs?.blue_white?.price || 300,
+      color: 'bg-blue-500',
+      activeBorderClass: 'ring-2 ring-blue-400 border-blue-600'
     },
     {
-      id: 'Platinum',
-      name: '💎 ভিআইপি গোল্ডেন কার্ড',
-      fee: 500,
-      badge: 'সমবায় ইনভেস্টর স্পেশাল',
-      desc: 'শুধুমাত্র সমবায় সমিতির অনুমোদিত নিবন্ধিত ইনভেস্টরদের জন্য সীমাবদ্ধ।',
-      benefit: 'আনলিমিটেড রেশন বুকিং ও ডিলার মেইন বিতরণ সেন্টারে ফাস্ট-ট্র্যাক সুবিধা।',
-      bgClass: 'from-purple-950 via-slate-900 to-purple-950 border-purple-800 text-white',
-      activeBorderClass: 'ring-4 ring-purple-600 border-purple-500'
+      id: 'green_white',
+      name: appConfig?.rationCardConfigs?.green_white?.label || 'প্রিমিয়াম',
+      fee: appConfig?.rationCardConfigs?.green_white?.price || 200,
+      color: 'bg-emerald-500',
+      activeBorderClass: 'ring-2 ring-emerald-400 border-emerald-600'
+    },
+    {
+      id: 'black_white',
+      name: appConfig?.rationCardConfigs?.black_white?.label || 'রেগুলার',
+      fee: appConfig?.rationCardConfigs?.black_white?.price || 100,
+      color: 'bg-slate-700',
+      activeBorderClass: 'ring-2 ring-slate-400 border-slate-500'
     }
   ];
 
-  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      if (file.size > 1.5 * 1024 * 1024) {
-        alert("অনুগ্রহ করে 1.5 মেগাবাইটের কম সাইজের ছবি নির্বাচন করুন।");
-        return;
-      }
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setPhotoBase64(reader.result as string);
-      };
-      reader.readAsDataURL(file);
-    }
-  };
-
-  const selectedCategoryObj = cardCategories.find(c => c.id === cardType) || cardCategories[1];
+  const selectedCategoryObj = cardCategories.find(c => c.id === cardType) || cardCategories[3];
   const totalFee = selectedCategoryObj.fee * parseInt(duration);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!photoBase64) {
-      alert("অনুগ্রহ করে আপনার একটি প্রোফাইল ছবি গ্যালারি থেকে আপলোড করুন।");
-      return;
-    }
-
-    // 1. Check if VIP Golden is selected, and verify if user is an approved samity member
-    if (cardType === 'Platinum') {
-      const samityStatus = liveUser?.samityStatus || 'none';
-      if (samityStatus !== 'approved') {
-        alert("দুঃখিত! ভিআইপি গোল্ডেন কার্ডের জন্য শুধুমাত্র সমবায় সমিতির অনুমোদিত নিবন্ধিত ইনভেস্টরগণ আবেদন করতে পারবেন। দয়া করে প্রথমে সমবায় ফান্ডে যুক্ত হোন বা রেগুলার/প্রিমিয়াম রেশন কার্ড নির্বাচন করুন।");
-        return;
-      }
-    }
+    
+    // Auto-use profile pic
+    const userPhoto = liveUser.profilePic || liveUser.photoURL || '';
 
     // 2. Check if user has sufficient main balance
     const userBalance = liveUser?.balance || 0;
@@ -105,7 +77,7 @@ export default function RationApplicationForm({ liveUser, onClose }: any) {
     setSubmitting(true);
     try {
       const timestamp = new Date().toISOString();
-      const cardNo = liveUser?.memberId || liveUser?.phone || `AMB-${Date.now()}`;
+      const cardNo = liveUser?.memberId || liveUser?.phone || `BNB-${Date.now()}`;
       
       // 3. Deduct balance from user
       const userRef = doc(db, 'users', liveUser.uid);
@@ -115,6 +87,7 @@ export default function RationApplicationForm({ liveUser, onClose }: any) {
       });
 
       // 4. Create Ration Card record
+      const expiryDateObj = new Date(new Date().setFullYear(new Date().getFullYear() + parseInt(duration)));
       await addDoc(collection(db, 'ration_cards'), {
         userId: liveUser.uid,
         userName: name,
@@ -125,19 +98,16 @@ export default function RationApplicationForm({ liveUser, onClose }: any) {
         upazila: address.split(',')[1] || 'যশোর সদর',
         district: address.split(',')[2] || 'যশোর',
         duration: duration,
-        cardType: cardType, // Standard, Premium, Platinum
+        cardType: cardType, 
         cardNo: cardNo,
         cardNumber: cardNo,
-        photoUrl: photoBase64,
+        photoUrl: userPhoto,
         status: 'pending',
         createdAt: timestamp,
         issueDate: new Date().toLocaleDateString('bn-BD'),
-        expiryDate: new Date(new Date().setFullYear(new Date().getFullYear() + parseInt(duration))).toLocaleDateString('bn-BD'),
-        signature: 'S.Hasan',
-        vipCardBg: cardType === 'Platinum' ? 'from-purple-950 via-slate-900 to-slate-950' : '',
-        vipBorderColor: cardType === 'Platinum' ? '#A855F7' : '',
-        vipTextColor: cardType === 'Platinum' ? 'text-purple-150' : '',
-        vipPrimaryColor: cardType === 'Platinum' ? '#7C3AED' : ''
+        expiryDate: expiryDateObj.toLocaleDateString('bn-BD'),
+        expiryTimestamp: expiryDateObj.toISOString(),
+        signature: 'S.Hasan'
       });
 
       // 5. Add Transaction Log
@@ -177,73 +147,50 @@ export default function RationApplicationForm({ liveUser, onClose }: any) {
   };
 
   return (
-    <div className="bg-slate-900/60 backdrop-blur-md min-h-screen p-4 text-slate-800 font-sans flex flex-col items-center justify-center relative select-none">
+    <div className="fixed inset-0 z-[60] bg-white overflow-y-auto font-sans text-slate-800 select-none animate-fade-in">
       {onClose && (
-        <div className="absolute top-4 left-4 z-50">
-          <UnifiedBackButton
-            onClick={onClose}
-            variant="light"
-            title="পিছনে যান"
-          />
+        <div className="sticky top-0 left-0 right-0 z-50 bg-white/80 backdrop-blur-md border-b border-slate-100 px-4 py-3 flex items-center justify-between">
+           <UnifiedBackButton onClick={onClose} variant="dark" title="পিছনে যান" />
+           <h2 className="text-[13px] font-black text-[#015335]">রেশন কার্ড আবেদন ফর্ম</h2>
+           <div className="w-8" />
         </div>
       )}
-      <div className="max-w-xl w-full bg-white rounded-3xl border border-slate-200 p-6 md:p-8 shadow-2xl space-y-6 text-left my-8 overflow-y-auto max-h-[90vh]">
+
+      <div className="max-w-xl mx-auto p-4 space-y-4">
         
-        <div className="border-b border-slate-100 pb-4 text-center space-y-1">
-          <div className="w-12 h-12 bg-emerald-50 rounded-full flex items-center justify-center text-emerald-600 mx-auto border-2 border-emerald-100">
-            <Award className="w-6 h-6" />
-          </div>
-          <h2 className="text-xl font-black text-[#015335]">🥗 কো-অপারেটিভ ডিজিটাল রেশন কার্ড আবেদনপত্র</h2>
-          <p className="text-[10.5px] text-slate-500 font-bold">ন্যায্যমূল্যে নিত্যপ্রয়োজনীয় চাল, ডাল, তেল ও অন্যান্য ভর্তুকি পণ্য সুবিধা পাওয়ার ডিজিটাল কার্ড</p>
+        <div className="text-center space-y-0.5 py-1">
+          <h2 className="text-[16px] font-black text-[#015335]">🥗 ডিজিটাল রেশন কার্ড আবেদনপত্র</h2>
+          <p className="text-[9px] text-slate-500 font-bold uppercase tracking-widest">ভর্তুকি পণ্য সুবিধা পাওয়ার স্মার্ট কার্ড</p>
         </div>
 
-        {/* 12 SECTIONS RULE & REPLICA ADHERENCE CONTAINER */}
-        <div className="bg-emerald-55/40 border border-emerald-100/80 p-3.5 rounded-2xl flex items-start gap-2.5">
-          <Sparkles className="w-5 h-5 text-emerald-700 shrink-0 mt-0.5 animate-pulse" />
-          <div className="text-[10.5px] text-emerald-950 font-semibold leading-relaxed">
-            <span className="font-black text-emerald-800">সহজ নিয়মাবলীঃ </span>
-            আপনার ওয়ালেটে আবেদনের জন্য পর্যাপ্ত মেইন ব্যালেন্স থাকতে হবে। আবেদন সম্পূর্ণ হওয়ামাত্রই মেইন অ্যাকাউন্ট থেকে কার্ড সক্রিয়করণ চার্জ ডেবিট হয়ে যাবে। এডমিন অনুমোদন করা মাত্র কার্ডটি সচল দেখাবে।
-          </div>
+        <div className="bg-emerald-50 border border-emerald-100 p-2.5 rounded-xl flex items-start gap-2">
+          <Sparkles className="w-3.5 h-3.5 text-emerald-700 shrink-0 mt-0.5" />
+          <p className="text-[9px] text-emerald-950 font-bold leading-tight">
+            ওয়ালেটে পর্যাপ্ত মেইন ব্যালেন্স থাকতে হবে। আবেদন সম্পূর্ণ হওয়ামাত্রই অ্যাকাউন্ট থেকে ফি কেটে নেওয়া হবে।
+          </p>
         </div>
 
-        {/* THREE DISTINCT CARD CATEGORIES SELECTION BOXES */}
-        <div className="space-y-3">
-          <label className="block text-xs font-black text-slate-700">1. আপনার ডিজিটাল রেশন কার্ডের ক্যাটাগরি বেছে নিন *</label>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5">
+        <div className="space-y-1.5">
+          <label className="block text-[9px] font-black text-slate-500 uppercase tracking-tight ml-1">কার্ড ক্যাটাগরি নির্বাচন করুন *</label>
+          <div className="flex gap-1 overflow-x-auto no-scrollbar pb-0.5">
             {cardCategories.map((category, idx) => {
               const isSelected = cardType === category.id;
-              const isPlatinumVip = category.id === 'Platinum';
               return (
                 <div
                   key={`${category.id}-${idx}`}
                   onClick={() => setCardType(category.id)}
-                  className={`border-2 rounded-2xl p-4 cursor-pointer transition-all duration-200 relative flex flex-col justify-between text-left h-full shadow-sm select-none ${
+                  className={`border rounded-lg p-1.5 cursor-pointer transition-all flex-1 min-w-[75px] flex flex-col items-center justify-center gap-1 text-center ${
                     isSelected 
-                      ? category.activeBorderClass + ' scale-[1.01] bg-white' 
-                      : 'border-slate-200 hover:border-slate-300 bg-slate-50/50'
+                      ? category.activeBorderClass + ' bg-white shadow-sm scale-[1.02]' 
+                      : 'border-slate-100 hover:border-slate-200 bg-slate-50/50'
                   }`}
                 >
-                  {/* Selected check circle overlay */}
-                  {isSelected && (
-                    <div className="absolute top-2 right-2 w-5 h-5 bg-[#015335] text-white rounded-full flex items-center justify-center">
-                      <Check className="w-3.5 h-3.5 stroke-[3]" />
-                    </div>
-                  )}
-
-                  <div className="space-y-1.5 flex-grow">
-                    <span className="px-2 py-0.5 bg-slate-200/60 text-slate-800 text-[8.5px] font-black rounded-md inline-block">
-                      {category.badge}
-                    </span>
-                    <h4 className="text-xs font-black text-slate-900 leading-tight">{category.name}</h4>
-                    <p className="text-[10px] text-slate-600 font-bold leading-normal">{category.desc}</p>
-                    <p className="text-[9.5px] text-[#015335] font-extrabold leading-normal bg-emerald-50/50 p-1.5 rounded-lg border border-emerald-100/40">
-                      🎁 সুবিধা: {category.benefit}
-                    </p>
+                  <div className={`w-2.5 h-2.5 rounded-full ${category.color} flex items-center justify-center`}>
+                    {isSelected && <Check className="w-1.5 h-1.5 text-white stroke-[4]" />}
                   </div>
-
-                  <div className="pt-3 border-t border-slate-100 mt-3 flex items-baseline gap-1">
-                    <span className="text-base font-black text-slate-900 font-mono">৳{category.fee}</span>
-                    <span className="text-[10px] text-slate-400 font-bold">/ বছরে</span>
+                  <div className="space-y-0">
+                    <h4 className="text-[8.5px] font-black text-slate-800 leading-none truncate w-full px-0.5">{category.name}</h4>
+                    <p className="text-[10px] font-mono font-black text-emerald-700 leading-none mt-0.5">৳{category.fee}</p>
                   </div>
                 </div>
               );
@@ -251,118 +198,78 @@ export default function RationApplicationForm({ liveUser, onClose }: any) {
           </div>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-3.5 pt-1">
           
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-xs font-extrabold text-slate-600 mb-1">সদস্যের নাম *</label>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1">
+              <label className="text-[10px] font-black text-slate-500 uppercase ml-1">সদস্যের নাম *</label>
               <input 
                 type="text" 
                 value={name} 
                 onChange={(e) => setName(e.target.value)} 
-                className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold focus:ring-1 focus:ring-[#015335] outline-none" 
+                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-[11px] font-bold outline-none focus:border-emerald-500 transition-all" 
                 required 
               />
             </div>
 
-            <div>
-              <label className="block text-xs font-extrabold text-slate-600 mb-1">মোবাইল নাম্বার *</label>
+            <div className="space-y-1">
+              <label className="text-[10px] font-black text-slate-500 uppercase ml-1">মোবাইল নাম্বার *</label>
               <input 
                 type="text" 
                 value={phone} 
                 onChange={(e) => setPhone(e.target.value)} 
-                className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-mono font-bold focus:ring-1 focus:ring-[#015335] outline-none" 
+                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-[11px] font-mono font-bold outline-none focus:border-emerald-500 transition-all" 
                 required 
               />
             </div>
           </div>
 
-          <div>
-            <label className="block text-xs font-extrabold text-slate-600 mb-1">ঠিকানা (গ্রাম, উপজেলা, জেলা) *</label>
+          <div className="space-y-1">
+            <label className="text-[10px] font-black text-slate-500 uppercase ml-1">পূর্ণ ঠিকানা (গ্রাম, উপজেলা, জেলা) *</label>
             <textarea 
               value={address} 
               onChange={(e) => setAddress(e.target.value)} 
               placeholder="যেমন: খড়কী, যশোর সদর, যশোর"
-              className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold focus:ring-1 focus:ring-[#015335] outline-none h-16 resize-none" 
+              className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-[11px] font-bold outline-none h-12 resize-none focus:border-emerald-500 transition-all" 
               required 
             />
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-center">
-            <div>
-              <label className="block text-xs font-extrabold text-slate-600 mb-1">মেয়াদের সময়সীমা (বছর)</label>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1">
+              <label className="text-[10px] font-black text-slate-500 uppercase ml-1">মেয়াদের সময়সীমা</label>
               <select 
                 value={duration} 
                 onChange={(e) => setDuration(e.target.value)} 
-                className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold focus:ring-1 focus:ring-[#015335] outline-none"
+                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-[11px] font-bold outline-none"
               >
                 {[1, 2, 3, 4, 5].map(y => <option key={y} value={y.toString()}>{y} বছর</option>)}
               </select>
             </div>
 
-            {/* Total Payable Charge block */}
-            <div className="bg-emerald-50/75 p-3.5 rounded-2xl border border-emerald-100 flex justify-between items-center h-full">
+            <div className="bg-slate-900 text-white px-3 py-2 rounded-xl flex justify-between items-center">
               <div>
-                <p className="text-[10px] text-emerald-800 font-extrabold">মোট সক্রিয়করণ ফি</p>
-                <p className="text-xs text-slate-500 font-semibold">ফি ৳{selectedCategoryObj.fee} × {duration} বছর</p>
+                <p className="text-[8px] text-slate-400 font-bold uppercase leading-none">মোট ফি</p>
+                <p className="text-[9px] text-emerald-400 font-black mt-1">৳{selectedCategoryObj.fee} × {duration}</p>
               </div>
               <div className="text-right">
-                <span className="text-lg font-black text-[#015335] font-mono">৳{totalFee} BDT</span>
+                <span className="text-[15px] font-black text-white font-mono leading-none">৳{totalFee}</span>
               </div>
             </div>
           </div>
 
-          {/* Member photo upload with Base64 gallery selection */}
-          <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200/80">
-            <label className="block text-xs font-black text-[#015335] mb-2">📸 সদস্য প্রোফাইল ছবি আপলোড (গ্যালারি থেকে) *</label>
-            <div className="flex items-center gap-4">
-              <input 
-                type="file" 
-                accept="image/*" 
-                onChange={handleImageChange} 
-                className="hidden" 
-                id="user-photo-upload" 
-              />
-              <label 
-                htmlFor="user-photo-upload"
-                className="px-4 py-2.5 bg-emerald-700 hover:bg-emerald-800 text-white text-[11px] font-black rounded-xl cursor-pointer transition flex items-center gap-1.5 shadow-sm active:scale-95 shrink-0"
-              >
-                <ImageIcon className="w-4 h-4" /> গ্যালারি থেকে ছবি নিন
-              </label>
-              {photoBase64 ? (
-                <div className="relative">
-                  <img src={photoBase64} alt="Selected Preview" className="w-14 h-14 rounded-xl object-cover border border-slate-200 shadow-sm" />
-                  <button 
-                    type="button" 
-                    onClick={() => setPhotoBase64('')}
-                    className="absolute -top-1.5 -right-1.5 bg-rose-600 text-white p-0.5 rounded-full cursor-pointer hover:bg-rose-700"
-                  >
-                    <X className="w-3 h-3" />
-                  </button>
-                </div>
-              ) : (
-                <span className="text-[10px] text-slate-500 font-bold">কোনো ছবি নির্বাচন করা হয়নি</span>
-              )}
-            </div>
+          <div className="pt-2">
+            <button 
+              type="submit" 
+              disabled={submitting}
+              className="w-full py-3.5 bg-[#015335] hover:bg-[#014028] disabled:bg-slate-300 text-white rounded-xl font-black text-[11px] transition cursor-pointer shadow-lg uppercase tracking-widest active:scale-95"
+            >
+              {submitting ? 'প্রসেস হচ্ছে...' : `✓ ৳${totalFee} পরিশোধ ও আবেদন জমা দিন`}
+            </button>
+            <p className="text-[8.5px] text-slate-400 text-center mt-2.5 font-bold">
+              প্রোফাইল পিকচারটি রেশন কার্ডে অটোমেটিক সেট করা হবে।
+            </p>
           </div>
-
-          {/* VIP golden constraint warning */}
-          {cardType === 'Platinum' && (
-            <div className="bg-amber-50 border border-amber-200 p-3.5 rounded-2xl flex gap-2">
-              <ShieldAlert className="w-5 h-5 text-amber-700 shrink-0 mt-0.5" />
-              <p className="text-[10px] text-amber-900 font-bold leading-normal">
-                সতর্কতা: ভিআইপি গোল্ডেন কার্ড শুধুমাত্র কো-অপারেটিভ সমবায় সমিতির নিবন্ধিত অনুমোদিত ইনভেস্টরদের জন্য। আপনি ইনভেস্টর না হয়ে থাকলে আবেদনটি বাতিল করা হবে।
-              </p>
-            </div>
-          )}
-
-          <button 
-            type="submit" 
-            disabled={submitting}
-            className="w-full py-3.5 bg-[#015335] hover:bg-[#014028] disabled:bg-slate-400 text-white rounded-2xl font-black text-xs transition cursor-pointer shadow-lg tracking-wide uppercase"
-          >
-            {submitting ? 'আবেদন পাঠানো হচ্ছে ও ফি ডেবিট হচ্ছে...' : `✓ ৳${totalFee} পরিশোধ ও রেশন কার্ড আবেদন জমা দিন`}
-          </button>
         </form>
       </div>
     </div>

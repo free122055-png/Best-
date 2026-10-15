@@ -131,7 +131,7 @@ export default function LockoutScreen({
       {/* Admin WhatsApp Support Contact */}
       <div className="space-y-2 pt-1">
         <a
-          href="https://wa.me/8801865911728?text=আসসালামু%20আলাইকুম%20এডমিন,%20আমার%20AMB%20অ্যাকাউন্টটি%20লক%20হয়ে%20গেছে।%20জরুরি%20সাহায্য%20প্রয়োজন।"
+          href="https://wa.me/8801865911728?text=আসসালামু%20আলাইকুম%20এডমিন,%20আমার%20BNB%20অ্যাকাউন্টটি%20লক%20হয়ে%20গেছে।%20জরুরি%20সাহায্য%20প্রয়োজন।"
           target="_blank"
           rel="noopener noreferrer"
           className="w-full bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white font-bold py-3 px-4 rounded-xl text-xs transition flex items-center justify-center gap-2 shadow-md shadow-emerald-600/20 cursor-pointer"

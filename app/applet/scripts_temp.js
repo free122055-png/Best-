@@ -44,7 +44,7 @@ if (c.includes(loan_target)) {
   console.log('Replaced loan admin notification');
 }
 
-c = c.replace('AMB ম্যানেজমেন্ট কোম্পানি ইনভেস্টর নীতি অনুযায়ী', 'BNB কোম্পানি ইনভেস্টর নীতি অনুযায়ী');
+c = c.replace('BNB ম্যানেজমেন্ট কোম্পানি ইনভেস্টর নীতি অনুযায়ী', 'BNB কোম্পানি ইনভেস্টর নীতি অনুযায়ী');
 
 fs.writeFileSync('src/components/SamityScreen.tsx', c, 'utf8');
 console.log('Done!');

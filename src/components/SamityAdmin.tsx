@@ -122,7 +122,7 @@ export default function SamityAdmin({
   defaultSamitySlides
 }: SamityAdminProps) {
 
-  // Active sub-section state inside AMB Investor admin panel
+  // Active sub-section state inside BNB Investor admin panel
   const [activeSubView, setActiveSubView] = useState<'main' | 'membership' | 'transactions' | 'ledger' | 'notices' | 'banners' | 'members' | 'policy_rules' | 'monthly_collection' | 'investments_manager'>('main');
 
   // Monthly Savings Collection & Auto-Debit states
@@ -158,7 +158,7 @@ export default function SamityAdmin({
   const [settingsSaveSuccess, setSettingsSaveSuccess] = useState(false);
   const [settingsSaveError, setSettingsSaveError] = useState('');
 
-  // Local state for AMB Investor Policy Config & Rules
+  // Local state for BNB Investor Policy Config & Rules
   const [policyConfig, setPolicyConfig] = useState<SamityPolicyConfig>(() => ({
     policyTitle: appConfig?.samityPolicyConfig?.policyTitle || 'মাসিক বিনিয়োগ ও নীতিমালা',
     policySubTitle: appConfig?.samityPolicyConfig?.policySubTitle || '1ম থেকে 25শে অক্টোবর পেমেন্ট সিস্টেম ও বিলম্ব চার্জসমূহ',
@@ -540,7 +540,7 @@ export default function SamityAdmin({
             <div className="flex items-center gap-2">
               <span className="w-2.5 h-2.5 bg-emerald-500 rounded-full animate-pulse" />
               <h2 className="text-sm sm:text-base font-black text-slate-900">
-                {activeSubView === 'main' && '🏢 AMB কোম্পানি ম্যানেজমেন্ট ইনভেস্টর কন্ট্রোল সেন্টার'}
+                {activeSubView === 'main' && '🏢 BNB কোম্পানি ম্যানেজমেন্ট ইনভেস্টর কন্ট্রোল সেন্টার'}
                 {activeSubView === 'membership' && '👥 সদস্যপদ অনুমোদন প্যানেল'}
                 {activeSubView === 'transactions' && '📥 ডিপোজিট ও লোন অনুমোদন পোর্টাল'}
                 {activeSubView === 'ledger' && '📊 ঋণ খতিয়ান ও ম্যানুয়াল খাতা এন্ট্রি'}
@@ -559,7 +559,7 @@ export default function SamityAdmin({
               {activeSubView === 'notices' && 'লাইভ স্ক্রোলিং নোটিশ ঘোষণা এবং সদস্যপদের জন্য রেজিষ্ট্রেশন ফি এর শর্তাবলী পরিবর্তন'}
               {activeSubView === 'banners' && 'ইনভেস্টর মডিউলের হোম স্ক্রিনে প্রদর্শিত চমৎকার ব্যানার স্লাইডার কনফিগারেশন'}
               {activeSubView === 'members' && 'সকল নিবন্ধিত সদস্যের প্রোফাইল, ব্যালেন্স, এনআইডি এবং মোবাইল নাম্বার সরাসরি এডিট বা ডিলিট করুন'}
-              {activeSubView === 'policy_rules' && 'AMB ইনভেস্টার ইউজার ড্যাশবোর্ডের সমস্ত নিয়মকানুন, কিস্তি পলিসি ও বিলম্ব জরিমানা স্কেল পরিবর্তন করুন'}
+              {activeSubView === 'policy_rules' && 'BNB ইনভেস্টার ইউজার ড্যাশবোর্ডের সমস্ত নিয়মকানুন, কিস্তি পলিসি ও বিলম্ব জরিমানা স্কেল পরিবর্তন করুন'}
               {activeSubView === 'monthly_collection' && 'সকল নিবন্ধিত সদস্যের 12 মাসের কিস্তির খতিয়ান, মেইন ব্যালেন্স থেকে অটো-কাটিং এবং ম্যানুয়াল কিস্তি সমন্বয়'}
             </p>
           </div>
@@ -668,7 +668,7 @@ export default function SamityAdmin({
             <div className="bg-slate-50 border border-slate-200 p-4.5 rounded-2.5xl flex items-start gap-3 shadow-3xs">
               <span className="text-amber-500 bg-amber-50 p-1.5 rounded-xl shrink-0"><Info className="w-4 h-4" /></span>
               <div className="text-xs text-slate-600 leading-relaxed">
-                <strong>ম্যানেজমেন্ট পলিসি সিকিউরিটিঃ</strong> এখানে প্রদর্শিত প্রতিটি বিষয় সরাসরি ইউজার প্যানেলের <strong>"AMB কোম্পানি ম্যানেজমেন্ট ইনভেস্টর"</strong> সেকশনের সাথে সংযুক্ত। নতুন মেম্বার আবেদন করা মাত্রই আপনি এখানে নোটিফিকেশন পাবেন এবং তাদের যাবতীয় কিস্তি ট্রানজেকশন অনুমোদন করতে পারবেন।
+                <strong>ম্যানেজমেন্ট পলিসি সিকিউরিটিঃ</strong> এখানে প্রদর্শিত প্রতিটি বিষয় সরাসরি ইউজার প্যানেলের <strong>"BNB কোম্পানি ম্যানেজমেন্ট ইনভেস্টর"</strong> সেকশনের সাথে সংযুক্ত। নতুন মেম্বার আবেদন করা মাত্রই আপনি এখানে নোটিফিকেশন পাবেন এবং তাদের যাবতীয় কিস্তি ট্রানজেকশন অনুমোদন করতে পারবেন।
               </div>
             </div>
 
@@ -851,7 +851,7 @@ export default function SamityAdmin({
                   </div>
                 </button>
 
-                {/* Option 7: AMB Investor Rules & Policy Config */}
+                {/* Option 7: BNB Investor Rules & Policy Config */}
                 <button
                   onClick={() => setActiveSubView('policy_rules')}
                   className="group relative bg-white hover:bg-teal-50/40 border-2 border-slate-200/90 hover:border-teal-500 rounded-xl sm:rounded-2xl p-2 sm:p-3 text-left transition-all duration-200 hover:shadow-md active:scale-98 cursor-pointer flex flex-col justify-between min-h-[110px] sm:min-h-[135px] w-full min-w-0"
@@ -903,7 +903,7 @@ export default function SamityAdmin({
                   </div>
                 </button>
 
-                {/* Option 9: AMB Our Investments (আমাদের ইনভেস্ট পোস্ট ও পোর্টফোলিও ম্যানেজার) */}
+                {/* Option 9: BNB Our Investments (আমাদের ইনভেস্ট পোস্ট ও পোর্টফোলিও ম্যানেজার) */}
                 <button
                   onClick={() => setActiveSubView('investments_manager')}
                   className="group relative bg-gradient-to-br from-amber-50/80 via-orange-50/70 to-yellow-50/80 hover:from-amber-100 hover:to-orange-100 border-2 border-amber-300 hover:border-amber-500 rounded-xl sm:rounded-2xl p-2 sm:p-3 text-left transition-all duration-200 hover:shadow-md active:scale-98 cursor-pointer flex flex-col justify-between min-h-[110px] sm:min-h-[135px] w-full min-w-0"
@@ -1921,14 +1921,14 @@ export default function SamityAdmin({
           </div>
         )}
 
-        {/* VIEW G: AMB INVESTOR RULES & POLICY CUSTOMIZER */}
+        {/* VIEW G: BNB INVESTOR RULES & POLICY CUSTOMIZER */}
         {activeSubView === 'policy_rules' && (
           <div className="bg-white border border-slate-200/80 rounded-3xl p-5 shadow-3xs space-y-6 animate-fade-in">
             <div className="border-b border-slate-150 pb-4 mb-4 flex items-center justify-between">
               <div>
                 <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
                   <FileText className="w-4 h-4 text-teal-600" />
-                  AMB ইনভেস্টার নিয়মকানুন ও জরিমানা কাস্টমাইজেশন
+                  BNB ইনভেস্টার নিয়মকানুন ও জরিমানা কাস্টমাইজেশন
                 </h3>
                 <p className="text-[11px] text-slate-500 mt-1">
                   সদস্যদের ইউজার ড্যাশবোর্ডে প্রদর্শিত সমস্ত নিয়মাবলী, কিস্তি পলিসি এবং বিলম্ব জরিমানা স্কেল রিয়েল-টাইমে ডায়নামিক পরিবর্তন করুন।
@@ -1945,7 +1945,7 @@ export default function SamityAdmin({
             {policySaveSuccess && (
               <div className="p-3 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-2xl text-xs font-bold flex items-center gap-2 animate-bounce">
                 <Check className="w-4 h-4 text-emerald-600" />
-                AMB ইনভেস্টার নীতি ও জরিমানা স্কেল সফলভাবে আপডেট করা হয়েছে!
+                BNB ইনভেস্টার নীতি ও জরিমানা স্কেল সফলভাবে আপডেট করা হয়েছে!
               </div>
             )}
 
@@ -3008,7 +3008,7 @@ export default function SamityAdmin({
           </div>
         )}
 
-        {/* VIEW I: AMB OUR INVESTMENTS (আমাদের ইনভেস্ট পোস্ট ও পোর্টফোলিও ম্যানেজার) */}
+        {/* VIEW I: BNB OUR INVESTMENTS (আমাদের ইনভেস্ট পোস্ট ও পোর্টফোলিও ম্যানেজার) */}
         {activeSubView === 'investments_manager' && (
           <div className="bg-white border border-slate-200/80 rounded-3xl p-3 sm:p-5 shadow-3xs space-y-4 animate-fade-in text-left">
             <div className="border-b border-slate-150 pb-3 mb-2 flex items-center justify-between">

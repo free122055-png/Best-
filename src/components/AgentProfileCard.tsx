@@ -59,7 +59,7 @@ export default function AgentProfileCard({
     const lat = agent.realLat !== undefined ? agent.realLat : agent.lat;
     const lng = agent.realLng !== undefined ? agent.realLng : agent.lng;
     navigator.clipboard.writeText(
-      `AMB Agent: ${agent.name}, Phone: ${agent.phone}, Map URL: https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`
+      `BNB Agent: ${agent.name}, Phone: ${agent.phone}, Map URL: https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`
     );
     alert(lang === 'bn' ? 'এজেন্টের তথ্য সফলভাবে ক্লিপবোর্ডে কপি করা হয়েছে!' : 'Agent information successfully copied to clipboard!');
   };
@@ -90,7 +90,7 @@ export default function AgentProfileCard({
           <div>
             <h4 className="text-xs font-black text-slate-100 tracking-tight flex items-center gap-1">
               <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-              AMB Cooperative Ltd.
+              BNB Cooperative Ltd.
             </h4>
             <p className="text-[7px] text-[#22C55E] font-black tracking-widest uppercase font-mono">
               {agent.role || 'APPROVED CO-OP AGENT'}
@@ -123,7 +123,7 @@ export default function AgentProfileCard({
               {agent.verified && <ShieldCheck className="w-3.5 h-3.5 text-emerald-400 shrink-0 fill-emerald-400/10" />}
             </h3>
             <p className="text-[8px] text-slate-350 font-mono mt-0.5">
-              ID: AMB-AGT-{agent.id.substring(0, 6).toUpperCase()}
+              ID: BNB-AGT-{agent.id.substring(0, 6).toUpperCase()}
             </p>
             <p className="text-[8px] text-[#22C55E] bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-full inline-block mt-1 font-bold">
               ● {agent.status === 'Available' ? t.agentCardStatusActive : agent.status === 'Busy' ? t.agentCardStatusBusy : t.agentCardStatusOffline}
@@ -154,9 +154,18 @@ export default function AgentProfileCard({
       {/* Live Details info under Card */}
       <div className="bg-white border border-slate-150 p-4 rounded-3xl shadow-3xs space-y-3 font-sans text-xs">
         <div className="grid grid-cols-2 gap-3 pt-0.5">
-          <div className="space-y-0.5 text-left">
+          <div className="space-y-0.5 text-left col-span-2">
             <p className="text-[9px] font-black text-slate-400 uppercase tracking-wider">{t.locationLabel}</p>
-            <p className="font-bold text-slate-800">{agent.city}, {agent.country} {agent.flag}</p>
+            <p className="font-extrabold text-slate-900 text-[13px] leading-tight">
+              {agent.shopMapLink ? (
+                <span className="flex items-center gap-1.5">
+                   {agent.shopMapLink}
+                   <span className="text-[9px] bg-sky-50 text-sky-600 px-1.5 py-0.2 rounded border border-sky-100 font-black">WRITTEN</span>
+                </span>
+              ) : (
+                `${agent.city}, ${agent.country} ${agent.flag}`
+              )}
+            </p>
           </div>
           <div className="space-y-0.5 text-left">
             <p className="text-[9px] font-black text-slate-400 uppercase tracking-wider">{t.phoneLabel}</p>

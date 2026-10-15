@@ -25,14 +25,14 @@ import { User, Transaction, Notice, Offer, BapReport, BapGroup, BapAdminRequest,
 import { normalizeMemberId, formatBanglaAmount, normalizePhoneNumber, findUserInFirestoreByPhone, getNextSequentialMemberId, deleteUserCompletelyFromDatabase, convertBengaliToEnglishDigits } from '../../lib/memberUtils';
 import { sortTransactionsNewestFirst, getTxTime } from '../../lib/transactionUtils';
 import { saveAppConfig, DEFAULT_QARD_CONFIG } from '../../lib/config';
-import { AMBLogo } from '../AMBLogo';
+import { BNBLogo } from '../BNBLogo';
 import { HeaderPendingModal } from '../HeaderPendingModal';
 import SamityScreen from '../SamityScreen';
 import UnifiedBackButton from '../UnifiedBackButton';
 import SamityAdmin from '../SamityAdmin';
 import SafiPremiumShop from '../SafiPremiumShop';
 import TelecomAdmin from '../TelecomAdmin';
-import AmbSalaryAdmin from '../AmbSalaryAdmin';
+import BNBSalaryAdmin from '../BNBSalaryAdmin';
 import { HistoryRetentionSettings } from '../HistoryRetentionSettings';
 import { runWalletEndToEndTests, TestResultItem } from '../../lib/walletTests';
 import { 
@@ -298,7 +298,7 @@ export function AdminLedgerSection(props: any) {
                     ওয়ালেট লেজার ইনটেগ্রিটি ও এন্ড-টু-এন্ড টেস্ট স্যুট (Tests 1–8)
                   </h3>
                   <p className="text-[11px] text-slate-300 mt-1">
-                    বাস্তব ডাটাবেজ ও লেজারের মাধ্যমে Add Money, Payment, AMB-to-AMB Transfer, Idempotency, Concurrency এবং Reconciliation টেস্ট করুন।
+                    বাস্তব ডাটাবেজ ও লেজারের মাধ্যমে Add Money, Payment, BNB-to-BNB Transfer, Idempotency, Concurrency এবং Reconciliation টেস্ট করুন।
                   </p>
                 </div>
                 <button
@@ -488,7 +488,7 @@ export function AdminLedgerSection(props: any) {
                       type="text"
                       value={historySearch}
                       onChange={(e) => setHistorySearch(e.target.value)}
-                      placeholder="যেমন: MD SUJON, AMB-1025, 01815..."
+                      placeholder="যেমন: MD SUJON, BNB-1025, 01815..."
                       className="w-full pl-8 pr-3 py-2 border rounded-xl text-xs font-bold text-slate-800 bg-slate-50 outline-none focus:ring-1 focus:ring-rose-500/50"
                     />
                     <Search className="absolute left-2.5 top-2.5 w-3.5 h-3.5 text-slate-400" />
