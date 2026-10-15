@@ -1,3 +1,10 @@
+
+export function stripHeavyConfigFields(configObj: any): any {
+  if (!configObj || typeof configObj !== 'object') return configObj;
+  const { customGridIcons, sectionIcons, mandatoryNoticeResponses, ...clean } = configObj;
+  return clean;
+}
+
 import { db } from './firebase';
 import { doc, getDoc, setDoc, updateDoc, deleteField } from 'firebase/firestore';
 import { AppConfig } from '../types';
@@ -390,16 +397,21 @@ export const DEFAULT_SAMITY_INVESTMENTS: import('../types').SamityInvestment[] =
 export async function loadAppConfig(): Promise<AppConfig> {
   try {
     const configRef = doc(db, 'system_settings', 'app_config');
+    const mainConfigRef = doc(db, 'app_config', 'main');
     const iconsRef = doc(db, 'system_settings', 'section_icons');
+    const responsesRef = doc(db, 'system_settings', 'notice_responses');
 
-    const [docSnap, iconsSnap] = await Promise.all([
-      getDoc(configRef),
+    const [docSnap, mainSnap, iconsSnap] = await Promise.all([
+      getDoc(configRef).catch(() => null),
+      getDoc(mainConfigRef).catch(() => null),
       getDoc(iconsRef).catch(() => null)
     ]);
 
     let data: any = {};
-    if (docSnap.exists()) {
+    if (docSnap && docSnap.exists()) {
       data = docSnap.data() as any;
+    } else if (mainSnap && mainSnap.exists()) {
+      data = mainSnap.data() as any;
     }
 
     let iconsData: Record<string, string> = {};
@@ -407,19 +419,45 @@ export async function loadAppConfig(): Promise<AppConfig> {
       iconsData = (iconsSnap.data() as Record<string, string>) || {};
     }
 
-    // Migration / fallback: if legacy app_config still has sectionIcons, merge and clean it
-    if (data.sectionIcons && typeof data.sectionIcons === 'object') {
-      iconsData = { ...data.sectionIcons, ...iconsData };
-      try {
-        await updateDoc(configRef, { sectionIcons: deleteField() });
-      } catch (e) {}
+    // Migration: If legacy oversized customGridIcons/sectionIcons/mandatoryNoticeResponses exist in app_config, move & delete to keep document < 20 KB
+    const legacyIcons = { ...(data.customGridIcons || {}), ...(data.sectionIcons || {}) };
+    const legacyResponses = data.mandatoryNoticeResponses;
+
+    if (Object.keys(legacyIcons).length > 0 || legacyResponses) {
+      console.log("[Config Migration] Migrating heavy fields out of app_config to shrink document size below 1MB limit...");
+      
+      if (Object.keys(legacyIcons).length > 0) {
+        iconsData = { ...legacyIcons, ...iconsData };
+        await setDoc(iconsRef, iconsData, { merge: true }).catch(() => null);
+      }
+
+      if (legacyResponses) {
+        await setDoc(responsesRef, legacyResponses, { merge: true }).catch(() => null);
+      }
+
+      const cleanupPayload = {
+        customGridIcons: deleteField(),
+        sectionIcons: deleteField(),
+        mandatoryNoticeResponses: deleteField()
+      };
+
+      if (docSnap && docSnap.exists()) {
+        await updateDoc(configRef, cleanupPayload).catch(() => null);
+      }
+      if (mainSnap && mainSnap.exists()) {
+        await updateDoc(mainConfigRef, cleanupPayload).catch(() => null);
+      }
+
+      delete data.customGridIcons;
       delete data.sectionIcons;
+      delete data.mandatoryNoticeResponses;
     }
 
     if (!iconsData.samity) {
       iconsData.samity = "/samity_logo.svg";
     }
     data.sectionIcons = iconsData;
+    data.customGridIcons = iconsData;
 
     let updated = false;
     if (!data.globalTexts) {
@@ -470,16 +508,24 @@ export function sanitizeConfig(obj: any): any {
 export async function saveAppConfig(newConfig: AppConfig): Promise<void> {
   try {
     const configRef = doc(db, 'system_settings', 'app_config');
+    const mainConfigRef = doc(db, 'app_config', 'main');
+    const iconsRef = doc(db, 'system_settings', 'section_icons');
+    
     const sanitized = sanitizeConfig(newConfig);
-    // Exclude sectionIcons from app_config to prevent hitting the 1MB Firestore document limit
-    const { sectionIcons, ...configWithoutIcons } = sanitized;
-    await setDoc(configRef, configWithoutIcons, { merge: true });
-
-    // Persist sectionIcons to dedicated system_settings/section_icons document if provided
-    if (sectionIcons && typeof sectionIcons === 'object' && Object.keys(sectionIcons).length > 0) {
-      const iconsRef = doc(db, 'system_settings', 'section_icons');
-      await setDoc(iconsRef, sectionIcons, { merge: true });
+    
+    // Save heavy icon maps to dedicated system_settings/section_icons document
+    const iconsData = { ...(sanitized.sectionIcons || {}), ...(sanitized.customGridIcons || {}) };
+    if (Object.keys(iconsData).length > 0) {
+      await setDoc(iconsRef, iconsData, { merge: true }).catch(() => null);
     }
+
+    // Strip heavy fields before writing to app_config to guarantee document size stays < 20 KB
+    const lightConfig = stripHeavyConfigFields(sanitized);
+
+    await Promise.all([
+      setDoc(configRef, lightConfig, { merge: true }),
+      setDoc(mainConfigRef, lightConfig, { merge: true }).catch(() => null)
+    ]);
 
     try {
       localStorage.setItem('amb_app_config', JSON.stringify({ ...DEFAULT_CONFIG, ...sanitized }));

@@ -706,7 +706,23 @@ export const Dashboard = React.memo(function Dashboard({
     return str;
   };
 
-  const getTxt = (key: string, fallback: string) => {
+  
+  // Helper to render custom gallery image icon if set by Admin, else fall back to default SVG
+  const renderGridServiceIcon = (key: string, DefaultIconComponent: React.ComponentType<{ className?: string }>) => {
+    const customImg = appConfig?.customGridIcons?.[key] || appConfig?.sectionIcons?.[key];
+    if (customImg && customImg !== '/samity_logo.svg') {
+      return (
+        <img 
+          src={customImg} 
+          alt="Service Icon" 
+          className="w-11 h-11 sm:w-13 sm:h-13 object-contain rounded-xl transition-transform group-hover:scale-105 shadow-2xs" 
+        />
+      );
+    }
+    return <DefaultIconComponent className="w-11 h-11 sm:w-13 sm:h-13 transition-transform group-hover:scale-105" />;
+  };
+
+const getTxt = (key: string, fallback: string) => {
     const rawVal = appConfig?.globalTexts?.[key] || fallback;
     return appLanguage === 'en' ? t(rawVal) : rawVal;
   };
@@ -3836,16 +3852,16 @@ export const Dashboard = React.memo(function Dashboard({
             </div>
           </div>
 
-          {/* Center: Dual Pill Buttons Container (Yellow Balance & Red Due) - Guaranteed Mobile Screen Containment */}
-          <div className="flex items-center rounded-full overflow-hidden shadow-lg shrink-0 mx-auto border-0 bg-transparent max-w-[46%] xs:max-w-none">
+          {/* Center: Dual Pill Buttons Container - Prominent & Large Matching Reference Screenshot Exactly */}
+          <div className="flex items-center rounded-full overflow-hidden shadow-xl shrink-0 mx-auto border-0 bg-transparent">
             {/* Yellow Main Balance Pill (Displays 'Balance' in English, Tap reveals amount for 3 seconds) */}
             <button
               type="button"
               onClick={handleTapBalance}
               title="Tap to view main balance for 3 seconds"
-              className="bg-amber-400 hover:bg-amber-500 px-2.5 xs:px-4 py-2 flex items-center justify-center text-slate-950 font-black text-[13px] xs:text-[15.5px] sm:text-[18px] transition-all cursor-pointer min-w-[75px] xs:min-w-[105px] sm:min-w-[135px] h-9 xs:h-11 rounded-l-full active:scale-98 shadow-xs border-0 truncate"
+              className="bg-amber-400 hover:bg-amber-500 px-4 xs:px-5 sm:px-6 py-2.5 flex items-center justify-center text-slate-950 font-black text-[15px] xs:text-[17px] sm:text-[19px] transition-all cursor-pointer min-w-[95px] xs:min-w-[120px] sm:min-w-[140px] h-10.5 xs:h-12 rounded-l-full active:scale-98 shadow-sm border-0"
             >
-              <span className="whitespace-nowrap tracking-tight font-black font-sans truncate">
+              <span className="whitespace-nowrap tracking-tight font-black font-sans">
                 {showBalance 
                   ? '৳' + (liveUser?.balance || 0).toLocaleString('bn-BD', { minimumFractionDigits: 2 }) 
                   : 'Balance'}
@@ -3853,7 +3869,7 @@ export const Dashboard = React.memo(function Dashboard({
             </button>
 
             {/* Red Due Loan Pill (Always Visible - Prominent Outstanding Amount) */}
-            <div className="bg-rose-600 px-2.5 xs:px-4 py-2 flex items-center justify-center text-white font-black text-[13px] xs:text-[15.5px] sm:text-[18px] min-w-[75px] xs:min-w-[105px] sm:min-w-[135px] h-9 xs:h-11 rounded-r-full shadow-xs border-0 truncate">
+            <div className="bg-[#e60049] px-4 xs:px-5 sm:px-6 py-2.5 flex items-center justify-center text-white font-black text-[15px] xs:text-[17px] sm:text-[19px] transition-all min-w-[95px] xs:min-w-[120px] sm:min-w-[140px] h-10.5 xs:h-12 rounded-r-full shadow-sm border-0">
               <span className="whitespace-nowrap tracking-tight font-black font-sans">
                 ৳{(liveUser?.dueLoan || 0).toLocaleString('bn-BD', { minimumFractionDigits: 2 })}
               </span>
@@ -3928,7 +3944,7 @@ export const Dashboard = React.memo(function Dashboard({
                   className="flex flex-col items-center text-center cursor-pointer active:scale-95 transition-transform group"
                 >
                   <div className="w-12 h-12 sm:w-14 sm:h-14 flex items-center justify-center shrink-0">
-                    <SamityIcon className="w-11 h-11 sm:w-13 sm:h-13 transition-transform group-hover:scale-105" />
+                    {renderGridServiceIcon('samity', SamityIcon)}
                   </div>
                   <h4 className="text-[10.5px] sm:text-[11.5px] font-black text-slate-900 leading-tight mt-1 line-clamp-2 text-center tracking-tight font-sans">
                     {getTxt('cardSamityTitle', 'BNB কোম্পানি ইনভেস্টর')}
@@ -3941,7 +3957,7 @@ export const Dashboard = React.memo(function Dashboard({
                   className="flex flex-col items-center text-center cursor-pointer active:scale-95 transition-transform group"
                 >
                   <div className="w-12 h-12 sm:w-14 sm:h-14 flex items-center justify-center shrink-0">
-                    <SafeDealsIcon className="w-11 h-11 sm:w-13 sm:h-13 transition-transform group-hover:scale-105" />
+                    {renderGridServiceIcon('safedeals', SafeDealsIcon)}
                   </div>
                   <h4 className="text-[10.5px] sm:text-[11.5px] font-black text-slate-900 leading-tight mt-1 line-clamp-2 text-center tracking-tight font-sans">
                     {getTxt('cardSafeDealsTitle', 'BNB নিরাপদ লেনদেন')}
@@ -3954,7 +3970,7 @@ export const Dashboard = React.memo(function Dashboard({
                   className="flex flex-col items-center text-center cursor-pointer active:scale-95 transition-transform group"
                 >
                   <div className="w-12 h-12 sm:w-14 sm:h-14 flex items-center justify-center shrink-0">
-                    <QardIcon className="w-11 h-11 sm:w-13 sm:h-13 transition-transform group-hover:scale-105" />
+                    {renderGridServiceIcon('qard', QardIcon)}
                   </div>
                   <h4 className="text-[10.5px] sm:text-[11.5px] font-black text-slate-900 leading-tight mt-1 line-clamp-2 text-center tracking-tight font-sans">
                     {getTxt('cardQardTitle', 'BNB কার্জ হাসানা')}
@@ -3967,7 +3983,7 @@ export const Dashboard = React.memo(function Dashboard({
                   className="flex flex-col items-center text-center cursor-pointer active:scale-95 transition-transform group"
                 >
                   <div className="w-12 h-12 sm:w-14 sm:h-14 flex items-center justify-center shrink-0">
-                    <BankIcon className="w-11 h-11 sm:w-13 sm:h-13 transition-transform group-hover:scale-105" />
+                    {renderGridServiceIcon('bank', BankIcon)}
                   </div>
                   <h4 className="text-[10.5px] sm:text-[11.5px] font-black text-slate-900 leading-tight mt-1 line-clamp-2 text-center tracking-tight font-sans">
                     {getTxt('cardBankTitle', 'MY BNB লেনদেন')}
@@ -3980,7 +3996,7 @@ export const Dashboard = React.memo(function Dashboard({
                   className="flex flex-col items-center text-center cursor-pointer active:scale-95 transition-transform group"
                 >
                   <div className="w-12 h-12 sm:w-14 sm:h-14 flex items-center justify-center shrink-0">
-                    <TelecomIcon className="w-11 h-11 sm:w-13 sm:h-13 transition-transform group-hover:scale-105" />
+                    {renderGridServiceIcon('telecom', TelecomIcon)}
                   </div>
                   <h4 className="text-[10.5px] sm:text-[11.5px] font-black text-slate-900 leading-tight mt-1 line-clamp-2 text-center tracking-tight font-sans">
                     {getTxt('cardTelecomTitle', 'BNB টেলিকম')}
@@ -3993,7 +4009,7 @@ export const Dashboard = React.memo(function Dashboard({
                   className="flex flex-col items-center text-center cursor-pointer active:scale-95 transition-transform group"
                 >
                   <div className="w-12 h-12 sm:w-14 sm:h-14 flex items-center justify-center shrink-0">
-                    <RationIcon className="w-11 h-11 sm:w-13 sm:h-13 transition-transform group-hover:scale-105" />
+                    {renderGridServiceIcon('ration', RationIcon)}
                   </div>
                   <h4 className="text-[10.5px] sm:text-[11.5px] font-black text-slate-900 leading-tight mt-1 line-clamp-2 text-center tracking-tight font-sans">
                     {getTxt('cardRationTitle', 'BNB রেশন কার্ড')}
@@ -4006,7 +4022,7 @@ export const Dashboard = React.memo(function Dashboard({
                   className="flex flex-col items-center text-center cursor-pointer active:scale-95 transition-transform group"
                 >
                   <div className="w-12 h-12 sm:w-14 sm:h-14 flex items-center justify-center shrink-0">
-                    <SalaryIcon className="w-11 h-11 sm:w-13 sm:h-13 transition-transform group-hover:scale-105" />
+                    {renderGridServiceIcon('salary', SalaryIcon)}
                   </div>
                   <h4 className="text-[10.5px] sm:text-[11.5px] font-black text-slate-900 leading-tight mt-1 line-clamp-2 text-center tracking-tight font-sans">
                     {getTxt('cardSalaryTitle', 'BNB আটা সেলারি পে')}
@@ -4019,7 +4035,7 @@ export const Dashboard = React.memo(function Dashboard({
                   className="flex flex-col items-center text-center cursor-pointer active:scale-95 transition-transform group"
                 >
                   <div className="w-12 h-12 sm:w-14 sm:h-14 flex items-center justify-center shrink-0">
-                    <SafiIcon className="w-11 h-11 sm:w-13 sm:h-13 transition-transform group-hover:scale-105" />
+                    {renderGridServiceIcon('safi', SafiIcon)}
                   </div>
                   <h4 className="text-[10.5px] sm:text-[11.5px] font-black text-slate-900 leading-tight mt-1 line-clamp-2 text-center tracking-tight font-sans">
                     {getTxt('cardSafiTitle', 'al safi')}
@@ -4032,7 +4048,7 @@ export const Dashboard = React.memo(function Dashboard({
                   className="flex flex-col items-center text-center cursor-pointer active:scale-95 transition-transform group"
                 >
                   <div className="w-12 h-12 sm:w-14 sm:h-14 flex items-center justify-center shrink-0">
-                    <AutoRechargeIcon className="w-11 h-11 sm:w-13 sm:h-13 transition-transform group-hover:scale-105" />
+                    {renderGridServiceIcon('auto_recharge', AutoRechargeIcon)}
                   </div>
                   <h4 className="text-[10.5px] sm:text-[11.5px] font-black text-slate-900 leading-tight mt-1 line-clamp-2 text-center tracking-tight font-sans">
                     {getTxt('cardAutoRechargeTitle', 'BNB ডাটা রিচার্জ')}
@@ -4045,7 +4061,7 @@ export const Dashboard = React.memo(function Dashboard({
                   className="flex flex-col items-center text-center cursor-pointer active:scale-95 transition-transform group"
                 >
                   <div className="w-12 h-12 sm:w-14 sm:h-14 flex items-center justify-center shrink-0">
-                    <BillPayIcon className="w-11 h-11 sm:w-13 sm:h-13 transition-transform group-hover:scale-105" />
+                    {renderGridServiceIcon('bill_pay', BillPayIcon)}
                   </div>
                   <h4 className="text-[10.5px] sm:text-[11.5px] font-black text-slate-900 leading-tight mt-1 line-clamp-2 text-center tracking-tight font-sans">
                     {getTxt('cardBillPayTitle', 'BNB বিল পে')}
@@ -4058,7 +4074,7 @@ export const Dashboard = React.memo(function Dashboard({
                   className="flex flex-col items-center text-center cursor-pointer active:scale-95 transition-transform group"
                 >
                   <div className="w-12 h-12 sm:w-14 sm:h-14 flex items-center justify-center shrink-0">
-                    <AgentIcon className="w-11 h-11 sm:w-13 sm:h-13 transition-transform group-hover:scale-105" />
+                    {renderGridServiceIcon('agent', AgentIcon)}
                   </div>
                   <h4 className="text-[10.5px] sm:text-[11.5px] font-black text-slate-900 leading-tight mt-1 line-clamp-2 text-center tracking-tight font-sans">
                     {getTxt('cardAgentTitle', 'BNB এজেন্ট')}
@@ -4071,7 +4087,7 @@ export const Dashboard = React.memo(function Dashboard({
                   className="flex flex-col items-center text-center cursor-pointer active:scale-95 transition-transform group"
                 >
                   <div className="w-12 h-12 sm:w-14 sm:h-14 flex items-center justify-center shrink-0">
-                    <AboutIcon className="w-11 h-11 sm:w-13 sm:h-13 transition-transform group-hover:scale-105" />
+                    {renderGridServiceIcon('about', AboutIcon)}
                   </div>
                   <h4 className="text-[10.5px] sm:text-[11.5px] font-black text-slate-900 leading-tight mt-1 line-clamp-2 text-center tracking-tight font-sans">
                     {getTxt('cardAboutTitle', 'BNB আমাদের লক্ষ্য')}

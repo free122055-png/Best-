@@ -190,8 +190,8 @@ export default function App() {
           const merged = {
             ...prev,
             ...data,
-            // Keep sectionIcons from separate document or fallback to existing
-            sectionIcons: { ...(prev.sectionIcons || {}), ...(data.sectionIcons || {}) }
+            customGridIcons: { ...(prev.customGridIcons || {}), ...(data.customGridIcons || {}), ...(data.sectionIcons || {}) },
+            sectionIcons: { ...(prev.sectionIcons || {}), ...(data.sectionIcons || {}), ...(data.customGridIcons || {}) }
           };
           try {
             localStorage.setItem('amb_app_config', JSON.stringify({ ...DEFAULT_CONFIG, ...merged }));
@@ -212,6 +212,7 @@ export default function App() {
         setAppConfig(prev => {
           const merged = {
             ...prev,
+            customGridIcons: { ...(prev.customGridIcons || {}), ...iconsData },
             sectionIcons: { ...(prev.sectionIcons || {}), ...iconsData }
           };
           try {

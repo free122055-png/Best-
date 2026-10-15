@@ -1583,8 +1583,7 @@ export default function AdminPanel(props: AdminPanelProps) {
         oneSignalRestApiKey: cfgOneSignalRestApiKey.trim()
       };
       
-      const configRef = doc(db, 'system_settings', 'app_config');
-      await setDoc(configRef, updatedConfig, { merge: true });
+      await saveAppConfig(updatedConfig);
       onChangeConfig(updatedConfig);
       
       setOneSignalSuccess(true);
@@ -1822,8 +1821,7 @@ export default function AdminPanel(props: AdminPanelProps) {
         }
       };
       
-      const configRef = doc(db, 'system_settings', 'app_config');
-      await setDoc(configRef, updatedConfig, { merge: true });
+      await saveAppConfig(updatedConfig);
       onChangeConfig(updatedConfig);
       
       setIntegSuccessMessage(`✅ জেসন সফলভাবে পড়া হয়েছে এবং "${name}" গেটওয়েটি "${targetSectionKey}" সেকশনের জন্য স্বয়ংক্রিয়ভাবে সেভ ও সক্রিয় করা হয়েছে! আলাদা কোনো ফর্ম পূরণ বা সাবমিট করতে হবে না।`);
@@ -1983,8 +1981,7 @@ export default function AdminPanel(props: AdminPanelProps) {
         }
       };
       
-      const configRef = doc(db, 'system_settings', 'app_config');
-      await setDoc(configRef, updatedConfig, { merge: true });
+      await saveAppConfig(updatedConfig);
       onChangeConfig(updatedConfig);
       
       setIntegSuccessMessage(`অভিনন্দন! "${integName}" সফটওয়্যার গেটওয়েটি সফলভাবে সেটআপ করা হয়েছে এবং নির্বাচিত সেকশনের সাথে ইন্টিগ্রেট করা হয়েছে।`);
@@ -2042,8 +2039,7 @@ export default function AdminPanel(props: AdminPanelProps) {
         softwareIntegrations: currentIntegrations
       };
       
-      const configRef = doc(db, 'system_settings', 'app_config');
-      await setDoc(configRef, updatedConfig, { merge: true });
+      await saveAppConfig(updatedConfig);
       onChangeConfig(updatedConfig);
     } catch (err: any) {
       console.error('Error toggling integration active status:', err);
@@ -3750,8 +3746,7 @@ export default function AdminPanel(props: AdminPanelProps) {
         ...appConfig,
         allowManualAgentLocation: newValue
       };
-      const configRef = doc(db, 'system_settings', 'app_config');
-      await setDoc(configRef, updatedConfig, { merge: true });
+      await saveAppConfig(updatedConfig);
       onChangeConfig(updatedConfig);
       setAgentRequestSuccessMsg(
         newValue
@@ -4600,47 +4595,35 @@ export default function AdminPanel(props: AdminPanelProps) {
           const approvedLat = (targetReq.lat !== undefined && targetReq.lat !== null) ? Number(targetReq.lat) : userLat;
           const approvedLng = (targetReq.lng !== undefined && targetReq.lng !== null) ? Number(targetReq.lng) : userLng;
 
-          const agentUpdateData: any = {
+          const agentData = {
+            id: agentId,
+            name: targetReq.userName || targetReq.fullName || 'অনুমোদিত এজেন্ট',
+            phone: targetReq.phone || '',
+            role: 'Approved Agent',
+            country: reqCountry,
+            flag: countryFlag,
+            city: targetReq.city || targetReq.area || targetReq.district || 'Dhaka',
             lat: approvedLat,
             lng: approvedLng,
             realLat: approvedLat,
             realLng: approvedLng,
-            shopMapLink: targetReq.shopMapLink || targetReq.writtenLocation || '',
-            updatedAt: new Date().toISOString()
+            bdX: 50,
+            bdY: 50,
+            img: targetReq.img || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=120',
+            district: targetReq.district || '',
+            thana: targetReq.thana || targetReq.area || '',
+            postOffice: targetReq.postOffice || '',
+            shopMapLink: targetReq.shopMapLink || '',
+            verified: true,
+            status: 'Available',
+            lastSeen: 'Active Now',
+            whatsapp: targetReq.whatsNumber || targetReq.whatsapp || targetReq.phone || '',
+            messenger: '',
+            createdAt: new Date().toISOString()
           };
 
-          // If it's a new application, add full details
-          if (targetReq.type !== 'location_update') {
-            Object.assign(agentUpdateData, {
-              id: agentId,
-              name: targetReq.userName || targetReq.fullName || 'অনুমোদিত এজেন্ট',
-              phone: targetReq.phone || '',
-              role: 'Approved Agent',
-              country: reqCountry,
-              flag: countryFlag,
-              city: targetReq.city || targetReq.area || targetReq.district || 'Dhaka',
-              img: targetReq.img || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=120',
-              district: targetReq.district || '',
-              thana: targetReq.thana || targetReq.area || '',
-              postOffice: targetReq.postOffice || '',
-              verified: true,
-              status: 'Available',
-              lastSeen: 'Active Now',
-              whatsapp: targetReq.whatsNumber || targetReq.whatsapp || targetReq.phone || '',
-              createdAt: targetReq.createdAt || new Date().toISOString()
-            });
-          }
-
-          promises.push(setDoc(doc(db, 'agents', agentId), agentUpdateData, { merge: true }));
-          promises.push(setDoc(doc(db, 'bap_agents', agentId), agentUpdateData, { merge: true }).catch(() => {}));
-          
-          // Also update the user's profile with the new approved location
-          promises.push(updateDoc(doc(db, 'users', userId), {
-            realLat: approvedLat,
-            realLng: approvedLng,
-            shopMapLink: agentUpdateData.shopMapLink,
-            hasRealGPS: true
-          }).catch(() => {}));
+          promises.push(setDoc(doc(db, 'agents', agentId), agentData, { merge: true }));
+          promises.push(setDoc(doc(db, 'bap_agents', agentId), agentData, { merge: true }).catch(() => {}));
         }
 
         // Run all operations concurrently
@@ -5224,8 +5207,7 @@ export default function AdminPanel(props: AdminPanelProps) {
         ...appConfig,
         ...fieldsToUpdate
       };
-      const configRef = doc(db, 'system_settings', 'app_config');
-      await setDoc(configRef, updatedConfig, { merge: true });
+      await saveAppConfig(updatedConfig);
       onChangeConfig(updatedConfig);
     } catch (err: any) {
       console.error("Error updating config:", err);
@@ -5248,8 +5230,7 @@ export default function AdminPanel(props: AdminPanelProps) {
         mfsUpayNumber: cfgMfsUpayNumber,
         mfsUpayActive: cfgMfsUpayActive
       };
-      const configRef = doc(db, 'system_settings', 'app_config');
-      await setDoc(configRef, updatedConfig, { merge: true });
+      await saveAppConfig(updatedConfig);
       onChangeConfig(updatedConfig);
       alert('মোবাইল ব্যাংকিং (MFS) গেটওয়েসমূহ সফলভাবে সেভ হয়েছে!');
     } catch (err: any) {
@@ -5387,8 +5368,7 @@ export default function AdminPanel(props: AdminPanelProps) {
         ...appConfig,
         paymentBanks: defaultBanks
       };
-      const configRef = doc(db, 'system_settings', 'app_config');
-      await setDoc(configRef, updatedConfig, { merge: true });
+      await saveAppConfig(updatedConfig);
       onChangeConfig(updatedConfig);
       alert('ডিফল্ট ব্যাংক পেমেন্ট মেথডগুলো সফলভাবে লোড করা হয়েছে!');
     } catch (err: any) {
@@ -5421,8 +5401,7 @@ export default function AdminPanel(props: AdminPanelProps) {
         ...appConfig,
         paymentBanks: [...nonIntl, ...newIntlList]
       };
-      const configRef = doc(db, 'system_settings', 'app_config');
-      await setDoc(configRef, updatedConfig, { merge: true });
+      await saveAppConfig(updatedConfig);
       onChangeConfig(updatedConfig);
       alert('সৌদি ন্যাশনাল ব্যাংক ও দুবাই ব্যাংকসহ প্রবাসী ব্যাংকসমূহ এডমিন প্যানেলে লোড হয়েছে!');
     } catch (err: any) {
@@ -5498,8 +5477,7 @@ export default function AdminPanel(props: AdminPanelProps) {
         ...appConfig,
         paymentBanks: updatedBanks
       };
-      const configRef = doc(db, 'system_settings', 'app_config');
-      await setDoc(configRef, updatedConfig, { merge: true });
+      await saveAppConfig(updatedConfig);
       onChangeConfig(updatedConfig);
 
       alert(editingBank ? 'পেমেন্ট মেথড তথ্য সফলভাবে আপডেট হয়েছে!' : 'নতুন ব্যাংক/পেমেন্ট মেথড অ্যাকাউন্ট যুক্ত করা হয়েছে!');
@@ -5623,8 +5601,7 @@ export default function AdminPanel(props: AdminPanelProps) {
         ...appConfig,
         paymentBanks: updatedBanks
       };
-      const configRef = doc(db, 'system_settings', 'app_config');
-      await setDoc(configRef, updatedConfig, { merge: true });
+      await saveAppConfig(updatedConfig);
       onChangeConfig(updatedConfig);
       alert('ব্যাংক মেথডটি সফলভাবে মুছে ফেলা হয়েছে!');
     } catch (err: any) {
@@ -5683,8 +5660,7 @@ export default function AdminPanel(props: AdminPanelProps) {
         oneSignalRestApiKey: cfgOneSignalRestApiKey
       };
 
-      const configRef = doc(db, 'system_settings', 'app_config');
-      await setDoc(configRef, updatedConfig, { merge: true });
+      await saveAppConfig(updatedConfig);
       onChangeConfig(updatedConfig);
       
       setCfgSuccess(true);
