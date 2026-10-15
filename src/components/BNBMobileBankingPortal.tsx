@@ -1,3 +1,4 @@
+import { JenifyPaymentGateway } from './JenifyPaymentGateway';
 import React, { useState, useEffect } from 'react';
 import { X, PlusCircle, Globe, Banknote, Send, ArrowRight, Home, FileText, ChevronLeft, CreditCard, CheckCircle2, AlertCircle, Copy, Search, HelpCircle, Eye, EyeOff, ChevronDown, Lightbulb, Flame, Droplet, Wifi, Tv, Smartphone, UploadCloud, Trash2, Image, Camera, ChevronRight, RotateCcw, Briefcase, Bookmark, Info, ShieldCheck, Lock } from 'lucide-react';
 import { User, Transaction, AppConfig, SavedBNBCard, normalizePaidMonthsArray, getEffectiveBalance, generateBNBTrxId, formatShortTrxId } from '../types';
@@ -8,7 +9,7 @@ import { BNBPaymentReceiptModal, PaymentReceiptData } from './BNBPaymentReceiptM
 import { OtpVerificationModal } from './OtpVerificationModal';
 import { useBackHandler } from '../lib/navigationManager';
 import UnifiedBackButton from './UnifiedBackButton';
-import { JenifyPaymentGateway } from './JenifyPaymentGateway';
+// JenifyPaymentGateway imported or inlined
 import { apiUrl, getReturnOrigin } from '../config/api';
 
 interface BNBMobileBankingPortalProps {

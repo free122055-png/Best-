@@ -1,3 +1,4 @@
+import { JenifyPaymentGateway } from './JenifyPaymentGateway';
 import React, { useState, useEffect, useRef } from 'react';
 import { User, Transaction, Notice, Offer, AppConfig, Product, UserNotification, SAMITY_MONTHS, SAMITY_YEARS, SAMITY_QUARTERLY_MONTHS, normalizePaidMonthsArray, getEffectivePaidMonthsList, getEffectiveBalance, generateBNBTrxId, formatShortTrxId } from '../types';
 import { isUserQuarterlyPaid } from '../lib/samitySavingsEngine';
@@ -112,7 +113,7 @@ import ProfileView from './ProfileView';
 import { formatBanglaAmount, hasCompletedSamityProfile } from '../lib/memberUtils';
 import MoneyExchangeModule from './MoneyExchangeModule';
 import { BNBMobileBankingPortal } from './BNBMobileBankingPortal';
-import { JenifyPaymentGateway } from './JenifyPaymentGateway';
+// JenifyPaymentGateway inlined below
 import RationCardView from './RationCardView';
 import BNBAutoSalaryPay from './BNBAutoSalaryPay';
 import BNBEducationCenter from './BNBEducationCenter';
@@ -5607,3 +5608,4 @@ export const Dashboard = React.memo(function Dashboard({
 });
 
 export default Dashboard;
+
