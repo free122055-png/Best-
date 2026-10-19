@@ -61,11 +61,39 @@ export const JenifyPaymentGateway: React.FC<JenifyPaymentGatewayProps> = ({
     return true;
   }, true, 35);
 
+  // Helper to resolve user ID safely across all object formats, Firebase auth, and local storage
+  const getUserUid = (): string => {
+    if (currentUser?.uid) return String(currentUser.uid).trim();
+    if (currentUser?.id) return String(currentUser.id).trim();
+    if (currentUser?.userId) return String(currentUser.userId).trim();
+    if (auth.currentUser?.uid) return auth.currentUser.uid;
+    if (typeof window !== 'undefined') {
+      const ambUid = localStorage.getItem('amb_user_uid');
+      if (ambUid && ambUid.trim()) return ambUid.trim();
+      const bnbUid = localStorage.getItem('bnb_user_uid');
+      if (bnbUid && bnbUid.trim()) return bnbUid.trim();
+    }
+    return '';
+  };
+
+  // Helper to resolve user phone safely
+  const getUserPhone = (): string => {
+    if (currentUser?.phone) return String(currentUser.phone).trim();
+    if (currentUser?.userPhone) return String(currentUser.userPhone).trim();
+    if (currentUser?.phoneNumber) return String(currentUser.phoneNumber).trim();
+    if (auth.currentUser?.phoneNumber) return auth.currentUser.phoneNumber;
+    if (typeof window !== 'undefined') {
+      const ambPhone = localStorage.getItem('amb_user_phone');
+      if (ambPhone && ambPhone.trim()) return ambPhone.trim();
+    }
+    return '';
+  };
+
   // Silent background status checker via server API only
   const checkPaymentStatusSilently = async () => {
     if (!activeInvoice) return;
 
-    const targetUserId = currentUser?.uid || localStorage.getItem('amb_user_uid') || '';
+    const targetUserId = getUserUid();
 
     try {
       const res = await fetch(apiUrl('/api/payment/check-status'), {
@@ -126,7 +154,7 @@ export const JenifyPaymentGateway: React.FC<JenifyPaymentGatewayProps> = ({
         const parsed = JSON.parse(savedRaw);
         if (parsed && (parsed.invoice_id || parsed.val_id)) {
           setActiveInvoice(parsed);
-          const targetUid = currentUser?.uid || localStorage.getItem('amb_user_uid') || '';
+          const targetUid = getUserUid();
           fetch(apiUrl('/api/payment/check-status'), {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -186,13 +214,13 @@ export const JenifyPaymentGateway: React.FC<JenifyPaymentGatewayProps> = ({
       return;
     }
 
-    const targetUserId = currentUser?.uid || localStorage.getItem('amb_user_uid') || '';
+    const targetUserId = getUserUid();
     if (!targetUserId) {
       setErrorMsg('ব্যবহারকারী শনাক্ত করা যায়নি। দয়া করে পুনরায় লগইন করুন।');
       return;
     }
 
-    const targetPhone = currentUser?.phone || localStorage.getItem('amb_user_phone') || '';
+    const targetPhone = getUserPhone();
 
     setErrorMsg('');
     setLocalLoading(true);
