@@ -303,7 +303,7 @@ const MoneyExchangeModule: React.FC<MoneyExchangeModuleProps> = ({
           status: 'success',
           description: `সরাসরি নিরাপদ লেনদেন হোল্ডঃ প্রাপক ${resolvedRecipient.name} (আইডি: ${resolvedRecipient.memberId})। টাকা এসক্রো লক করা হয়েছে।`,
           createdAt: new Date().toISOString(),
-          paymentMethod: 'Al Mayadin Wallet'
+          paymentMethod: 'BNB Wallet'
         });
 
         // Send Notification to recipient
@@ -564,7 +564,7 @@ const MoneyExchangeModule: React.FC<MoneyExchangeModuleProps> = ({
             status: 'success',
             description: `নিরাপদ এক্সচেঞ্জ ডিল সফলভাবে সম্পন্ন ও টাকা রিলিজ। জরিমানা: ৳${overtimeFine}।`,
             createdAt: new Date().toISOString(),
-            paymentMethod: 'Al Mayadin Wallet'
+            paymentMethod: 'BNB Wallet'
           });
 
           // Notifications to both users
@@ -623,7 +623,7 @@ const MoneyExchangeModule: React.FC<MoneyExchangeModuleProps> = ({
   // Copy receipt to clipboard
   const copyReceiptToClipboard = () => {
     if (!receiptModal) return;
-    const text = `=================================\n   BNB ডিজিটাল মানি এক্সচেঞ্জ রিসিট\n=================================\nরিসিট শিরোনাম: ${receiptModal.title}\nট্রানজেকশন নম্বর: ${receiptModal.txnId}\nটাকার পরিমাণ: ৳${receiptModal.amount.toLocaleString('bn-BD')}\nলেনদেনের তারিখ ও সময়: ${receiptModal.timestamp}\nবর্তমান স্ট্যাটাস: ${receiptModal.statusBadge}\nসবুজ পক্ষ (দাতা): ${receiptModal.senderName} (${receiptModal.senderPhone || 'N/A'})\nলাল পক্ষ (প্রাপক): ${receiptModal.recipientName} (${receiptModal.recipientPhone || 'N/A'})\nবিবরণ: ${receiptModal.note}\n=================================\nAl Mayadin Bazar Escrow Gateway`;
+    const text = `=================================\n   BNB ডিজিটাল মানি এক্সচেঞ্জ রিসিট\n=================================\nরিসিট শিরোনাম: ${receiptModal.title}\nট্রানজেকশন নম্বর: ${receiptModal.txnId}\nটাকার পরিমাণ: ৳${receiptModal.amount.toLocaleString('bn-BD')}\nলেনদেনের তারিখ ও সময়: ${receiptModal.timestamp}\nবর্তমান স্ট্যাটাস: ${receiptModal.statusBadge}\nসবুজ পক্ষ (দাতা): ${receiptModal.senderName} (${receiptModal.senderPhone || 'N/A'})\nলাল পক্ষ (প্রাপক): ${receiptModal.recipientName} (${receiptModal.recipientPhone || 'N/A'})\nবিবরণ: ${receiptModal.note}\n=================================\nBNB Business Network Gateway`;
 
     navigator.clipboard.writeText(text);
     setCopiedReceipt(true);
@@ -663,7 +663,7 @@ const MoneyExchangeModule: React.FC<MoneyExchangeModuleProps> = ({
         </div>
       )}
 
-      {/* 1. HEADER (BNB নিরাপদ এক্সচেঞ্জ / Al Mayadin Bazar Escrow Gateway) */}
+      {/* 1. HEADER (BNB নিরাপদ এক্সচেঞ্জ / BNB Business Network Gateway) */}
       <div className="bg-gradient-to-r from-[#014022] to-[#015E34] text-white p-4 pb-6 rounded-b-[2rem] shadow-xl relative shrink-0">
         <div className="flex justify-between items-start gap-2">
           {/* Back Action */}
@@ -677,7 +677,7 @@ const MoneyExchangeModule: React.FC<MoneyExchangeModuleProps> = ({
               <span className="bg-white/20 text-xs font-black px-2 py-0.5 rounded-lg tracking-widest">BNB</span>
               <h1 className="font-extrabold text-lg tracking-tight leading-none">BNB নিরাপদ এক্সচেঞ্জ</h1>
             </div>
-            <p className="text-[9px] opacity-80 font-mono mt-1 uppercase tracking-wider">Al Mayadin Bazar Escrow Gateway</p>
+            <p className="text-[9px] opacity-80 font-mono mt-1 uppercase tracking-wider">BNB Business Network Gateway</p>
           </div>
 
           {/* Right Balanced Frame: User Balance Display Box (সাদা বক্স) */}
@@ -1073,7 +1073,7 @@ const MoneyExchangeModule: React.FC<MoneyExchangeModuleProps> = ({
               </div>
               <h2 className="text-base font-black tracking-wide text-white">{receiptModal.title}</h2>
               <p className="text-[10px] text-emerald-200 font-mono uppercase tracking-widest mt-0.5">
-                Al Mayadin Bazar Escrow Gateway
+                BNB Business Network Gateway
               </p>
             </div>
 

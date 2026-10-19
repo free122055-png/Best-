@@ -96,7 +96,7 @@ new_func = """  // Reusable 100% accurate visual representation of the Digital R
                   BNB
                 </h2>
                 <p className="text-[10px] text-slate-800 font-extrabold tracking-wider leading-none mt-1 uppercase">
-                  AL MAYADIN BAZAR
+                  BNB BUSINESS NETWORK BANGLADESH
                 </p>
               </div>
             </div>

@@ -1,30 +1,32 @@
 {
-  "timestamp": "2026-10-14T12:49:22.640Z",
+  "timestamp": "2026-10-18T16:15:51.384Z",
   "frontend_payload": {
-    "amount": 15,
-    "userId": "test_user_playstore_check",
-    "phone": "01812345678",
-    "origin": "https://localhost"
+    "amount": 10,
+    "userId": "anon_user_bexdfa0e1sj",
+    "phone": "01600664081"
   },
   "user_profile_data": {
-    "error": "User document not found in firestore"
+    "fetched_name": "Md rasel mia",
+    "fetched_phone": "01600664081",
+    "fetched_email": "raselmiamd2121@gmail.com",
+    "fetched_memberId": "BNB00000001"
   },
   "outgoing_zinipay_payload": {
-    "cus_name": "BNB Customer",
-    "cus_email": "customer@bnbbusiness.com",
-    "amount": 15,
+    "cus_name": "Md rasel mia",
+    "cus_email": "raselmiamd2121@gmail.com",
+    "amount": 10,
     "metadata": {
-      "order_id": "ORD-ZINI_1791982162672_5951",
-      "customer_id": "test_user_playstore_check",
-      "userId": "test_user_playstore_check",
-      "phone": "01812345678",
-      "memberId": "BNB000000",
+      "order_id": "ORD-ZINI_1792340151414_2810",
+      "customer_id": "anon_user_bexdfa0e1sj",
+      "userId": "anon_user_bexdfa0e1sj",
+      "phone": "01600664081",
+      "memberId": "BNB00000001",
       "purpose": "add_money"
     },
-    "redirect_url": "https://ais-dev-lcpzj4h5d5mm2it3dw6e57-969303088573.asia-southeast1.run.app/api/payment/zinipay-callback?val_id=ZINI_1791982162672_5951&userId=test_user_playstore_check&returnOrigin=https%3A%2F%2Fais-dev-lcpzj4h5d5mm2it3dw6e57-969303088573.asia-southeast1.run.app",
-    "cancel_url": "https://ais-dev-lcpzj4h5d5mm2it3dw6e57-969303088573.asia-southeast1.run.app/api/payment/zinipay-cancel?val_id=ZINI_1791982162672_5951&userId=test_user_playstore_check&returnOrigin=https%3A%2F%2Fais-dev-lcpzj4h5d5mm2it3dw6e57-969303088573.asia-southeast1.run.app",
-    "val_id": "ZINI_1791982162672_5951",
-    "webhook_url": "https://ais-dev-lcpzj4h5d5mm2it3dw6e57-969303088573.asia-southeast1.run.app/api/payment/zinipay-webhook?val_id=ZINI_1791982162672_5951&userId=test_user_playstore_check"
+    "redirect_url": "https://ais-dev-lcpzj4h5d5mm2it3dw6e57-969303088573.asia-southeast1.run.app/api/payment/zinipay-callback?val_id=ZINI_1792340151414_2810&userId=anon_user_bexdfa0e1sj&returnOrigin=https%3A%2F%2Fais-dev-lcpzj4h5d5mm2it3dw6e57-969303088573.asia-southeast1.run.app",
+    "cancel_url": "https://ais-dev-lcpzj4h5d5mm2it3dw6e57-969303088573.asia-southeast1.run.app/api/payment/zinipay-cancel?val_id=ZINI_1792340151414_2810&userId=anon_user_bexdfa0e1sj&returnOrigin=https%3A%2F%2Fais-dev-lcpzj4h5d5mm2it3dw6e57-969303088573.asia-southeast1.run.app",
+    "val_id": "ZINI_1792340151414_2810",
+    "webhook_url": "https://ais-dev-lcpzj4h5d5mm2it3dw6e57-969303088573.asia-southeast1.run.app/api/payment/zinipay-webhook?val_id=ZINI_1792340151414_2810&userId=anon_user_bexdfa0e1sj"
   },
   "outgoing_headers": {
     "Content-Type": "application/json",
@@ -34,8 +36,8 @@
   "zinipay_response_body": {
     "status": true,
     "message": "Invoice created successfully.",
-    "payment_url": "https://secure.zinipay.com/bnb-business-network-bangladesh/payment/ed8b87b0-3bd8-44be-9e50-6ac2951ac015",
-    "val_id": "ZINI_1791982162672_5951"
+    "payment_url": "https://secure.zinipay.com/bnb-business-network-bangladesh/payment/3e794832-5b58-49b3-b58a-6858ef5e2581",
+    "val_id": "ZINI_1792340151414_2810"
   },
   "error": null
 }

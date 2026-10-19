@@ -195,7 +195,7 @@ export const QardScreen = React.memo(function QardScreen({ user, onBack, syncLiv
     {
       id: 1,
       tag: "সঞ্চয় ও বিনিয়োগ",
-      title: "Al Mayadin Bazar",
+      title: "BNB Business Network Bangladesh",
       description: "নিরাপদে আপনার আমানত সঞ্চয় করুন ও সহজ ঋণের সুবিধা গ্রহণ করুন।",
       bgGradient: "from-emerald-950 via-emerald-900 to-teal-950",
       image: "https://images.unsplash.com/photo-1579621970563-ebec7560ff3e?auto=format&fit=crop&q=80&w=650"

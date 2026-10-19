@@ -123,7 +123,8 @@ import {
   Copy,
   Calendar,
   ChevronLeft,
-  CalendarDays
+  CalendarDays,
+  LineChart
 } from 'lucide-react';
 import { motion } from 'motion/react';
 import LeafletActiveMap from '../LeafletActiveMap';
@@ -226,6 +227,7 @@ export interface DispatchReport {
 
 export function AdminSamitySection(props: any) {
 
+
   const currentUser = props.currentUser || props.user || props.liveUser || {};
   const appConfig = props.appConfig || {};
 
@@ -320,12 +322,168 @@ export function AdminSamitySection(props: any) {
     handleDeleteUser
   } = props;
 
+  const [samityActiveSubTab, setSamityActiveSubTab] = useState<'samity_portal' | 'member_directory' | 'pending_applications'>(props.adminTab === 'general' ? 'member_directory' : 'samity_portal');
+  const [forceSamitySubView, setForceSamitySubView] = useState<'main' | 'our_investments' | null>(null);
+
+  const [selectedAppForReview, setSelectedAppForReview] = useState<User | null>(null);
+  const [selectedRoleForApp, setSelectedRoleForApp] = useState<'owner' | 'shareholder' | 'investor' | 'general'>('shareholder');
+  const [assignMemberIdForApp, setAssignMemberIdForApp] = useState<string>('');
+  const [appSearchQuery, setAppSearchQuery] = useState<string>('');
+  const [isReviewSubmitting, setIsReviewSubmitting] = useState<boolean>(false);
+
+  const handleOpenReviewModal = (user: User) => {
+    setSelectedAppForReview(user);
+    const initialRole = (user.memberCategory === 'owner' || user.memberCategory === 'shareholder' || user.memberCategory === 'investor' || user.memberCategory === 'regular')
+      ? user.memberCategory 
+      : 'shareholder';
+    setSelectedRoleForApp(initialRole as any);
+    const mId = user.memberId || (typeof autoGenerateMemberId === 'function' ? autoGenerateMemberId() : ('BNB-' + Math.floor(100000 + Math.random() * 900000)));
+    setAssignMemberIdForApp(mId);
+  };
+
+  const handleConfirmSamityApproval = async (applicant: User, targetRole: string, targetMemberId: string) => {
+    const targetUid = applicant.uid || applicant.id;
+    if (!targetUid) {
+      alert("আবেদনকারীর ইউজার আইডি পাওয়া যায়নি!");
+      return;
+    }
+
+    setIsReviewSubmitting(true);
+    try {
+      const finalMemberId = targetMemberId.trim() || applicant.memberId || ('BNB-' + Math.floor(100000 + Math.random() * 900000));
+      const nowIso = new Date().toISOString();
+
+      if (typeof props.setUsers === 'function') {
+        props.setUsers((prev: User[]) => prev.map(u => (u.uid === targetUid || u.id === targetUid) ? {
+          ...u,
+          approved: true,
+          samityApproved: true,
+          isSamityMember: true,
+          samityStatus: 'approved',
+          status: 'active',
+          memberCategory: targetRole,
+          samityRole: targetRole,
+          memberId: finalMemberId
+        } : u));
+      }
+
+      const userRef = doc(db, 'users', targetUid);
+      const appRef = doc(db, 'samity_applications', targetUid);
+
+      const updatePayload = {
+        approved: true,
+        samityApproved: true,
+        isSamityMember: true,
+        samityStatus: 'approved',
+        status: 'active',
+        memberCategory: targetRole,
+        samityRole: targetRole,
+        memberId: finalMemberId,
+        updatedAt: nowIso
+      };
+
+      await Promise.all([
+        updateDoc(userRef, updatePayload).catch(() => setDoc(userRef, updatePayload, { merge: true })),
+        setDoc(appRef, updatePayload, { merge: true }).catch(() => {})
+      ]);
+
+      const roleLabels: Record<string, string> = {
+        owner: '👑 অনার (Owner / স্বত্বাধিকারী)',
+        shareholder: '📈 শেয়ার হোল্ডার (Shareholder / শেয়ারমালিক)',
+        investor: '💼 ইনভেস্টার (Investor / বিনিয়োগকারী)',
+        general: '👥 সাধারণ সমবায় সদস্য (General Member)'
+      };
+      const roleText = roleLabels[targetRole] || targetRole;
+
+      const notifId = 'notif_samity_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7);
+      await setDoc(doc(db, 'user_notifications', notifId), {
+        id: notifId,
+        userId: targetUid,
+        memberId: finalMemberId,
+        title: "🎉 সমবায় সমিতির সদস্যপদ সফলভাবে অনুমোদিত!",
+        body: "অভিনন্দন আপনার সদস্যপদ সফলভাবে অনুমোদিত হয়েছে।",
+        read: false,
+        createdAt: nowIso,
+        type: 'samity_approved'
+      }).catch(() => {});
+
+      alert("✅ সদস্যপদ সফলভাবে অনুমোদন করা হয়েছে।");
+      setSelectedAppForReview(null);
+    } catch (err: any) {
+      console.error("Error confirming samity approval:", err);
+      alert("অনুমোদন করতে সমস্যা হয়েছে: " + (err.message || err));
+    } finally {
+      setIsReviewSubmitting(false);
+    }
+  };
+
+  const handleRejectSamityAppWithReason = async (applicant: User) => {
+    const targetUid = applicant.uid || applicant.id;
+    if (!targetUid) return;
+
+    const reason = window.prompt("আবেদন বাতিলের কারণ লিখুন (সদস্যকে নোটিফিকেশন পাঠানো হবে):", "প্রদত্ত এনআইডি বা তথ্যে গরমিল রয়েছে। অনুগ্রহ করে সঠিক তথ্য প্রদান করুন।");
+    if (!reason || !reason.trim()) return;
+
+    setIsReviewSubmitting(true);
+    try {
+      const nowIso = new Date().toISOString();
+      const userRef = doc(db, 'users', targetUid);
+      const appRef = doc(db, 'samity_applications', targetUid);
+
+      if (typeof props.setUsers === 'function') {
+        props.setUsers((prev: User[]) => prev.map(u => (u.uid === targetUid || u.id === targetUid) ? {
+          ...u,
+          samityStatus: 'rejected',
+          samityApproved: false
+        } : u));
+      }
+
+      const updatePayload = {
+        samityStatus: 'rejected',
+        samityApproved: false,
+        samityRejectionReason: reason.trim(),
+        updatedAt: nowIso
+      };
+
+      await Promise.all([
+        updateDoc(userRef, updatePayload).catch(() => setDoc(userRef, updatePayload, { merge: true })),
+        setDoc(appRef, updatePayload, { merge: true }).catch(() => {})
+      ]);
+
+      const notifId = 'notif_samity_rej_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7);
+      await setDoc(doc(db, 'user_notifications', notifId), {
+        id: notifId,
+        userId: targetUid,
+        title: "❌ সমবায় সদস্যপদ আবেদন বাতিল",
+        body: `দুঃখিত, আপনার সমবায় সদস্যপদ আবেদনটি বাতিল করা হয়েছে। কারণ: ${reason.trim()}`,
+        read: false,
+        createdAt: nowIso,
+        type: 'samity_rejected'
+      }).catch(() => {});
+
+      alert("❌ আবেদন বাতিলের বিষয়টি নিশ্চিত করা হয়েছে।");
+      setSelectedAppForReview(null);
+    } catch (err: any) {
+      alert("বাতিল করতে সমস্যা হয়েছে: " + (err.message || err));
+    } finally {
+      setIsReviewSubmitting(false);
+    }
+  };
+
+  useEffect(() => {
+    if (adminTab === 'general') {
+      setSamityActiveSubTab('member_directory');
+    }
+  }, [adminTab]);
+
   const [processingRefundUid, setProcessingRefundUid] = useState<string | null>(null);
 
   const handleApproveSamityRefund = async (memberUser: any) => {
     const refundAmt = Number(memberUser.savings !== undefined ? memberUser.savings : (memberUser as any).dpsBalance) || 0;
     if (!window.confirm(`${memberUser.name || 'সদস্য'} (আইডি: ${memberUser.memberId || 'N/A'}) এর জমানো মোট ৳${refundAmt.toLocaleString('bn-BD')} টাকা মেইন ওয়ালেটে রিফান্ড অনুমোদন করতে চান?`)) {
       return;
+
+
     }
     setProcessingRefundUid(memberUser.uid);
     try {
@@ -578,86 +736,192 @@ export function AdminSamitySection(props: any) {
 
   return (
     <>
-        {adminTab === 'samity' && (
+        {(adminTab === 'samity' || adminTab === 'general') && (
           <div className="space-y-4 animate-fade-in text-slate-800 font-sans">
-            <SamityScreen
-              user={currentUser}
-              allUsers={users}
-              onBack={() => setViewingGrid(true)}
-              syncLiveProfile={() => {}}
-              setActiveTab={() => {}}
-              setModalType={(type) => { if (!type) setViewingGrid(true); }}
-              appConfig={appConfig}
-              allNotices={notices}
-            />
-          </div>
-        )}
+            {/* Tabs removed as requested */}
 
-        {adminTab === 'general' && (
-          <div className="space-y-2.5 animate-fade-in text-slate-800 font-sans text-left pb-96 sm:pb-[480px]">
-            {/* 1. Header Title Banner with Quick Controls - Slim & High-Density */}
-            <div className="bg-gradient-to-r from-teal-700 via-emerald-800 to-teal-900 px-3 py-2 sm:px-4 sm:py-2.5 rounded-xl text-white relative overflow-hidden shadow-xs border border-teal-600/60">
-              <div className="relative z-10 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
-                <div className="space-y-0.5 min-w-0">
-                  <div className="flex items-center gap-1.5 flex-wrap">
-                    <span className="inline-flex items-center gap-1 bg-teal-500/20 text-teal-200 border border-teal-500/30 px-2 py-0.2 rounded-full text-[9.5px] font-bold">
-                      👥 সদস্য ডিরেক্টরি ও নিয়ন্ত্রণ
-                    </span>
-                    <h2 className="text-xs sm:text-sm font-black text-white leading-tight">
-                      সমিতি সদস্য ডিরেক্টরি খাতা ও নিয়ন্ত্রণ প্যানেল
-                    </h2>
+            {samityActiveSubTab === 'pending_applications' && (
+              <div className="space-y-4 animate-fade-in text-slate-800 font-sans text-left pb-32">
+                <button
+                  type="button"
+                  onClick={() => setSamityActiveSubTab('member_directory')}
+                  className="flex items-center gap-2 px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-white rounded-xl text-xs font-black transition shadow-sm border border-slate-700 active:scale-95 cursor-pointer"
+                >
+                  ⬅️ ব্যাক (Back)
+                </button>
+
+                <div className="bg-gradient-to-r from-amber-700 via-orange-800 to-amber-900 px-4 py-3 rounded-2xl text-white shadow-md border border-amber-600/60 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                  <div className="space-y-0.5">
+                    <h3 className="text-sm sm:text-base font-black flex items-center gap-2">
+                      <span>⏳ সমবায় সমিতি সদস্য পদ ও ইনভেস্টর আবেদনপত্র যাচাই-বাছাই</span>
+                    </h3>
+                    <p className="text-xs text-amber-100/90">
+                      কেউ সমবায় সমিতির সদস্য হতে আবেদন করলে এখানে সম্পূর্ণ তথ্য আসবে। তথ্য যাচাই করে একসেপ্ট করলে অনার, শেয়ার হোল্ডার বা ইনভেস্টার হিসেবে সদস্য হতে পারবেন।
+                    </p>
                   </div>
-                  <p className="text-[10px] text-teal-100/90 truncate">
-                    সকল সদস্যের তথ্য, চার ডিজিটের পিন, ওয়ালেট ব্যালেন্স ও ক্যাটাগরি সরাসরি সংশোধন করুন।
-                  </p>
+                  <div className="flex items-center gap-2 w-full sm:w-auto shrink-0">
+                    <input
+                      type="text"
+                      placeholder="🔍 নাম, মোবাইল বা আইডি দিয়ে খুঁজুন..."
+                      value={appSearchQuery}
+                      onChange={(e) => setAppSearchQuery(e.target.value)}
+                      className="px-3 py-1.5 rounded-xl bg-slate-900/80 border border-amber-500/40 text-white placeholder-amber-200/60 text-xs w-full sm:w-64 outline-none focus:ring-2 focus:ring-amber-400"
+                    />
+                  </div>
                 </div>
 
-                {/* 🚀 Header Quick Actions (Waiver & Policy) - Slim Buttons */}
-                <div className="flex items-center gap-1.5 shrink-0 w-full sm:w-auto">
-                  {(() => {
-                    const now = new Date();
-                    const curYear = now.getFullYear();
-                    const curMonthDef = BENGALI_MONTH_DEFS[now.getMonth()];
-                    const isCurExempt = isMonthExemptedInConfig(curYear, curMonthDef?.key || '08');
-                    const curMonthCfg = getMonthExemptConfig(curYear, curMonthDef?.key || '08');
-                    const exemptDay = curMonthCfg.exemptUntilDay || policyFormState?.penaltyExemptionUntilDay || (isCurExempt ? 31 : 9);
-                    const dayLabel = exemptDay === 31 ? 'পুরো মাস' : `${exemptDay}ই পর্যন্ত`;
-
+                {(() => {
+                  const pendingApps = users.filter((u: any) => {
+                    const isPend = u.samityStatus === 'pending' || (u.samityAppliedAt && u.samityStatus !== 'approved' && u.samityStatus !== 'rejected');
+                    if (!isPend) return false;
+                    if (!appSearchQuery.trim()) return true;
+                    const q = appSearchQuery.toLowerCase();
                     return (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setQuickPenaltyDay(exemptDay > 9 ? exemptDay : 15);
-                          setQuickPenaltyNote(curMonthCfg.note || policyFormState?.penaltyExemptionNote || '');
-                          setIsQuickPenaltyModalOpen(true);
-                        }}
-                        className={`flex-1 sm:flex-initial px-2.5 py-1 rounded-lg text-[10.5px] font-black transition cursor-pointer shadow-xs flex items-center justify-center gap-1.5 border active:scale-95 ${
-                          isCurExempt
-                            ? 'bg-amber-400 text-slate-950 border-amber-300 ring-1 ring-amber-300/40'
-                            : 'bg-teal-950/70 hover:bg-teal-900 text-amber-200 border-teal-500/60'
-                        }`}
-                        title="জরিমানা স্থগিতের তারিখ পরিবর্তন করুন"
-                      >
-                        <span>🛡️</span>
-                        <span>{isCurExempt ? `🟢 ${dayLabel} জরিমানা স্থগিত` : `🔴 জরিমানা স্বাভাবিক (9ই)`}</span>
-                        <span className="text-[9px] bg-black/20 px-1 py-0.2 rounded font-bold">⚙️</span>
-                      </button>
+                      (u.name && u.name.toLowerCase().includes(q)) ||
+                      (u.phone && u.phone.toLowerCase().includes(q)) ||
+                      (u.memberId && u.memberId.toLowerCase().includes(q)) ||
+                      (u.nid && u.nid.toLowerCase().includes(q))
                     );
-                  })()}
+                  });
 
-                  <button
-                    type="button"
-                    onClick={() => setIsPolicyModalOpen(true)}
-                    className="flex-1 sm:flex-initial px-2.5 py-1 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white rounded-lg text-[10.5px] font-black shadow-xs transition cursor-pointer flex items-center justify-center gap-1.5 border border-emerald-300/40 active:scale-95"
-                    title="সমিতির নিয়ম-কানুন ও পলিসি ওপেন করুন"
-                  >
-                    <span>📜</span>
-                    <span>নিয়ম-কানুন পলিসি</span>
-                    <span className="text-[9px] bg-white/20 px-1 py-0.2 rounded-full font-mono">এডিট</span>
-                  </button>
-                </div>
+                  if (pendingApps.length === 0) {
+                    return (
+                      <div className="bg-white border border-slate-200 rounded-3xl p-12 text-center space-y-3 shadow-xs">
+                        <div className="w-16 h-16 bg-amber-50 text-amber-600 rounded-2xl flex items-center justify-center mx-auto text-2xl border border-amber-100 shadow-xs">
+                          ⏳
+                        </div>
+                        <h4 className="text-sm font-black text-slate-800">কোনো নতুন সমবায় সদস্য আবেদন অপেক্ষমান নেই</h4>
+                        <p className="text-xs text-slate-500 max-w-md mx-auto">
+                          যখন কোনো সাধারণ সদস্য সমবায় সমিতি, শেয়ার হোল্ডার বা ইনভেস্টর হওয়ার জন্য আবেদন ফর্ম জমা দেবেন, তখন তাদের সম্পূর্ণ তথ্য ও এনআইডি সহ এখানে প্রদর্শিত হবে।
+                        </p>
+                      </div>
+                    );
+                  }
+
+                  return (
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                      {pendingApps.map((appUser: any, idx: number) => {
+                        const memberCategoryLabel: Record<string, string> = {
+                          owner: '👑 অনার (Owner / স্বত্বাধিকারী)',
+                          shareholder: '📈 শেয়ার হোল্ডার (Shareholder)',
+                          investor: '💼 ইনভেস্টার (Investor / বিনিয়োগকারী)',
+                          general: '👥 সাধারণ সমবায় সদস্য'
+                        };
+                        const catLabel = memberCategoryLabel[appUser.memberCategory || 'shareholder'] || '📈 শেয়ার হোল্ডার';
+
+                        return (
+                          <div 
+                            key={appUser.uid || idx}
+                            className="bg-white border-2 border-amber-200/80 rounded-3xl p-4 sm:p-5 shadow-md hover:shadow-lg transition space-y-3 relative overflow-hidden flex flex-col justify-between"
+                          >
+                            <div className="absolute top-0 right-0 bg-gradient-to-l from-amber-500 to-orange-600 text-white text-[10px] font-black px-3 py-1 rounded-bl-2xl shadow-xs">
+                              {catLabel}
+                            </div>
+
+                            <div className="space-y-2 pr-20">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <h4 className="text-sm sm:text-base font-black text-slate-900">{appUser.name || 'নামবিহীন সদস্য'}</h4>
+                                <span className="text-xs font-mono font-bold bg-amber-50 text-amber-800 border border-amber-200 px-2 py-0.5 rounded-lg">
+                                  📱 {appUser.phone}
+                                </span>
+                                {appUser.memberId && (
+                                  <span className="text-xs font-mono text-slate-600 font-bold bg-slate-100 px-2 py-0.5 rounded-lg">
+                                    ID: #{appUser.memberId}
+                                  </span>
+                                )}
+                              </div>
+                              <p className="text-[11px] text-slate-500 font-medium">
+                                📅 আবেদন করার সময়: {appUser.samityAppliedAt ? new Date(appUser.samityAppliedAt).toLocaleString('bn-BD') : 'তারিখ অনুপলব্ধ'}
+                              </p>
+                            </div>
+
+                            {/* Detailed Information Grid */}
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 bg-slate-50/80 p-3 rounded-2xl border border-slate-200/80 text-xs">
+                              <div className="space-y-1">
+                                <p className="text-slate-600"><strong className="text-slate-800">पिता/Father:</strong> {appUser.fatherName || 'প্রদান করা হয়নি'}</p>
+                                <p className="text-slate-600"><strong className="text-slate-800">माता/Mother:</strong> {appUser.motherName || 'প্রদান করা হয়নি'}</p>
+                                <p className="text-slate-600"><strong className="text-slate-800">NID / Passport:</strong> <span className="font-mono font-bold text-slate-900">{appUser.nid || 'প্রদান করা হয়নি'}</span></p>
+                                <p className="text-slate-600"><strong className="text-slate-800">जन्मतारीখ/DOB:</strong> {appUser.dob || 'প্রদান করা হয়নি'}</p>
+                              </div>
+                              <div className="space-y-1">
+                                <p className="text-slate-600"><strong className="text-slate-800">ঠিকানা:</strong> {[appUser.postOffice, appUser.thana, appUser.district, appUser.division].filter(Boolean).join(', ') || 'প্রদান করা হয়নি'}</p>
+                                <p className="text-slate-600"><strong className="text-slate-800">দেশ:</strong> {appUser.country || 'Bangladesh'}</p>
+                                <p className="text-slate-600"><strong className="text-slate-800">নমিনির নাম:</strong> {appUser.nomineeName || 'প্রদান করা হয়নি'} ({appUser.nomineeRelation || '-'})</p>
+                                <p className="text-slate-600"><strong className="text-slate-800">নমিনির ফোন:</strong> <span className="font-mono">{appUser.nomineePhone || '-'}</span></p>
+                              </div>
+                            </div>
+
+                            {appUser.samityOptOutReason && (
+                              <div className="bg-amber-50 border border-amber-200 p-2 rounded-xl text-xs text-amber-900">
+                                <strong>📝 আবেদনের নোট / কারণ:</strong> {appUser.samityOptOutReason}
+                              </div>
+                            )}
+
+                            {/* Action Buttons */}
+                            <div className="flex items-center gap-2 pt-2 border-t border-slate-100">
+                              <button
+                                type="button"
+                                onClick={() => handleOpenReviewModal(appUser)}
+                                className="flex-1 py-2 bg-gradient-to-r from-emerald-600 to-teal-700 hover:from-emerald-500 hover:to-teal-600 text-white font-black text-xs rounded-xl transition cursor-pointer shadow-xs flex items-center justify-center gap-1.5"
+                              >
+                                <span>🔍</span>
+                                <span>যাচাই করে অনুমোদন দিন (Approve)</span>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleRejectSamityAppWithReason(appUser)}
+                                className="px-3 py-2 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 font-bold text-xs rounded-xl transition cursor-pointer flex items-center gap-1"
+                              >
+                                <span>❌</span>
+                                <span>বাতিল</span>
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  );
+                })()}
               </div>
-            </div>
+            )}
+
+            {samityActiveSubTab === 'samity_portal' && (
+              <div className="space-y-4 animate-fade-in text-slate-800 font-sans">
+                {/* Back button logic */}
+                <button
+                    onClick={() => {
+                        // If we are in the deeper view, go back one level first
+                        if (forceSamitySubView === 'our_investments') {
+                            setForceSamitySubView('main');
+                        } 
+                        // If we are already at main level, close the samity portal subview
+                        else {
+                            setSamityActiveSubTab('member_directory'); 
+                            setViewingGrid(true);
+                        }
+                    }}
+                    className="flex items-center gap-2 px-3 py-1.5 bg-slate-200 hover:bg-slate-300 rounded-lg text-xs font-bold text-slate-800 transition shadow-sm mb-2"
+                >
+                    ⬅️ ব্যাক (Back)
+                </button>
+                <SamityScreen
+                  user={currentUser}
+                  allUsers={users}
+                  onBack={() => { setViewingGrid(true); setForceSamitySubView(null); }}
+                  syncLiveProfile={() => {}}
+                  setActiveTab={() => {}}
+                  setModalType={(type) => { if (!type) { setViewingGrid(true); setForceSamitySubView(null); } }}
+                  appConfig={appConfig}
+                  allNotices={notices}
+                  isAdminView={true}
+                  initialSubView={forceSamitySubView || 'main'}
+                />
+              </div>
+            )}
+
+            {samityActiveSubTab === 'member_directory' && (
+          <div className="space-y-2.5 animate-fade-in text-slate-800 font-sans text-left pb-96 sm:pb-[480px]">
+
 
             {/* 2. ⚙️ গ্লোবাল সদস্য তথ্য নিজস্ব আপডেট সুইচ (Member Profile Self-Edit Switch) - Slim Bar */}
             <div className="bg-gradient-to-r from-amber-50 via-orange-50 to-emerald-50 border border-amber-200/90 px-3 py-1.5 sm:px-3.5 sm:py-2 rounded-xl shadow-2xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-1.5 text-left">
@@ -840,309 +1104,96 @@ export function AdminSamitySection(props: any) {
                         </span>
                       </button>
 
-                      {/* 4. 🔘 ON/OFF */}
+                      {/* 4. 📈 আমাদের ইনভেস্ট / সদস্য আবেদন */}
                       <button
                         type="button"
-                        onClick={() => setGeneralMemberFilterTab(generalMemberFilterTab === 'switch_off' ? 'switch_on' : 'switch_off')}
+                        onClick={() => {
+                          setSamityActiveSubTab('pending_applications');
+                        }}
                         className={`py-1 px-0.5 rounded-lg transition-all flex flex-col items-center justify-center text-center cursor-pointer min-h-[52px] ${
-                          generalMemberFilterTab === 'switch_off' || generalMemberFilterTab === 'switch_on'
-                            ? 'bg-teal-700 text-white ring-2 ring-teal-400 shadow-md'
-                            : 'bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700'
+                          (samityActiveSubTab as string) === 'pending_applications'
+                            ? 'bg-indigo-600 text-white ring-2 ring-indigo-400 shadow-md'
+                            : 'bg-slate-800 hover:bg-indigo-950/60 text-slate-200 border border-slate-700'
                         }`}
                       >
-                        <span className="text-[10px] font-black leading-tight">🔘 ON/OFF</span>
-                        <span className="text-[8px] font-mono font-bold text-teal-300">
-                          {generalMemberFilterTab === 'switch_off' ? '🔴 অফ তালিকা' : generalMemberFilterTab === 'switch_on' ? '🟢 অন তালিকা' : 'PIN নিয়ন্ত্রণ'}
-                        </span>
-                        <span className="text-[7.5px] bg-black/40 text-teal-200 px-1 py-0.2 rounded mt-0.5">
-                          {switchOffUsers.length} বন্ধ / {switchOnUsers.length} চালু
+                        <span className="text-[10px] font-black leading-tight">📈 আমাদের ইনভেস্ট</span>
+                        <span className="text-[8px] font-mono font-bold text-indigo-300">
+                          {users.filter((u: any) => u.samityStatus === 'pending' || (u.samityAppliedAt && u.samityStatus !== 'approved' && u.samityStatus !== 'rejected')).length > 0
+                            ? `⏳ ${users.filter((u: any) => u.samityStatus === 'pending' || (u.samityAppliedAt && u.samityStatus !== 'approved' && u.samityStatus !== 'rejected')).length}টি আবেদন`
+                            : 'পোর্টাল'}
                         </span>
                       </button>
                     </div>
                   </div>
 
-                  {/* 8 Sections STRICTLY in 4-per-row grid (Row 1: 4 Cards, Row 2: 4 Cards) */}
-                  <div className="grid grid-cols-4 gap-1 sm:gap-1.5">
-                    {/* 1. সর্বমোট সদস্য */}
-                    <button
-                      type="button"
-                      onClick={() => setGeneralMemberFilterTab('all')}
-                      className={`p-1.5 sm:p-2 rounded-lg border text-left transition-all cursor-pointer min-w-0 flex flex-col justify-between ${
-                        generalMemberFilterTab === 'all'
-                          ? 'bg-slate-800 border-slate-500 text-white shadow-xs ring-1 ring-emerald-400'
-                          : 'bg-slate-950/70 border-slate-800 hover:border-slate-700 text-slate-300'
-                      }`}
-                    >
-                      <div className="flex items-center justify-between gap-0.5">
-                        <span className={`text-[7px] sm:text-[8.5px] font-extrabold uppercase block tracking-tight truncate ${
-                          generalMemberFilterTab === 'all' ? 'text-emerald-300' : 'text-slate-400'
-                        }`}>
-                          🌐 সর্বমোট সদস্য
-                        </span>
-                        {generalMemberFilterTab === 'all' && (
-                          <span className="w-1 h-1 rounded-full bg-emerald-400 shrink-0" />
-                        )}
-                      </div>
-                      <h4 className="text-xs sm:text-base font-black mt-0.5 leading-none text-white font-mono truncate">
-                        {users.length} জন
-                      </h4>
-                      <p className="text-[6.5px] sm:text-[7.5px] font-medium mt-0.5 text-slate-400 truncate">
-                        সকল নিবন্ধিত
-                      </p>
-                    </button>
+                    {/* 8 Sections STRICTLY in 4-per-row grid (Row 1: 4 Cards, Row 2: 4 Cards) */}
+                    <div className="grid grid-cols-4 gap-1 sm:gap-1.5">
+                      {/* 1. সর্বমোট সদস্য */}
+                      <button type="button" onClick={() => setGeneralMemberFilterTab('all')} className={`p-1.5 sm:p-2 rounded-lg border text-left transition-all cursor-pointer min-w-0 flex flex-col justify-between ${generalMemberFilterTab === 'all' ? 'bg-slate-800 border-slate-500 text-white shadow-xs ring-1 ring-emerald-400' : 'bg-slate-950/70 border-slate-800 hover:border-slate-700 text-slate-300'}`}>
+                        <span className="text-[7px] sm:text-[8.5px] font-extrabold uppercase text-slate-400 truncate">🌐 সর্বমোট সদস্য</span>
+                        <h4 className="text-xs sm:text-base font-black text-white font-mono truncate">{users.length} জন</h4>
+                        <p className="text-[6.5px] sm:text-[7.5px] font-medium text-slate-500 truncate">সকল নিবন্ধিত</p>
+                      </button>
 
-                    {/* 2. সমিতি / শেয়ার সদস্য */}
-                    <button
-                      type="button"
-                      onClick={() => setGeneralMemberFilterTab('samity')}
-                      className={`p-1.5 sm:p-2 rounded-lg border text-left transition-all cursor-pointer min-w-0 flex flex-col justify-between ${
-                        generalMemberFilterTab === 'samity'
-                          ? 'bg-emerald-950 border-emerald-500 text-white shadow-xs ring-1 ring-emerald-400'
-                          : 'bg-slate-950/70 border-slate-800 hover:border-emerald-700/50 text-slate-300'
-                      }`}
-                    >
-                      <div className="flex items-center justify-between gap-0.5">
-                        <span className={`text-[7px] sm:text-[8.5px] font-extrabold uppercase block tracking-tight truncate ${
-                          generalMemberFilterTab === 'samity' ? 'text-emerald-300' : 'text-emerald-400'
-                        }`}>
-                          👥 সমিতি / শেয়ার
-                        </span>
-                        {generalMemberFilterTab === 'samity' && (
-                          <span className="w-1 h-1 rounded-full bg-emerald-400 shrink-0" />
-                        )}
-                      </div>
-                      <h4 className="text-xs sm:text-base font-black mt-0.5 leading-none text-emerald-300 font-mono truncate">
-                        {samityShareholderUsers.length} জন
-                      </h4>
-                      <p className="text-[6.5px] sm:text-[7.5px] font-medium mt-0.5 text-emerald-400/80 truncate">
-                        শেয়ার ও সঞ্চয়ী
-                      </p>
-                    </button>
+                      {/* 2. ওনার */}
+                      <button type="button" onClick={() => setGeneralMemberFilterTab('owner')} className={`p-1.5 sm:p-2 rounded-lg border text-left transition-all cursor-pointer min-w-0 flex flex-col justify-between ${generalMemberFilterTab === 'owner' ? 'bg-rose-950 border-rose-500 text-white shadow-xs ring-1 ring-rose-400' : 'bg-slate-950/70 border-slate-800 hover:border-rose-700/50 text-slate-300'}`}>
+                        <span className="text-[7px] sm:text-[8.5px] font-extrabold uppercase text-rose-300 truncate">🔴 ওনার</span>
+                        <h4 className="text-xs sm:text-base font-black text-rose-200 font-mono truncate">{ownerUsers.length} জন</h4>
+                        <p className="text-[6.5px] sm:text-[7.5px] font-medium text-rose-400/80 truncate">কোম্পানি অনার</p>
+                      </button>
 
-                    {/* 3. 🔴 সুইচ অফ সদস্য (রিফান্ড ফান্ড সহ) */}
-                    <button
-                      type="button"
-                      onClick={() => setGeneralMemberFilterTab('switch_off')}
-                      className={`p-1.5 sm:p-2 rounded-lg border text-left transition-all cursor-pointer min-w-0 flex flex-col justify-between ${
-                        generalMemberFilterTab === 'switch_off'
-                          ? 'bg-rose-950 border-rose-500 text-white shadow-xs ring-1 ring-rose-400'
-                          : 'bg-slate-950/70 border-slate-800 hover:border-rose-700/50 text-slate-300'
-                      }`}
-                    >
-                      <div className="flex items-center justify-between gap-0.5">
-                        <span className="text-[7px] sm:text-[8.5px] font-extrabold uppercase block tracking-tight truncate text-rose-300">
-                          🔴 সুইচ অফ
-                        </span>
-                        <span className="w-1 h-1 rounded-full bg-rose-500 animate-pulse shrink-0" />
-                      </div>
-                      <h4 className="text-xs sm:text-base font-black mt-0.5 leading-none text-rose-200 font-mono truncate">
-                        {switchOffUsers.length} জন
-                      </h4>
-                      <p className="text-[6.5px] sm:text-[7.5px] font-medium mt-0.5 text-rose-400/80 truncate">
-                        ৳{totalSwitchOffRefundAmount.toLocaleString('bn-BD')} রিফান্ড
-                      </p>
-                    </button>
+                      {/* 3. শেয়ার হোল্ডার */}
+                      <button type="button" onClick={() => setGeneralMemberFilterTab('shareholder')} className={`p-1.5 sm:p-2 rounded-lg border text-left transition-all cursor-pointer min-w-0 flex flex-col justify-between ${generalMemberFilterTab === 'shareholder' ? 'bg-amber-950 border-amber-500 text-white shadow-xs ring-1 ring-amber-400' : 'bg-slate-950/70 border-slate-800 hover:border-amber-700/50 text-slate-300'}`}>
+                        <span className="text-[7px] sm:text-[8.5px] font-extrabold uppercase text-amber-300 truncate">🟡 শেয়ার হোল্ডার</span>
+                        <h4 className="text-xs sm:text-base font-black text-amber-200 font-mono truncate">{samityShareholderUsers.length} জন</h4>
+                        <p className="text-[6.5px] sm:text-[7.5px] font-medium text-amber-400/80 truncate">শেয়ার ও সঞ্চয়ী</p>
+                      </button>
 
-                    {/* 4. 🟢 সুইচ অন সদস্য */}
-                    <button
-                      type="button"
-                      onClick={() => setGeneralMemberFilterTab('switch_on')}
-                      className={`p-1.5 sm:p-2 rounded-lg border text-left transition-all cursor-pointer min-w-0 flex flex-col justify-between ${
-                        generalMemberFilterTab === 'switch_on'
-                          ? 'bg-teal-950 border-teal-500 text-white shadow-xs ring-1 ring-teal-400'
-                          : 'bg-slate-950/70 border-slate-800 hover:border-teal-700/50 text-slate-300'
-                      }`}
-                    >
-                      <div className="flex items-center justify-between gap-0.5">
-                        <span className="text-[7px] sm:text-[8.5px] font-extrabold uppercase block tracking-tight truncate text-teal-300">
-                          🟢 সুইচ অন
-                        </span>
-                        <span className="w-1 h-1 rounded-full bg-teal-400 animate-pulse shrink-0" />
-                      </div>
-                      <h4 className="text-xs sm:text-base font-black mt-0.5 leading-none text-teal-200 font-mono truncate">
-                        {switchOnUsers.length} জন
-                      </h4>
-                      <p className="text-[6.5px] sm:text-[7.5px] font-medium mt-0.5 text-teal-400/80 truncate">
-                        নিয়মিত সঞ্চয়ী
-                      </p>
-                    </button>
+                      {/* 4. ইনভেস্টর */}
+                      <button type="button" onClick={() => setGeneralMemberFilterTab('investor')} className={`p-1.5 sm:p-2 rounded-lg border text-left transition-all cursor-pointer min-w-0 flex flex-col justify-between ${generalMemberFilterTab === 'investor' ? 'bg-slate-700 border-slate-500 text-white shadow-xs ring-1 ring-slate-400' : 'bg-slate-950/70 border-slate-800 hover:border-slate-700 text-slate-300'}`}>
+                        <span className="text-[7px] sm:text-[8.5px] font-extrabold uppercase text-slate-300 truncate">⚪ ইনভেস্টর</span>
+                        <h4 className="text-xs sm:text-base font-black text-slate-200 font-mono truncate">{investorUsers.length} জন</h4>
+                        <p className="text-[6.5px] sm:text-[7.5px] font-medium text-slate-400/80 truncate">বিনিয়োগকারী</p>
+                      </button>
 
-                    {/* 5. 🌱 সাধারণ সদস্য */}
-                    <button
-                      type="button"
-                      onClick={() => setGeneralMemberFilterTab('general')}
-                      className={`p-1.5 sm:p-2 rounded-lg border text-left transition-all cursor-pointer min-w-0 flex flex-col justify-between ${
-                        generalMemberFilterTab === 'general'
-                          ? 'bg-sky-950 border-sky-500 text-white shadow-xs ring-1 ring-sky-400'
-                          : 'bg-slate-950/70 border-slate-800 hover:border-sky-700/50 text-slate-300'
-                      }`}
-                    >
-                      <div className="flex items-center justify-between gap-0.5">
-                        <span className="text-[7px] sm:text-[8.5px] font-extrabold uppercase block tracking-tight truncate text-sky-300">
-                          🌱 সাধারণ সদস্য
-                        </span>
-                        {generalMemberFilterTab === 'general' && (
-                          <span className="w-1 h-1 rounded-full bg-sky-400 shrink-0" />
-                        )}
-                      </div>
-                      <h4 className="text-xs sm:text-base font-black mt-0.5 leading-none text-sky-200 font-mono truncate">
-                        {generalAppUsers.length} জন
-                      </h4>
-                      <p className="text-[6.5px] sm:text-[7.5px] font-medium mt-0.5 text-sky-400/80 truncate">
-                        ফ্রি/বেসিক
-                      </p>
-                    </button>
+                      {/* 5. সাধারণ সদস্য */}
+                      <button type="button" onClick={() => setGeneralMemberFilterTab('general')} className={`p-1.5 sm:p-2 rounded-lg border text-left transition-all cursor-pointer min-w-0 flex flex-col justify-between ${generalMemberFilterTab === 'general' ? 'bg-sky-950 border-sky-500 text-white shadow-xs ring-1 ring-sky-400' : 'bg-slate-950/70 border-slate-800 hover:border-sky-700/50 text-slate-300'}`}>
+                        <span className="text-[7px] sm:text-[8.5px] font-extrabold uppercase text-sky-300 truncate">🌱 সাধারণ সদস্য</span>
+                        <h4 className="text-xs sm:text-base font-black text-sky-200 font-mono truncate">{generalAppUsers.length} জন</h4>
+                        <p className="text-[6.5px] sm:text-[7.5px] font-medium text-sky-400/80 truncate">ফ্রি/বেসিক</p>
+                      </button>
 
-                    {/* 6. 💼 ইনভেস্টর সদস্য */}
-                    <button
-                      type="button"
-                      onClick={() => setGeneralMemberFilterTab('investor')}
-                      className={`p-1.5 sm:p-2 rounded-lg border text-left transition-all cursor-pointer min-w-0 flex flex-col justify-between ${
-                        generalMemberFilterTab === 'investor'
-                          ? 'bg-amber-950 border-amber-500 text-white shadow-xs ring-1 ring-amber-400'
-                          : 'bg-slate-950/70 border-slate-800 hover:border-amber-700/50 text-slate-300'
-                      }`}
-                    >
-                      <div className="flex items-center justify-between gap-0.5">
-                        <span className="text-[7px] sm:text-[8.5px] font-extrabold uppercase block tracking-tight truncate text-amber-300">
-                          💼 ইনভেস্টর
-                        </span>
-                        {generalMemberFilterTab === 'investor' && (
-                          <span className="w-1 h-1 rounded-full bg-amber-400 shrink-0" />
-                        )}
-                      </div>
-                      <h4 className="text-xs sm:text-base font-black mt-0.5 leading-none text-amber-200 font-mono truncate">
-                        {investorUsers.length} জন
-                      </h4>
-                      <p className="text-[6.5px] sm:text-[7.5px] font-medium mt-0.5 text-amber-400/80 truncate">
-                        কোম্পানি পার্টনার
-                      </p>
-                    </button>
+                      {/* 6. সুইচ অফ */}
+                      <button type="button" onClick={() => setGeneralMemberFilterTab('switch_off')} className={`p-1.5 sm:p-2 rounded-lg border text-left transition-all cursor-pointer min-w-0 flex flex-col justify-between ${generalMemberFilterTab === 'switch_off' ? 'bg-rose-950 border-rose-500 text-white shadow-xs ring-1 ring-rose-400' : 'bg-slate-950/70 border-slate-800 hover:border-rose-700/50 text-slate-300'}`}>
+                        <span className="text-[7px] sm:text-[8.5px] font-extrabold uppercase text-rose-300 truncate">🔴 সুইচ অফ</span>
+                        <h4 className="text-xs sm:text-base font-black text-rose-200 font-mono truncate">{switchOffUsers.length} জন</h4>
+                        <p className="text-[6.5px] sm:text-[7.5px] font-medium text-rose-400/80 truncate">বন্ধ সঞ্চয়</p>
+                      </button>
 
-                    {/* 7. 🛡️ সাব এডমিন */}
-                    <button
-                      type="button"
-                      onClick={() => setGeneralMemberFilterTab('sub_admin')}
-                      className={`p-1.5 sm:p-2 rounded-lg border text-left transition-all cursor-pointer min-w-0 flex flex-col justify-between ${
-                        generalMemberFilterTab === 'sub_admin'
-                          ? 'bg-purple-950 border-purple-500 text-white shadow-xs ring-1 ring-purple-400'
-                          : 'bg-slate-950/70 border-slate-800 hover:border-purple-700/50 text-slate-300'
-                      }`}
-                    >
-                      <div className="flex items-center justify-between gap-0.5">
-                        <span className="text-[7px] sm:text-[8.5px] font-extrabold uppercase block tracking-tight truncate text-purple-300">
-                          🛡️ সাব এডমিন
-                        </span>
-                        {generalMemberFilterTab === 'sub_admin' && (
-                          <span className="w-1 h-1 rounded-full bg-purple-400 shrink-0" />
-                        )}
-                      </div>
-                      <h4 className="text-xs sm:text-base font-black mt-0.5 leading-none text-purple-200 font-mono truncate">
-                        {subAdminUsers.length} জন
-                      </h4>
-                      <p className="text-[6.5px] sm:text-[7.5px] font-medium mt-0.5 text-purple-400/80 truncate">
-                        অ্যাসাইনড এডমিন
-                      </p>
-                    </button>
+                      {/* 7. সাব এডমিন */}
+                      <button type="button" onClick={() => setGeneralMemberFilterTab('sub_admin')} className={`p-1.5 sm:p-2 rounded-lg border text-left transition-all cursor-pointer min-w-0 flex flex-col justify-between ${generalMemberFilterTab === 'sub_admin' ? 'bg-purple-950 border-purple-500 text-white shadow-xs ring-1 ring-purple-400' : 'bg-slate-950/70 border-slate-800 hover:border-purple-700/50 text-slate-300'}`}>
+                        <span className="text-[7px] sm:text-[8.5px] font-extrabold uppercase text-purple-300 truncate">🛡️ সাব এডমিন</span>
+                        <h4 className="text-xs sm:text-base font-black text-purple-200 font-mono truncate">{subAdminUsers.length} জন</h4>
+                        <p className="text-[6.5px] sm:text-[7.5px] font-medium text-purple-400/80 truncate">এডমিন প্রতিনিধি</p>
+                      </button>
 
-                    {/* 8. 🔒 পাসওয়ার্ড / পিন রিসেট */}
-                    <button
-                      type="button"
-                      onClick={() => setGeneralMemberFilterTab('reset_requests')}
-                      className={`p-1.5 sm:p-2 rounded-lg border text-left transition-all cursor-pointer min-w-0 flex flex-col justify-between ${
-                        generalMemberFilterTab === 'reset_requests'
-                          ? 'bg-rose-950 border-rose-400 text-white shadow-xs ring-1 ring-rose-400'
-                          : appLockResetUsers.length > 0
-                          ? 'bg-rose-950/90 border-rose-500/60 text-rose-200 animate-pulse'
-                          : 'bg-slate-950/70 border-slate-800 hover:border-rose-700/50 text-slate-300'
-                      }`}
-                    >
-                      <div className="flex items-center justify-between gap-0.5">
-                        <span className="text-[7px] sm:text-[8.5px] font-extrabold uppercase block tracking-tight truncate text-rose-300">
-                          🔒 পাসওয়ার্ড/পিন
-                        </span>
-                        {appLockResetUsers.length > 0 ? (
-                          <span className="w-1.5 h-1.5 rounded-full bg-rose-400 animate-ping shrink-0" />
-                        ) : (
-                          <span className="text-[8px] text-slate-500 shrink-0">০</span>
-                        )}
-                      </div>
-                      <h4 className="text-xs sm:text-base font-black mt-0.5 leading-none text-rose-300 font-mono truncate">
-                        {appLockResetUsers.length} জন
-                      </h4>
-                      <p className="text-[6.5px] sm:text-[7.5px] font-medium mt-0.5 text-rose-400/90 truncate">
-                        রিসেট রিকোয়েস্ট
-                      </p>
-                    </button>
-                  </div>
+                      {/* 8. আমাদের ইনভেস্ট / সদস্য আবেদন */}
+                      <button type="button" onClick={() => setSamityActiveSubTab('pending_applications')} className="p-1.5 sm:p-2 rounded-lg border text-left transition-all cursor-pointer min-w-0 flex flex-col justify-between bg-slate-950/70 border-slate-800 hover:border-indigo-500/50 text-slate-300">
+                          <span className="text-[7px] sm:text-[8.5px] font-extrabold uppercase text-indigo-300 truncate">📈 আমাদের ইনভেস্ট</span>
+                          <h4 className="text-xs sm:text-base font-black text-indigo-200 font-mono truncate">
+                            {users.filter((u: any) => u.samityStatus === 'pending' || (u.samityAppliedAt && u.samityStatus !== 'approved' && u.samityStatus !== 'rejected')).length > 0
+                              ? `⏳ ${users.filter((u: any) => u.samityStatus === 'pending' || (u.samityAppliedAt && u.samityStatus !== 'approved' && u.samityStatus !== 'rejected')).length}টি আবেদন`
+                              : 'সেকশন'}
+                          </h4>
+                          <p className="text-[6.5px] sm:text-[7.5px] font-medium text-indigo-400/80 truncate">পোর্টাল / আবেদন</p>
+                      </button>
+                    </div>
+
                 </div>
               );
             })()}
 
-            {/* 4. ⏳ পেন্ডিং সমবায় সদস্য আবেদনপত্র দ্রুত নিয়ন্ত্রণ বক্স - Slim Box */}
-            {(() => {
-              const samityPendingUsers = users.filter(u => u.samityStatus === 'pending' || u.approved === false);
-              const totalPendingCount = samityPendingUsers.length;
-              if (totalPendingCount === 0) return null;
 
-              return (
-                <div className="bg-gradient-to-r from-teal-900/90 via-slate-900 to-teal-950 border border-teal-500/80 p-3 sm:p-3.5 rounded-2xl text-white space-y-2 shadow-lg">
-                  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 border-b border-teal-500/30 pb-2">
-                    <div>
-                      <h3 className="text-xs sm:text-sm font-black text-teal-300 flex items-center gap-1.5">
-                        <span className="w-2 h-2 rounded-full bg-teal-400 animate-ping" />
-                        ⏳ সদস্য অ্যাকাউন্ট ও আবেদন অপেক্ষমান ({totalPendingCount} জন)
-                      </h3>
-                      <p className="text-[10px] text-teal-100/80">
-                        নতুন সদস্যদের মেম্বারশিপ আবেদন রিভিউয়ের অপেক্ষায় রয়েছে।
-                      </p>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => setAdminTab('approvals')}
-                      className="px-3 py-1 bg-teal-500 hover:bg-teal-400 text-slate-950 font-black text-[11px] rounded-lg transition cursor-pointer shadow-xs shrink-0"
-                    >
-                      🚀 সকল আবেদন দেখুন
-                    </button>
-                  </div>
-
-                  {/* Pending Users List */}
-                  {samityPendingUsers.length > 0 && (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 pt-1">
-                      {samityPendingUsers.slice(0, 6).map((pu, idx) => (
-                        <div key={`${pu.uid}-${idx}`} className="bg-slate-900/80 border border-teal-500/30 p-2.5 rounded-xl flex flex-col justify-between gap-2">
-                          <div className="space-y-0.5 text-left min-w-0">
-                            <div className="flex justify-between items-center gap-1">
-                              <h5 className="text-xs font-black text-white truncate">{pu.name}</h5>
-                              <span className="text-[8.5px] font-mono bg-teal-500/20 text-teal-300 border border-teal-500/30 px-1.5 py-0.2 rounded font-bold">
-                                {pu.memberId || 'N/A'}
-                              </span>
-                            </div>
-                            <p className="text-[10.5px] text-slate-300 font-mono">📱 {pu.phone}</p>
-                          </div>
-                          <div className="flex gap-1.5 border-t border-slate-800 pt-1.5">
-                            <button
-                              type="button"
-                              onClick={() => handleApproveUserAccount(pu)}
-                              className="flex-1 py-1 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-[10.5px] rounded-lg transition cursor-pointer"
-                            >
-                              ✓ অনুমোদন
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => handleRejectUserAccount(pu)}
-                              className="px-2 py-1 bg-rose-950 hover:bg-rose-900 text-rose-300 border border-rose-800/40 text-[10.5px] font-bold rounded-lg transition cursor-pointer"
-                            >
-                              ❌ বাতিল
-                            </button>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              );
-            })()}
 
             {/* 5. Header controls for Manual Member Registration Toggle & Serial ID Resequence - Slim Bar */}
             <div className="bg-white border border-slate-150 rounded-xl px-3 py-2 sm:px-3.5 sm:py-2.5 flex flex-col sm:flex-row items-center justify-between gap-2">
@@ -1413,7 +1464,7 @@ export function AdminSamitySection(props: any) {
                     </div>
                   </div>
 
-                  {/* Members Grid/List - Sleek, Slim & Compact */}
+                  {/* Members Grid/List */}
                   <div className="space-y-2">
                     {(() => {
                       const isSubAdminUser = (u: any) => Boolean(
@@ -1991,8 +2042,8 @@ export function AdminSamitySection(props: any) {
             })()}
           </div>
         )}
-
-                {/* TAB 1.5: PENDING MEMBER APPROVALS */}
-    </>
-  );
+      </div>
+    )}
+  </>
+);
 }

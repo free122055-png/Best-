@@ -108,6 +108,107 @@ async function processVerifiedPayment(db, transaction_id, verifiedUserId, verifi
 // Centralized Idempotent ZiniPay Payment Processor
 // 100% Guaranteed Main Balance & Wallet Crediting
 // ==========================================
+const ZINIPAY_API_KEY = process.env.ZINIPAY_API_KEY || '95f4bae1906bfd060176e99fa1747c98c8ff6b1b3252d81c';
+const ZINIPAY_BASE_URL = 'https://api.zinipay.com';
+const ZINIPAY_REGISTERED_DOMAIN = 'https://ais-dev-lcpzj4h5d5mm2it3dw6e57-969303088573.asia-southeast1.run.app';
+
+function normalizeZiniVerify(verifyData: any, fallbackInv?: any) {
+  const data = (verifyData && typeof verifyData === 'object' && verifyData.data) ? verifyData.data : (verifyData || {});
+  const statusStr = String(data?.status || verifyData?.status || '').toUpperCase();
+  const isCompleted = statusStr === 'COMPLETED' || (verifyData?.status === true && String(data?.status || '').toUpperCase() === 'COMPLETED');
+  const isFailed = statusStr === 'FAILED' || statusStr === 'EXPIRED';
+  const isCancelled = statusStr === 'CANCELLED';
+
+  const rawAmount = (data?.amount !== undefined && data?.amount !== null)
+    ? data.amount
+    : (verifyData?.amount !== undefined ? verifyData.amount : fallbackInv?.amount);
+  const amount = parseFloat(String(rawAmount || 0));
+
+  const userId = data?.metadata?.userId || data?.metadata?.customer_id || data?.customer_id || verifyData?.metadata?.userId || fallbackInv?.userId || '';
+  const trxId = data?.trx_id || data?.transaction_id || verifyData?.transaction_id || data?.payment_id || data?.invoice_id || fallbackInv?.invoice_id || fallbackInv?.val_id || '';
+  const paymentMethod = data?.payment_method || verifyData?.payment_method || 'Online Gateway';
+
+  return {
+    isCompleted,
+    isFailed,
+    isCancelled,
+    statusStr,
+    amount,
+    userId,
+    trxId,
+    paymentMethod,
+    data
+  };
+}
+
+let isZinipayReconciling = false;
+async function runAutoZinipayReconciliation(dbInstance: any) {
+  if (!dbInstance || isZinipayReconciling) return;
+  isZinipayReconciling = true;
+  try {
+    const invoicesRef = collection(dbInstance, 'zinipay_invoices');
+    const q = query(invoicesRef, where('status', '==', 'pending'), limit(25));
+    const snap = await getDocs(q);
+    if (snap.empty) {
+      isZinipayReconciling = false;
+      return;
+    }
+
+    for (const d of snap.docs) {
+      const inv = d.data();
+      const invoice_id = inv.invoice_id || d.id;
+      const val_id = inv.val_id;
+      if (!invoice_id && !val_id) continue;
+
+      try {
+        const verifyPayload: any = {};
+        if (invoice_id) verifyPayload.invoice_id = invoice_id;
+        if (val_id) verifyPayload.val_id = val_id;
+
+        const verifyRes = await fetch(`${ZINIPAY_BASE_URL}/v1/payment/verify`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'zini-api-key': ZINIPAY_API_KEY
+          },
+          body: JSON.stringify(verifyPayload)
+        });
+
+        const verifyData = await verifyRes.json();
+        const normalized = normalizeZiniVerify(verifyData, inv);
+
+        if (normalized.isCompleted) {
+          const verifiedUserId = normalized.userId || inv.userId;
+          const verifiedAmount = normalized.amount || inv.amount;
+          const transaction_id = normalized.trxId || inv.invoice_id || val_id || `ZP_${Date.now()}`;
+
+          if (verifiedUserId && verifiedAmount > 0) {
+            await processVerifiedZiniPayment(dbInstance, transaction_id, verifiedUserId, verifiedAmount, verifyData);
+            await updateDoc(d.ref, {
+              status: 'completed',
+              completedAt: new Date().toISOString(),
+              transactionId: transaction_id
+            });
+            console.log(`[AutoReconcile] 100% SUCCESS: Credited pending ZiniPay invoice ${invoice_id} to user ${verifiedUserId}, amount ৳${verifiedAmount}, TrxID: ${transaction_id}`);
+          }
+        } else if (normalized.isFailed || normalized.isCancelled) {
+          await updateDoc(d.ref, {
+            status: normalized.statusStr.toLowerCase(),
+            failedAt: new Date().toISOString()
+          });
+          console.info(`[AutoReconcile] Invoice ${invoice_id} resolution confirmed: ${normalized.statusStr}`);
+        }
+      } catch (itemErr: any) {
+        // Individual verify error, continue loop
+      }
+    }
+  } catch (err: any) {
+    console.warn('[AutoReconcile] Error in reconciliation loop:', err?.message);
+  } finally {
+    isZinipayReconciling = false;
+  }
+}
+
 async function processVerifiedZiniPayment(db: any, transaction_id: string, verifiedUserId: string, verifiedAmount: any, rawVerifyData: any) {
   if (!db) throw new Error('database_disconnected');
   if (!verifiedUserId) throw new Error('user_not_found_in_verification');
@@ -577,6 +678,15 @@ app.get('/api/health', (req, res) => {
       setInterval(() => {
         runScheduledTransactionCleanup(db);
       }, 24 * 60 * 60 * 1000);
+
+      // Schedule real-time automated ZiniPay reconciliation loop: run 2s after boot and every 8 seconds
+      setTimeout(() => {
+        runAutoZinipayReconciliation(db);
+      }, 2000);
+
+      setInterval(() => {
+        runAutoZinipayReconciliation(db);
+      }, 8000);
 
 
 
@@ -1181,10 +1291,7 @@ app.get('/api/health', (req, res) => {
   // ==========================================
   // ZINIPAY GATEWAY INTEGRATION ENDPOINTS
   // ==========================================
-  const ZINIPAY_API_KEY = process.env.ZINIPAY_API_KEY || '95f4bae1906bfd060176e99fa1747c98c8ff6b1b3252d81c';
-  const ZINIPAY_BASE_URL = 'https://api.zinipay.com';
-  // Registered brand domain configured on ZiniPay sandbox dashboard
-  const ZINIPAY_REGISTERED_DOMAIN = 'https://ais-dev-lcpzj4h5d5mm2it3dw6e57-969303088573.asia-southeast1.run.app';
+  // (Uses top-level ZINIPAY_API_KEY, ZINIPAY_BASE_URL, ZINIPAY_REGISTERED_DOMAIN)
 
   // 1. Create Payment Proxy Endpoint (ZiniPay v1/payment/create)
   app.post('/api/payment/create', async (req, res) => {
@@ -1408,6 +1515,156 @@ app.get('/api/health', (req, res) => {
     }
   });
 
+  // 1.2 Check Single Payment Status Endpoint (for instant frontend polling & verification)
+  app.post('/api/payment/check-status', async (req, res) => {
+    try {
+      const { val_id, invoice_id, userId } = req.body;
+      if (!val_id && !invoice_id) {
+        return res.status(400).json({ error: 'invoice_id or val_id is required' });
+      }
+
+      let storedInvoice: any = null;
+      let invoiceRef: any = null;
+      if (db) {
+        const checkKey = (invoice_id || val_id).toString().trim();
+        invoiceRef = doc(db, 'zinipay_invoices', checkKey);
+        try {
+          const snap = await getDoc(invoiceRef);
+          if (snap.exists()) {
+            storedInvoice = snap.data();
+          }
+        } catch (e) {}
+      }
+
+      const verifyInvoiceId = invoice_id || storedInvoice?.invoice_id || val_id;
+      const verifyValId = val_id || storedInvoice?.val_id || invoice_id;
+
+      const verifyPayload: any = {};
+      if (verifyInvoiceId) verifyPayload.invoice_id = verifyInvoiceId;
+      if (verifyValId) verifyPayload.val_id = verifyValId;
+
+      const verifyRes = await fetch(`${ZINIPAY_BASE_URL}/v1/payment/verify`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'zini-api-key': ZINIPAY_API_KEY
+        },
+        body: JSON.stringify(verifyPayload)
+      });
+
+      let verifyData: any;
+      try {
+        verifyData = await verifyRes.json();
+      } catch (err) {
+        verifyData = { status: false, message: 'Invalid verify response' };
+      }
+
+      const normalized = normalizeZiniVerify(verifyData, storedInvoice);
+
+      if (normalized.isCompleted) {
+        const targetUserId = normalized.userId || storedInvoice?.userId || userId;
+        const targetAmount = normalized.amount || storedInvoice?.amount;
+        const transaction_id = normalized.trxId || verifyInvoiceId || verifyValId || `ZP_${Date.now()}`;
+
+        if (targetUserId && targetAmount > 0 && db) {
+          const result = await processVerifiedZiniPayment(db, transaction_id, targetUserId, targetAmount, verifyData);
+          if (invoiceRef) {
+            updateDoc(invoiceRef, {
+              status: 'completed',
+              completedAt: new Date().toISOString(),
+              transactionId: transaction_id
+            }).catch(() => {});
+          }
+          return res.json({
+            success: true,
+            status: 'completed',
+            amount: targetAmount,
+            newBalance: result.newBalance,
+            trxId: transaction_id,
+            alreadyProcessed: result.alreadyProcessed
+          });
+        }
+      }
+
+      return res.json({
+        success: true,
+        status: normalized.isFailed ? 'failed' : (normalized.isCancelled ? 'cancelled' : 'pending'),
+        rawStatus: normalized.statusStr || 'PENDING',
+        message: normalized.isCompleted ? 'পেমেন্ট সম্পন্ন হয়েছে।' : (normalized.isFailed ? 'পেমেন্ট ব্যর্থ হয়েছে।' : 'যাচাই করা হচ্ছে...')
+      });
+    } catch (err: any) {
+      console.error('Error in /api/payment/check-status:', err);
+      return res.status(500).json({ error: err.message });
+    }
+  });
+
+  // 1.3 Reconcile All Pending Payments for User Endpoint (on app focus or boot)
+  app.post('/api/payment/reconcile-pending', async (req, res) => {
+    try {
+      const { userId, phone } = req.body;
+      if (!userId && !phone) {
+        return res.status(400).json({ error: 'userId or phone required' });
+      }
+
+      if (!db) {
+        return res.status(500).json({ error: 'database_unavailable' });
+      }
+
+      const invoicesRef = collection(db, 'zinipay_invoices');
+      const q = query(invoicesRef, where('userId', '==', userId), where('status', '==', 'pending'), limit(15));
+      const snap = await getDocs(q);
+
+      let reconciledCount = 0;
+      let lastResult: any = null;
+
+      for (const d of snap.docs) {
+        const inv = d.data();
+        const invoice_id = inv.invoice_id || d.id;
+        const val_id = inv.val_id;
+
+        try {
+          const verifyPayload: any = {};
+          if (invoice_id) verifyPayload.invoice_id = invoice_id;
+          if (val_id) verifyPayload.val_id = val_id;
+
+          const verifyRes = await fetch(`${ZINIPAY_BASE_URL}/v1/payment/verify`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'zini-api-key': ZINIPAY_API_KEY
+            },
+            body: JSON.stringify(verifyPayload)
+          });
+          const verifyData = await verifyRes.json();
+          const normalized = normalizeZiniVerify(verifyData, inv);
+          if (normalized.isCompleted) {
+            const targetAmount = normalized.amount || inv.amount;
+            const targetUserId = normalized.userId || userId;
+            const transaction_id = normalized.trxId || invoice_id || val_id || `ZP_${Date.now()}`;
+
+            lastResult = await processVerifiedZiniPayment(db, transaction_id, targetUserId, targetAmount, verifyData);
+            await updateDoc(d.ref, {
+              status: 'completed',
+              completedAt: new Date().toISOString(),
+              transactionId: transaction_id
+            });
+            reconciledCount++;
+          } else if (normalized.isFailed || normalized.isCancelled) {
+            await updateDoc(d.ref, { status: normalized.statusStr.toLowerCase(), failedAt: new Date().toISOString() });
+          }
+        } catch (e) {}
+      }
+
+      return res.json({
+        success: true,
+        reconciledCount,
+        lastResult
+      });
+    } catch (e: any) {
+      return res.status(500).json({ error: e.message });
+    }
+  });
+
   // 2. ZiniPay Success/Return Callback Endpoint
   app.all(['/api/payment/zinipay-callback', '/api/payment/nagorikpay-callback', '/api/payment/callback'], async (req, res) => {
     try {
@@ -1481,23 +1738,23 @@ app.get('/api/health', (req, res) => {
 
       console.log('ZiniPay callback verification API response:', JSON.stringify(verifyData));
 
-      const statusUpper = String(verifyData?.status || '').toUpperCase();
-      const isCompleted = statusUpper === 'COMPLETED' || verifyData?.status === true || verifyData?.status === 'true';
+      const normalized = normalizeZiniVerify(verifyData, storedInvoice);
 
-      if (!isCompleted) {
+      if (!normalized.isCompleted) {
         console.error('ZiniPay transaction verification status is not completed:', verifyData);
-        if (statusUpper === 'PENDING') {
+        if (normalized.statusStr === 'PENDING') {
           return res.redirect(`/?payment_status=pending&val_id=${encodeURIComponent(verifyValId || '')}`);
         }
-        return res.redirect(`/?payment_status=failed&error=${encodeURIComponent(verifyData?.status || 'verification_failed')}`);
+        if (normalized.isCancelled) {
+          return res.redirect(`/?payment_status=cancelled`);
+        }
+        return res.redirect(`/?payment_status=failed&error=${encodeURIComponent(normalized.statusStr || 'verification_failed')}`);
       }
 
       // Extract verified details strictly from verified response or stored invoice record
-      let verifiedUserId = verifyData?.metadata?.userId || storedInvoice?.userId || req.query.userId || req.body.userId;
-      let verifiedAmount = verifyData?.amount || storedInvoice?.amount || req.query.amount || req.body.amount;
-      let transaction_id = (verifyData?.transaction_id && verifyData.transaction_id !== 'N/A')
-        ? verifyData.transaction_id
-        : (verifyData?.invoice_id || verifyValId || `ZP_${Date.now()}`);
+      let verifiedUserId = normalized.userId || storedInvoice?.userId || req.query.userId || req.body.userId;
+      let verifiedAmount = normalized.amount || storedInvoice?.amount || req.query.amount || req.body.amount;
+      let transaction_id = normalized.trxId || verifyInvoiceId || verifyValId || `ZP_${Date.now()}`;
 
       if (!verifiedUserId || !verifiedAmount) {
         console.error('CRITICAL: verifyData missing userId or amount!', verifyData);
@@ -1523,36 +1780,36 @@ app.get('/api/health', (req, res) => {
         }
 
         const rawReturnHost = (req.query.returnOrigin as string) || storedInvoice?.returnOrigin || '';
-        const returnHost = (rawReturnHost && !rawReturnHost.includes('localhost') && !rawReturnHost.startsWith('capacitor:') && !rawReturnHost.startsWith('file:'))
+        const returnHost = (rawReturnHost && !rawReturnHost.startsWith('capacitor:') && !rawReturnHost.startsWith('file:'))
           ? rawReturnHost.replace(/\/$/, '')
-          : ZINIPAY_REGISTERED_DOMAIN;
+          : (req.headers.origin ? String(req.headers.origin).replace(/\/$/, '') : 'https://ais-pre-lcpzj4h5d5mm2it3dw6e57-969303088573.asia-southeast1.run.app');
         return res.redirect(`${returnHost}/?payment_status=success&amount=${txResult.amount}&trxId=${encodeURIComponent(transaction_id)}&gateway=BNB`);
       } catch (err: any) {
         console.error('Error processing callback payment in db:', err.message);
         const rawReturnHost = (req.query.returnOrigin as string) || storedInvoice?.returnOrigin || '';
-        const returnHost = (rawReturnHost && !rawReturnHost.includes('localhost') && !rawReturnHost.startsWith('capacitor:') && !rawReturnHost.startsWith('file:'))
+        const returnHost = (rawReturnHost && !rawReturnHost.startsWith('capacitor:') && !rawReturnHost.startsWith('file:'))
           ? rawReturnHost.replace(/\/$/, '')
-          : ZINIPAY_REGISTERED_DOMAIN;
+          : (req.headers.origin ? String(req.headers.origin).replace(/\/$/, '') : 'https://ais-pre-lcpzj4h5d5mm2it3dw6e57-969303088573.asia-southeast1.run.app');
         return res.redirect(`${returnHost}/?payment_status=failed&error=${encodeURIComponent(err.message || 'processing_failed')}`);
       }
 
     } catch (error: any) {
       console.error('Error in ZiniPay callback handler:', error);
       const rawReturnHost = (req.query.returnOrigin as string) || '';
-      const returnHost = (rawReturnHost && !rawReturnHost.includes('localhost') && !rawReturnHost.startsWith('capacitor:') && !rawReturnHost.startsWith('file:'))
+      const returnHost = (rawReturnHost && !rawReturnHost.startsWith('capacitor:') && !rawReturnHost.startsWith('file:'))
         ? rawReturnHost.replace(/\/$/, '')
-        : ZINIPAY_REGISTERED_DOMAIN;
+        : (req.headers.origin ? String(req.headers.origin).replace(/\/$/, '') : 'https://ais-pre-lcpzj4h5d5mm2it3dw6e57-969303088573.asia-southeast1.run.app');
       return res.redirect(`${returnHost}/?payment_status=failed&error=${encodeURIComponent(error.message || 'callback_error')}`);
     }
   });
 
   // 3. ZiniPay Cancel Callback Endpoint
   app.all(['/api/payment/zinipay-cancel', '/api/payment/nagorikpay-cancel', '/api/payment/cancel'], (req, res) => {
-    console.log('ZiniPay payment cancelled by user:', req.query, 'Body:', req.body);
+    console.info('ZiniPay payment cancelled by user:', req.query);
     const rawReturnHost = (req.query.returnOrigin as string) || '';
-    const returnHost = (rawReturnHost && !rawReturnHost.includes('localhost') && !rawReturnHost.startsWith('capacitor:') && !rawReturnHost.startsWith('file:'))
+    const returnHost = (rawReturnHost && !rawReturnHost.startsWith('capacitor:') && !rawReturnHost.startsWith('file:'))
       ? rawReturnHost.replace(/\/$/, '')
-      : ZINIPAY_REGISTERED_DOMAIN;
+      : (req.headers.origin ? String(req.headers.origin).replace(/\/$/, '') : 'https://ais-pre-lcpzj4h5d5mm2it3dw6e57-969303088573.asia-southeast1.run.app');
     return res.redirect(`${returnHost}/?payment_status=cancelled`);
   });
 
@@ -1632,18 +1889,15 @@ app.get('/api/health', (req, res) => {
 
       console.log('ZiniPay webhook verification API response:', JSON.stringify(verifyData));
 
-      const statusUpper = String(verifyData?.status || '').toUpperCase();
-      const isCompleted = statusUpper === 'COMPLETED' || verifyData?.status === true || verifyData?.status === 'true';
+      const normalized = normalizeZiniVerify(verifyData, storedInvoice);
 
-      if (!isCompleted) {
-        return res.status(400).json({ error: 'verification_failed', status: verifyData?.status });
+      if (!normalized.isCompleted) {
+        return res.status(400).json({ error: 'verification_failed', status: normalized.statusStr });
       }
 
-      let verifiedUserId = verifyData?.metadata?.userId || storedInvoice?.userId || req.query.userId || req.body.userId;
-      let verifiedAmount = verifyData?.amount || storedInvoice?.amount || req.query.amount || req.body.amount;
-      let transaction_id = (verifyData?.transaction_id && verifyData.transaction_id !== 'N/A')
-        ? verifyData.transaction_id
-        : (verifyData?.invoice_id || verifyValId || `ZP_${Date.now()}`);
+      let verifiedUserId = normalized.userId || storedInvoice?.userId || req.query.userId || req.body.userId;
+      let verifiedAmount = normalized.amount || storedInvoice?.amount || req.query.amount || req.body.amount;
+      let transaction_id = normalized.trxId || verifyInvoiceId || verifyValId || `ZP_${Date.now()}`;
 
       if (!verifiedUserId || !verifiedAmount) {
         return res.status(400).json({ error: 'missing_verification_metadata', verifyData });

@@ -75,9 +75,16 @@ export default function App() {
   const [isLocked, setIsLocked] = useState(() => {
     try {
       if (typeof window !== 'undefined') {
-        const savedUid = localStorage.getItem('amb_user_uid');
-        const savedPhone = localStorage.getItem('amb_user_phone');
-        return !!(savedUid && savedPhone);
+        if (window.location.search.includes('payment_status=')) {
+          return false;
+        }
+        const lastUserRaw = localStorage.getItem('amb_last_user');
+        if (lastUserRaw) {
+          const parsed = JSON.parse(lastUserRaw);
+          if (parsed?.isAppLocked && sessionStorage.getItem('amb_session_unlocked') !== 'true') {
+            return true;
+          }
+        }
       }
     } catch (e) {}
     return false;
@@ -88,6 +95,9 @@ export default function App() {
   const [showSplash, setShowSplash] = useState(() => {
     try {
       if (typeof window !== 'undefined') {
+        if (window.location.search.includes('payment_status=')) {
+          return false;
+        }
         const alreadyShown = sessionStorage.getItem('amb_splash_shown');
         if (alreadyShown === 'true') {
           return false;
@@ -165,6 +175,8 @@ export default function App() {
                   (uData as any).mainBalance = effectiveBal;
                   setCurrentUser((prev) => prev ? { ...prev, ...uData, balance: effectiveBal, mainBalance: effectiveBal } : null);
                   localStorage.setItem('amb_user_balance', String(effectiveBal));
+                  window.dispatchEvent(new CustomEvent('amb_admin_sync_tick', { detail: { time: Date.now() } }));
+                  window.dispatchEvent(new CustomEvent('bnb_balance_updated', { detail: { amount: pAmount || 0, newBalance: effectiveBal } }));
                 }
               }).catch((e) => console.warn('Payment success balance refresh error:', e));
             }
@@ -175,7 +187,13 @@ export default function App() {
       }
 
       const newUrl = window.location.protocol + "//" + window.location.host + window.location.pathname;
-      window.history.replaceState({path: newUrl}, '', newUrl);
+      try {
+        window.history.replaceState({ amb_root: true }, '', newUrl);
+        window.history.pushState({ amb_active: true }, '');
+      } catch (e) {}
+      setTabHistory(['home']);
+      setSelectedAction(null);
+      setIsLocked(false);
     }
   }, []);
 
@@ -471,6 +489,7 @@ export default function App() {
 
   const setActiveTab = (tab: string) => {
     setTabHistory(prev => {
+      if (tab === 'home') return ['home'];
       if (prev[prev.length - 1] === tab) return prev;
       return [...prev, tab];
     });
@@ -514,6 +533,16 @@ export default function App() {
     }
     return false;
   }, showAdminPinModal, 80);
+
+  useBackHandler(() => {
+    if (paymentNotice) {
+      setPaymentNotice(null);
+      setTabHistory(['home']);
+      setSelectedAction(null);
+      return true;
+    }
+    return false;
+  }, Boolean(paymentNotice), 75);
 
   useBackHandler(() => {
     if (drawerOpen) {

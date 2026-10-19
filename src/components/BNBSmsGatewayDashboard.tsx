@@ -263,66 +263,21 @@ export const BNBSmsGatewayDashboard: React.FC<BNBSmsGatewayDashboardProps> = ({ 
   return (
     <div className="w-full bg-white rounded-3xl border border-slate-200 shadow-xl overflow-hidden font-sans text-slate-800">
       
-      {/* 1. Header Banner - Official Deep Green (#0b6623) */}
-      <div className="bg-[#0b6623] text-white p-5 sm:p-6 shadow-md relative overflow-hidden">
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 relative z-10">
-          <div>
-            <div className="flex items-center gap-2 text-emerald-200 text-xs font-black uppercase tracking-wider mb-1">
-              <ShieldCheck className="w-4 h-4 text-emerald-300" />
-              <span>BNB bKash Payment Detection & Control Center</span>
-            </div>
-            <h2 className="text-xl sm:text-2xl font-black tracking-tight text-white flex items-center gap-2">
-              <span>অটোমেটিক bKash SMS পেমেন্ট ভেরিফিকেশন সিস্টেম</span>
-              <span className="text-xs bg-amber-400 text-slate-900 px-2 py-0.5 rounded-full font-bold">
-                Personal Account
-              </span>
-            </h2>
-            <p className="text-emerald-100/90 text-xs sm:text-sm mt-1 max-w-2xl leading-relaxed">
-              Android ফোনে আসা Personal bKash পেমেন্ট SMS স্বয়ংক্রিয়ভাবে শনাক্তকরণ, ডুপ্লিকেট প্রতিরোধ এবং সদস্যের পরিচয় নিশ্চিতকরণপূর্বক নিরাপদ ব্যালেন্স প্রক্রিয়াকরণ।
-            </p>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={checkSystemStatus}
-              disabled={isRefreshing}
-              className="px-3.5 py-2 bg-white/15 hover:bg-white/25 active:scale-95 text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer border border-white/20"
-            >
-              <RefreshCw className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin' : ''}`} />
-              <span>রিফ্রেশ</span>
-            </button>
-          </div>
+      {/* Minimal Header Bar */}
+      <div className="bg-slate-900 text-white p-4 px-6 shadow-xs flex items-center justify-between font-sans border-b border-slate-800">
+        <div className="flex items-center gap-2.5">
+          <ShieldCheck className="w-5 h-5 text-emerald-400" />
+          <h2 className="text-sm sm:text-base font-black tracking-tight text-white">bKash SMS পেমেন্ট ভেরিফিকেশন ও ট্রানজেকশন তথ্য</h2>
         </div>
-
-        {/* Real-time System Status Badges */}
-        <div className="mt-4 pt-3 border-t border-emerald-700/60 flex flex-wrap items-center gap-3 text-xs">
-          {/* Gateway Status Badge */}
-          <div className="flex items-center gap-1.5 bg-black/20 px-3 py-1 rounded-full border border-white/10">
-            <span className={`w-2 h-2 rounded-full ${firebaseStatus === 'connected' ? 'bg-emerald-400 animate-pulse' : 'bg-rose-400'}`} />
-            <span className="font-bold text-white">Firebase:</span>
-            <span className={firebaseStatus === 'connected' ? 'text-emerald-200 font-semibold' : 'text-rose-200 font-semibold'}>
-              {firebaseStatus === 'connected' ? 'অনলাইন ও রিয়েলটাইম সংযুক্ত' : 'সংযোগ বিচ্ছিন্ন'}
-            </span>
-          </div>
-
-          {/* Android SMS Listener Badge */}
-          <div className="flex items-center gap-1.5 bg-black/20 px-3 py-1 rounded-full border border-white/10">
-            <Smartphone className="w-3.5 h-3.5 text-amber-300" />
-            <span className="font-bold text-white">SMS Listener:</span>
-            <span className="text-amber-200 font-semibold">
-              {nativeStatus.isNative ? (nativeStatus.hasPermission ? 'Android Native সক্রিয়' : 'অনুমতি প্রয়োজন') : 'Webhook / Forwarder রেডি'}
-            </span>
-          </div>
-
-          {/* Personal Account Security Notice */}
-          <div className="flex items-center gap-1.5 bg-amber-400/20 text-amber-100 px-3 py-1 rounded-full border border-amber-300/30">
-            <Lock className="w-3 h-3 text-amber-300" />
-            <span className="font-medium text-[11px]">
-              Personal Account নীতি: কোনো পেমেন্ট সরাসরি ব্যালেন্সে যোগ হবে না; সর্বদা Pending Verification-এ সুরক্ষিত থাকবে।
-            </span>
-          </div>
-        </div>
+        <button
+          type="button"
+          onClick={checkSystemStatus}
+          disabled={isRefreshing}
+          className="px-3 py-1.5 bg-white/10 hover:bg-white/20 active:scale-95 text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer border border-white/15"
+        >
+          <RefreshCw className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin' : ''}`} />
+          <span>রিফ্রেশ</span>
+        </button>
       </div>
 
       {/* 2. Mandatory 6 Tabs Navigation (Requirement 11) */}
@@ -454,11 +409,11 @@ export const BNBSmsGatewayDashboard: React.FC<BNBSmsGatewayDashboardProps> = ({ 
                 </button>
               </div>
 
-              {/* Honest Platform Disclosure (Requirement 14) */}
-              <div className="p-3 bg-amber-50 border border-amber-200 rounded-2xl text-xs text-amber-900 flex items-start gap-2.5">
-                <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+              {/* Platform Gateway Disclosure */}
+              <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-2xl text-xs text-emerald-900 flex items-start gap-2.5">
+                <CheckCircle2 className="w-4 h-4 text-[#0b6623] shrink-0 mt-0.5" />
                 <div className="leading-relaxed">
-                  <strong>প্ল্যাটফর্ম ও ব্যাকগ্রাউন্ড SMS বাস্তবতা:</strong> Web ব্রাউজার সরাসরি ফোনের ব্যাকগ্রাউন্ড SMS অ্যাক্সেস করতে পারে না (ব্রাউজার সিকিউরিটি স্যান্ডবক্স)। পেমেন্ট সিমযুক্ত ফোনে আমাদের অ্যান্ড্রয়েড APK (যার ভেতর <code>BkashSmsReceiver</code> এবং <code>RECEIVE_SMS</code> পারমিশন রয়েছে) অথবা ব্যাকগ্রাউন্ড SMS Forwarder APK চালু থাকতে হবে।
+                  <strong>পেমেন্ট গেটওয়ে ও ওয়েবহুক ইন্টিগ্রেশন:</strong> আমাদের সিস্টেম সরাসরি সুরক্ষিত পেমেন্ট গেটওয়ে API ও সার্ভার ওয়েবহুক আর্কিটেকচারের মাধ্যমে লেনদেন সম্পন্ন করে। ডিভাইসের কোনো সংবেদনশীল SMS পড়ার অনুমতির প্রয়োজন হয় না।
                 </div>
               </div>
             </div>

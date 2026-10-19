@@ -509,7 +509,7 @@ export async function processUserSamitySavingsAutoDeduction(
         amount: totalToDeduct,
         status: 'approved',
         isApproved: true,
-        paymentMethod: 'Al Mayadin Wallet',
+        paymentMethod: 'BNB Wallet',
         description: options?.customNote || `মেইন ব্যালেন্স থেকে ${monthNamesStr} সমবায় সঞ্চয় কিস্তি ৳${totalToDeduct.toLocaleString('bn-BD')} টাকা স্বয়ংক্রিয়ভাবে কর্তন করে সঞ্চয় ফাণ্ডে জমা করা হয়েছে।`,
         createdAt: nowIso,
         receiptNo: receiptCode
@@ -709,7 +709,7 @@ export async function adminRefundAllFutureAdvanceMonths(
         amount: refundAmount,
         status: 'approved',
         isApproved: true,
-        paymentMethod: 'Al Mayadin Wallet',
+        paymentMethod: 'BNB Wallet',
         description: `অগ্রিম মাসের (${monthNames}) সঞ্চয় কিস্তি ভুলবশত কর্তন হয়েছিল। এডমিন সিস্টেম কর্তৃক ৳${refundAmount.toLocaleString('bn-BD')} টাকা সদস্যের মেইন ব্যালেন্সে ফেরত প্রদান করা হয়েছে।`,
         createdAt: nowIso,
         receiptNo: `REF-ADV-${Date.now()}`
@@ -837,7 +837,7 @@ export async function adminProcessSamityMonthSettlement({
           amount: totalRefund,
           status: 'approved',
           isApproved: true,
-          paymentMethod: 'Al Mayadin Wallet',
+          paymentMethod: 'BNB Wallet',
           description: adminNote || `এডমিন প্যানেল কর্তৃক ${monthNamesStr} সমবায় সঞ্চয় কিস্তি ৳${totalRefund.toLocaleString('bn-BD')} টাকা সমবায় তহবিল থেকে প্রত্যাহার করে মেইন ব্যালেন্সে ফেরত প্রদান করা হয়েছে।`,
           createdAt: nowIso,
           receiptNo: receiptCode
@@ -909,7 +909,7 @@ export async function adminProcessSamityMonthSettlement({
         amount: totalAmount,
         status: 'approved',
         isApproved: true,
-        paymentMethod: deductFromMainBalance ? 'Al Mayadin Wallet' : 'Admin Cash/Direct Deposit',
+        paymentMethod: deductFromMainBalance ? 'BNB Wallet' : 'Admin Cash/Direct Deposit',
         description: adminNote || (deductFromMainBalance 
           ? `এডমিন প্যানেল কর্তৃক মেইন ব্যালেন্স থেকে ${monthNamesStr} সমবায় সঞ্চয় কিস্তি ৳${totalAmount.toLocaleString('bn-BD')} টাকা কর্তন ও সঞ্চয়ে জমা করা হয়েছে।`
           : `এডমিন কর্তৃক ${monthNamesStr} সমবায় সঞ্চয় কিস্তি ৳${totalAmount.toLocaleString('bn-BD')} টাকা সরাসরি সঞ্চয় হিসেবে জমা করা হয়েছে।`),
@@ -1057,7 +1057,7 @@ export async function processQuarterlyInstallmentPayment(
           amount: qRate,
           status: 'approved',
           isApproved: true,
-          paymentMethod: 'Al Mayadin Wallet',
+          paymentMethod: 'BNB Wallet',
           description: `সদস্য ${freshTarget.name || ''} (${freshTarget.memberId || ''})-এর ${qMonthName} ${year} ত্রৈমাসিক কিস্তি ৳${qRate.toLocaleString('bn-BD')} টাকা আপনার ওয়ালেট থেকে পরিশোধ করা হয়েছে।`,
           createdAt: nowIso,
           receiptNo: receiptCode
@@ -1125,7 +1125,7 @@ export async function processQuarterlyInstallmentPayment(
           amount: qRate,
           status: 'approved',
           isApproved: true,
-          paymentMethod: deductFromMainBalance ? 'Al Mayadin Wallet' : 'Direct Deposit',
+          paymentMethod: deductFromMainBalance ? 'BNB Wallet' : 'Direct Deposit',
           description: `মেইন ব্যালেন্স থেকে ${qMonthName} ${year} ত্রৈমাসিক অতিরিক্ত কিস্তি ৳${qRate.toLocaleString('bn-BD')} টাকা জমা দেওয়া হয়েছে।`,
           createdAt: nowIso,
           receiptNo: receiptCode
@@ -1287,7 +1287,7 @@ export async function processMultipleQuarterlyInstallmentsPayment(
           amount: totalRequired,
           status: 'approved',
           isApproved: true,
-          paymentMethod: 'Al Mayadin Wallet',
+          paymentMethod: 'BNB Wallet',
           description: `সদস্য ${freshTarget.name || ''} (${freshTarget.memberId || ''})-এর ${targetKeysToPay.length}টি ত্রৈমাসিক কিস্তি (${qNamesStr} ${year}) মোট ৳${totalRequired.toLocaleString('bn-BD')} আপনার ওয়ালেট থেকে পরিশোধ করা হয়েছে।`,
           createdAt: nowIso,
           receiptNo: receiptCode
@@ -1355,7 +1355,7 @@ export async function processMultipleQuarterlyInstallmentsPayment(
           amount: totalRequired,
           status: 'approved',
           isApproved: true,
-          paymentMethod: deductFromMainBalance ? 'Al Mayadin Wallet' : 'Direct Deposit',
+          paymentMethod: deductFromMainBalance ? 'BNB Wallet' : 'Direct Deposit',
           description: `মেইন ব্যালেন্স থেকে ${targetKeysToPay.length}টি ত্রৈমাসিক অতিরিক্ত কিস্তি (${qNamesStr} ${year}) বাবদ মোট ৳${totalRequired.toLocaleString('bn-BD')} টাকা জমা নেওয়া হয়েছে।`,
           createdAt: nowIso,
           receiptNo: receiptCode

@@ -1,3 +1,4 @@
+import { stripHeavyConfigFields } from '../lib/config';
 import React, { useState } from 'react';
 import { AppConfig } from '../types';
 import { db } from '../lib/firebase';
@@ -56,7 +57,7 @@ export const HistoryRetentionSettings: React.FC<HistoryRetentionSettingsProps> =
     try {
       const configRef = doc(db, 'system_settings', 'app_config');
       const updated = { ...appConfig, historyRetentionDays: daysToSave };
-      await setDoc(configRef, updated, { merge: true });
+      await setDoc(configRef, stripHeavyConfigFields(updated), { merge: true });
       onChangeConfig(updated);
       setSelectedDays(daysToSave);
 

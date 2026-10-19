@@ -118,9 +118,18 @@ export const BNBMobileBankingPortal: React.FC<BNBMobileBankingPortalProps> = ({
     if (isOtpModalOpen) { setIsOtpModalOpen(false); setPendingActionFn(null); return true; }
     if (isReceiptOpen) { setIsReceiptOpen(false); return true; }
     if (showSaveCardModal) { setShowSaveCardModal(false); return true; }
-    if (showMonthPopup) { setShowMonthPopup(false); return true; }
+    if (activeTab === 'auto_add_money') {
+      if (onClose) {
+        onClose();
+        return true;
+      }
+    }
     if (activeTab !== 'dashboard') {
       setActiveTab('dashboard');
+      return true;
+    }
+    if (onClose) {
+      onClose();
       return true;
     }
     return false;
@@ -2688,9 +2697,20 @@ const bankingTypes = ['add_money', 'deposit', 'withdraw', 'bill_pay', 'money_exc
 
         <div className="bg-white border border-slate-100 rounded-[2.5rem] shadow-2xl shadow-slate-200/50 overflow-hidden">
           <JenifyPaymentGateway 
-            onConfirm={(amount) => handleAutoPaymentSubmit(amount)}
-            onBack={() => setActiveTab('dashboard')}
-            isLoading={loading}
+            currentUser={user}
+            onBack={() => {
+              if (onClose) {
+                onClose();
+              } else {
+                setActiveTab('dashboard');
+              }
+            }}
+            onPaymentSuccess={() => {
+              syncLiveProfile();
+              if (onClose) {
+                onClose();
+              }
+            }}
           />
         </div>
 

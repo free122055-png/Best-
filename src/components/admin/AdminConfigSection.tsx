@@ -1,3 +1,4 @@
+import { AdminReceiptSection } from './AdminReceiptSection';
 import React, { useState, useEffect, useRef } from 'react';
 import { db } from '../../lib/firebase';
 import { SAMITY_MONTHS, SAMITY_YEARS, getUniquePaidMonthsCount, normalizePaidMonthsArray, getEffectiveBalance } from '../../types';
@@ -369,6 +370,9 @@ export function AdminConfigSection(props: any) {
     cfgSectionIcons,
     setCfgSectionIcons
   } = props;
+
+  const [configActiveSubTab, setConfigActiveSubTab] = useState<'app_params' | 'receipt_theme'>('app_params');
+
 
   return (
     <>
@@ -857,7 +861,29 @@ export function AdminConfigSection(props: any) {
         {/* TAB 7: SYSTEM CONFIGURATION */}
         {adminTab === 'config' && (
           <div className="space-y-6">
-            <form onSubmit={handleSaveConfig} className="space-y-6">
+            {/* Top Sub-Tab Navigation Bar inside Settings Section */}
+            <div className="flex items-center gap-2 p-1.5 bg-slate-900 text-white rounded-2xl border border-slate-800 shadow-md mb-2">
+              <button
+                type="button"
+                onClick={() => setConfigActiveSubTab('app_params')}
+                className={`flex-1 py-2.5 px-3 rounded-xl text-xs sm:text-sm font-black transition cursor-pointer flex items-center justify-center gap-2 ${configActiveSubTab === 'app_params' ? 'bg-gradient-to-r from-emerald-600 to-teal-700 text-white shadow-md ring-2 ring-emerald-400/50' : 'bg-white/5 hover:bg-white/10 text-slate-300'}`}
+              >
+                <span>⚙️</span>
+                <span>গ্লোবাল অ্যাপ কনফিগারেশন ও সিস্টেম প্যারামিটার</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setConfigActiveSubTab('receipt_theme')}
+                className={`flex-1 py-2.5 px-3 rounded-xl text-xs sm:text-sm font-black transition cursor-pointer flex items-center justify-center gap-2 ${configActiveSubTab === 'receipt_theme' ? 'bg-gradient-to-r from-purple-600 to-indigo-700 text-white shadow-md ring-2 ring-purple-400/50' : 'bg-white/5 hover:bg-white/10 text-slate-300'}`}
+              >
+                <span>🧾</span>
+                <span>রসিদ থিম ডিজাইন ও কালার কাস্টমাইজেশন</span>
+              </button>
+            </div>
+
+            {configActiveSubTab === 'app_params' && (
+              <div className="space-y-6">
+                <form onSubmit={handleSaveConfig} className="space-y-6">
             <div className="bg-slate-955 border border-slate-200/80 rounded-3xl p-6 space-y-6">
               <div className="border-b border-slate-200/80 pb-4">
                 <h3 className="text-base font-bold flex items-center gap-2 text-white text-left">
@@ -1784,7 +1810,13 @@ export function AdminConfigSection(props: any) {
 
           {/* HISTORY RETENTION SETTINGS & CLEANUP CONTROL */}
           <HistoryRetentionSettings appConfig={appConfig} onChangeConfig={onChangeConfig} />
-        </div>
+              </div>
+            )}
+
+            {configActiveSubTab === 'receipt_theme' && (
+              <AdminReceiptSection {...props} adminTab="receipt_admin" />
+            )}
+          </div>
         )}
 
         {/* TAB 7.5: RECEIPT & VOUCHER THEME DESIGNER */}

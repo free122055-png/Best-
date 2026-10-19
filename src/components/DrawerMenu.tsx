@@ -124,7 +124,7 @@ interface DrawerMenuProps {
   // FAQ Database
   const faqData = [
     {
-      q: 'Al Mayadin Bazar (BNB) সমবায় সমিতি কী?',
+      q: 'BNB Business Network Bangladesh সমবায় সমিতি কী?',
       a: 'BNB হচ্ছে গণপ্রজাতন্ত্রী বাংলাদেশ সরকারের বিধিমালা মেনে পরিচালিত একটি প্রগতিশীল অনলাইন ও অফলাইন ভিত্তিক সমবায় সঞ্চয় ও ঋণদান প্ল্যাটফর্ম। এর মূল উদ্দেশ্য সদস্যদের মাঝে অর্থনৈতিক বন্ধন সুদৃঢ় করা এবং গ্রামীণ ও ক্ষুদ্র ব্যবসায়ীদের সহজ শর্তে পুঁজির ব্যবস্থা করা।'
     },
     {
@@ -581,7 +581,7 @@ export const DrawerMenu = React.memo(function DrawerMenu({
                   </div>
                   <div>
                     <div className="flex items-center gap-1.5">
-                      <span className="text-xs font-black tracking-wider uppercase text-emerald-300">BNB Al Mayadin Bazar</span>
+                      <span className="text-xs font-black tracking-wider uppercase text-emerald-300">BNB Business Network Bangladesh</span>
                       <span className="bg-emerald-500/80 text-[8px] text-white px-1 py-0.5 rounded font-mono">v2.0</span>
                     </div>
                     <span className="bg-emerald-700/60 text-white font-mono text-[9px] px-2 py-0.5 rounded-md font-bold">Bangladesh</span>

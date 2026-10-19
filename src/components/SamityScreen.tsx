@@ -90,6 +90,8 @@ interface SamityScreenProps {
   appConfig?: AppConfig;
   allNotices?: any[];
   transactions?: Transaction[];
+  isAdminView?: boolean;
+  initialSubView?: 'main' | 'savings_dps' | 'loan_ledger' | 'profits' | 'member_registry' | 'withdraw_savings' | 'new_deposit' | 'monthly_investment_policy' | 'referral_network' | 'share_transfer' | 'register_other_member' | 'custom_savings' | 'admin' | 'our_investments' | string;
 }
 
 export const SamityScreen = React.memo(function SamityScreen({ 
@@ -101,11 +103,13 @@ export const SamityScreen = React.memo(function SamityScreen({
   setModalType,
   appConfig,
   allNotices = [],
-  transactions = []
+  transactions = [],
+  isAdminView = false,
+  initialSubView = 'main'
 }: SamityScreenProps) {
   
   // High-fidelity active sub-view state inside full-screen Samity option
-  const [activeSubView, setActiveSubView] = useState<'main' | 'savings_dps' | 'loan_ledger' | 'profits' | 'member_registry' | 'withdraw_savings' | 'new_deposit' | 'monthly_investment_policy' | 'referral_network' | 'share_transfer' | 'register_other_member' | 'custom_savings' | 'admin' | 'our_investments'>('main');
+  const [activeSubView, setActiveSubView] = useState<'main' | 'savings_dps' | 'loan_ledger' | 'profits' | 'member_registry' | 'withdraw_savings' | 'new_deposit' | 'monthly_investment_policy' | 'referral_network' | 'share_transfer' | 'register_other_member' | 'custom_savings' | 'admin' | 'our_investments'>((initialSubView as any) || 'main');
   const [bottomTab, setBottomTab] = useState<'home' | 'report' | 'messages' | 'profile'>('home');
 
   // States for registering other member
@@ -805,7 +809,7 @@ export const SamityScreen = React.memo(function SamityScreen({
           amount: liveTargetRate,
           status: 'approved',
           isApproved: true,
-          paymentMethod: 'Al Mayadin Wallet',
+          paymentMethod: 'BNB Wallet',
           description: `সদস্য কর্তৃক ওয়ালেট থেকে ${selectedPayMonth.name} ${payYear} সালের সমিতি সঞ্চয় কিস্তি ৳${liveTargetRate.toLocaleString('bn-BD')} জমা দেওয়া হয়েছে।`,
           createdAt: nowIso,
           receiptNo: `DEP-MONTH-${Date.now()}`
@@ -1917,12 +1921,12 @@ export const SamityScreen = React.memo(function SamityScreen({
           } else if (tx.type === 'coop_savings_deposit' || tx.type === 'samity_deposit') {
             updatedSavings += tx.amount;
             updatedDps += tx.amount;
-            if (tx.paymentMethod === 'Main Balance' || tx.paymentMethod === 'Al Mayadin Wallet' || tx.paymentMethod === 'মেইন ব্যালেন্স' || tx.paymentMethod === 'Wallet' || (tx as any).deductFromMain) {
+            if (tx.paymentMethod === 'Main Balance' || tx.paymentMethod === 'BNB Wallet' || tx.paymentMethod === 'মেইন ব্যালেন্স' || tx.paymentMethod === 'Wallet' || (tx as any).deductFromMain) {
               updatedBalance = Math.max(0, updatedBalance - tx.amount);
             }
           } else if (tx.type === 'loan_repayment') {
             updatedDueLoan = Math.max(0, updatedDueLoan - tx.amount);
-            if ((!tx.paymentMethod || tx.paymentMethod === 'Main Balance' || tx.paymentMethod === 'Al Mayadin Wallet' || tx.paymentMethod === 'মেইন ব্যালেন্স') && updatedBalance >= tx.amount) {
+            if ((!tx.paymentMethod || tx.paymentMethod === 'Main Balance' || tx.paymentMethod === 'BNB Wallet' || tx.paymentMethod === 'মেইন ব্যালেন্স') && updatedBalance >= tx.amount) {
               updatedBalance = Math.max(0, updatedBalance - tx.amount);
             }
           } else if (tx.type === 'coop_loan_apply') {
@@ -7605,7 +7609,7 @@ export const SamityScreen = React.memo(function SamityScreen({
           )}
         </AnimatePresence>
 
-      {/* Full-Screen Al Mayadin Payment Receipt Modal */}
+      {/* Full-Screen BNB Payment Receipt Modal */}
       <BNBPaymentReceiptModal
         isOpen={isReceiptOpen}
         onClose={() => setIsReceiptOpen(false)}

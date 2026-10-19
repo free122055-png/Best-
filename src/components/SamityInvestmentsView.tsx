@@ -49,6 +49,7 @@ interface SamityInvestmentsViewProps {
   user: User;
   onBack: () => void;
   isAdmin?: boolean;
+  hideHeader?: boolean;
 }
 
 const CATEGORIES: { id: SamityInvestmentCategory | 'all'; label: string; icon: any; color: string }[] = [
@@ -69,7 +70,7 @@ const PRESET_IMAGES = [
   { label: '🐟 মৎস্য ও ফিশারিজ', url: 'https://images.unsplash.com/photo-1522069169874-c58ec4b76be5?auto=format&fit=crop&w=1200&q=80' },
 ];
 
-export default function SamityInvestmentsView({ user, onBack, isAdmin }: SamityInvestmentsViewProps) {
+export default function SamityInvestmentsView({ user, onBack, isAdmin, hideHeader = false }: SamityInvestmentsViewProps) {
   const [investments, setInvestments] = useState<SamityInvestment[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedCategory, setSelectedCategory] = useState<SamityInvestmentCategory | 'all'>('all');
@@ -797,93 +798,95 @@ export default function SamityInvestmentsView({ user, onBack, isAdmin }: SamityI
     <div className="space-y-3 sm:space-y-4 pb-20 text-left max-w-2xl mx-auto">
       
       {/* 1. Header Navigation Bar */}
-      <div className="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white rounded-2xl p-3 sm:p-4 shadow-md relative overflow-hidden border border-indigo-500/30">
-        <div className="absolute -right-10 -bottom-10 w-40 h-40 bg-emerald-500/10 rounded-full blur-2xl pointer-events-none" />
-        
-        <div className="flex items-center justify-between gap-2 relative z-10">
-          <div className="flex items-center gap-2 sm:gap-3">
-            <UnifiedBackButton
-              onClick={() => handleStepBack()}
-              variant="dark"
-              title="পিছনে যান"
-            />
-            <div>
-              <div className="flex items-center gap-1.5">
-                <h2 className="text-base sm:text-lg font-black tracking-tight text-white flex items-center gap-1.5">
-                  <TrendingUp className="w-5 h-5 text-emerald-400" />
-                  আমাদের ইনভেস্ট (Our Investments)
-                </h2>
-                <span className="px-2 py-0.5 bg-emerald-500/20 text-emerald-300 border border-emerald-400/30 rounded-full text-[9px] font-black uppercase tracking-wider animate-pulse">
-                  লাইভ
-                </span>
+      {!hideHeader && (
+        <div className="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white rounded-2xl p-3 sm:p-4 shadow-md relative overflow-hidden border border-indigo-500/30">
+          <div className="absolute -right-10 -bottom-10 w-40 h-40 bg-emerald-500/10 rounded-full blur-2xl pointer-events-none" />
+          
+          <div className="flex items-center justify-between gap-2 relative z-10">
+            <div className="flex items-center gap-2 sm:gap-3">
+              <UnifiedBackButton
+                onClick={() => handleStepBack()}
+                variant="dark"
+                title="পিছনে যান"
+              />
+              <div>
+                <div className="flex items-center gap-1.5">
+                  <h2 className="text-base sm:text-lg font-black tracking-tight text-white flex items-center gap-1.5">
+                    <TrendingUp className="w-5 h-5 text-emerald-400" />
+                    আমাদের ইনভেস্ট (Our Investments)
+                  </h2>
+                  <span className="px-2 py-0.5 bg-emerald-500/20 text-emerald-300 border border-emerald-400/30 rounded-full text-[9px] font-black uppercase tracking-wider animate-pulse">
+                    লাইভ
+                  </span>
+                </div>
+                <p className="text-[10px] sm:text-xs text-slate-300 font-medium mt-0.5">
+                  স্বর্ণ, জমি ও লাভজনক প্রকল্পের স্বচ্ছ ক্রয়-বিক্রয় ও লাভ হিসেব
+                </p>
               </div>
-              <p className="text-[10px] sm:text-xs text-slate-300 font-medium mt-0.5">
-                স্বর্ণ, জমি ও লাভজনক প্রকল্পের স্বচ্ছ ক্রয়-বিক্রয় ও লাভ হিসেব
-              </p>
             </div>
-          </div>
 
-          {/* Admin Create & Manage Action Buttons */}
-          {isUserAdmin && (
-            <div className="flex items-center gap-1.5 shrink-0">
-              {investments.length > 0 && (
+            {/* Admin Create & Manage Action Buttons */}
+            {isUserAdmin && (
+              <div className="flex items-center gap-1.5 shrink-0">
+                {investments.length > 0 && (
+                  <button
+                    onClick={() => setShowDeleteAllModal(true)}
+                    className="px-2.5 py-1.5 sm:px-3 sm:py-2 bg-rose-600/90 hover:bg-rose-700 active:scale-95 text-white rounded-xl text-[11px] sm:text-xs font-black shadow-md flex items-center gap-1 transition cursor-pointer border border-rose-400/40"
+                    title="সকল ডেমো পোস্ট মুছে হিসাব 0 করুন"
+                  >
+                    <RotateCcw className="w-3.5 h-3.5" />
+                    <span className="hidden sm:inline">সব মুছুন (0 করুন)</span>
+                    <span className="sm:hidden">0 করুন</span>
+                  </button>
+                )}
                 <button
-                  onClick={() => setShowDeleteAllModal(true)}
-                  className="px-2.5 py-1.5 sm:px-3 sm:py-2 bg-rose-600/90 hover:bg-rose-700 active:scale-95 text-white rounded-xl text-[11px] sm:text-xs font-black shadow-md flex items-center gap-1 transition cursor-pointer border border-rose-400/40"
-                  title="সকল ডেমো পোস্ট মুছে হিসাব 0 করুন"
+                  onClick={handleOpenCreateModal}
+                  className="px-3 py-1.5 sm:px-3.5 sm:py-2 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white rounded-xl text-xs font-black shadow-md flex items-center gap-1.5 active:scale-95 transition cursor-pointer"
                 >
-                  <RotateCcw className="w-3.5 h-3.5" />
-                  <span className="hidden sm:inline">সব মুছুন (0 করুন)</span>
-                  <span className="sm:hidden">0 করুন</span>
+                  <Plus className="w-4 h-4 stroke-[3]" />
+                  <span className="hidden sm:inline">নতুন পোস্ট</span>
+                  <span className="sm:hidden">পোস্ট</span>
                 </button>
-              )}
-              <button
-                onClick={handleOpenCreateModal}
-                className="px-3 py-1.5 sm:px-3.5 sm:py-2 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white rounded-xl text-xs font-black shadow-md flex items-center gap-1.5 active:scale-95 transition cursor-pointer"
-              >
-                <Plus className="w-4 h-4 stroke-[3]" />
-                <span className="hidden sm:inline">নতুন পোস্ট</span>
-                <span className="sm:hidden">পোস্ট</span>
-              </button>
+              </div>
+            )}
+          </div>
+
+          {/* Aggregate Stats Summary Bar (4 Cards in a SINGLE Sleek Row) */}
+          <div className="grid grid-cols-4 gap-1 sm:gap-2 mt-2 pt-2 border-t border-white/10 relative z-10 text-center">
+            {/* Card 1: মোট ক্রয় */}
+            <div className="bg-white/5 border border-white/10 rounded-xl py-1 px-1 sm:py-1.5 sm:px-2 flex flex-col justify-center">
+              <span className="block text-[7.5px] sm:text-[9.5px] text-slate-300 font-semibold truncate leading-tight">মোট ক্রয়</span>
+              <strong className="text-[10px] sm:text-xs font-black text-emerald-400 font-mono block mt-0.5 leading-tight truncate">
+                ৳{formatBnNum(totalInvestedAmount)}
+              </strong>
             </div>
-          )}
-        </div>
 
-        {/* Aggregate Stats Summary Bar (4 Cards in a SINGLE Sleek Row) */}
-        <div className="grid grid-cols-4 gap-1 sm:gap-2 mt-2 pt-2 border-t border-white/10 relative z-10 text-center">
-          {/* Card 1: মোট ক্রয় */}
-          <div className="bg-white/5 border border-white/10 rounded-xl py-1 px-1 sm:py-1.5 sm:px-2 flex flex-col justify-center">
-            <span className="block text-[7.5px] sm:text-[9.5px] text-slate-300 font-semibold truncate leading-tight">মোট ক্রয়</span>
-            <strong className="text-[10px] sm:text-xs font-black text-emerald-400 font-mono block mt-0.5 leading-tight truncate">
-              ৳{formatBnNum(totalInvestedAmount)}
-            </strong>
-          </div>
+            {/* Card 2: মোট বিক্রি */}
+            <div className="bg-white/5 border border-white/10 rounded-xl py-1 px-1 sm:py-1.5 sm:px-2 flex flex-col justify-center">
+              <span className="block text-[7.5px] sm:text-[9.5px] text-cyan-300 font-semibold truncate leading-tight">মোট বিক্রি</span>
+              <strong className="text-[10px] sm:text-xs font-black text-cyan-300 font-mono block mt-0.5 leading-tight truncate">
+                ৳{formatBnNum(totalSoldAmount)}
+              </strong>
+            </div>
 
-          {/* Card 2: মোট বিক্রি */}
-          <div className="bg-white/5 border border-white/10 rounded-xl py-1 px-1 sm:py-1.5 sm:px-2 flex flex-col justify-center">
-            <span className="block text-[7.5px] sm:text-[9.5px] text-cyan-300 font-semibold truncate leading-tight">মোট বিক্রি</span>
-            <strong className="text-[10px] sm:text-xs font-black text-cyan-300 font-mono block mt-0.5 leading-tight truncate">
-              ৳{formatBnNum(totalSoldAmount)}
-            </strong>
-          </div>
+            {/* Card 3: নিট মুনাফা */}
+            <div className="bg-white/5 border border-white/10 rounded-xl py-1 px-1 sm:py-1.5 sm:px-2 flex flex-col justify-center">
+              <span className="block text-[7.5px] sm:text-[9.5px] text-amber-300 font-semibold truncate leading-tight">নিট মুনাফা</span>
+              <strong className="text-[10px] sm:text-xs font-black text-amber-300 font-mono block mt-0.5 leading-tight truncate">
+                ৳{formatBnNum(totalRealizedProfits)}
+              </strong>
+            </div>
 
-          {/* Card 3: নিট মুনাফা */}
-          <div className="bg-white/5 border border-white/10 rounded-xl py-1 px-1 sm:py-1.5 sm:px-2 flex flex-col justify-center">
-            <span className="block text-[7.5px] sm:text-[9.5px] text-amber-300 font-semibold truncate leading-tight">নিট মুনাফা</span>
-            <strong className="text-[10px] sm:text-xs font-black text-amber-300 font-mono block mt-0.5 leading-tight truncate">
-              ৳{formatBnNum(totalRealizedProfits)}
-            </strong>
-          </div>
-
-          {/* Card 4: মোট প্রজেক্ট */}
-          <div className="bg-white/5 border border-white/10 rounded-xl py-1 px-1 sm:py-1.5 sm:px-2 flex flex-col justify-center">
-            <span className="block text-[7.5px] sm:text-[9.5px] text-indigo-300 font-semibold truncate leading-tight">মোট প্রজেক্ট</span>
-            <strong className="text-[10px] sm:text-xs font-black text-white font-mono block mt-0.5 leading-tight truncate">
-              {formatBnNum(investments.length)}টি ({formatBnNum(soldCount)})
-            </strong>
+            {/* Card 4: মোট প্রজেক্ট */}
+            <div className="bg-white/5 border border-white/10 rounded-xl py-1 px-1 sm:py-1.5 sm:px-2 flex flex-col justify-center">
+              <span className="block text-[7.5px] sm:text-[9.5px] text-indigo-300 font-semibold truncate leading-tight">মোট প্রজেক্ট</span>
+              <strong className="text-[10px] sm:text-xs font-black text-white font-mono block mt-0.5 leading-tight truncate">
+                {formatBnNum(investments.length)}টি ({formatBnNum(soldCount)})
+              </strong>
+            </div>
           </div>
         </div>
-      </div>
+      )}
 
       {/* 2. Category Filter Tabs */}
       <div className="flex items-center gap-1.5 overflow-x-auto pb-1 no-scrollbar text-xs">

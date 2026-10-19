@@ -1,3 +1,4 @@
+import { stripHeavyConfigFields } from '../lib/config';
 import React, { useState, useEffect } from 'react';
 import { db } from '../lib/firebase';
 import { 
@@ -489,7 +490,7 @@ export default function BNBSalaryAdmin({ onBack }: BNBSalaryAdminProps) {
         createdAt: new Date().toISOString()
       };
 
-      await setDoc(configRef, data, { merge: true });
+      await setDoc(configRef, stripHeavyConfigFields(data), { merge: true });
 
       await sendInboxNotification(
         userIdToUse,

@@ -2435,7 +2435,7 @@ export const SafeDealsEscrowView = React.memo(function SafeDealsEscrowView({
                   <h3 className="text-sm font-black text-slate-800 flex items-center gap-1.5">
                     <ShieldCheck className="w-5 h-5 text-emerald-600" /> অ্যাডমিন সাপোর্ট ও ট্র্যাকিং সেন্টার
                   </h3>
-                  <p className="text-[10px] text-slate-450 font-bold">Al Mayadin Bazar (BNB)</p>
+                  <p className="text-[10px] text-slate-450 font-bold">BNB Business Network Bangladesh</p>
                 </div>
                 <button 
                   type="button"

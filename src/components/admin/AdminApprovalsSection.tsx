@@ -1,3 +1,4 @@
+import { stripHeavyConfigFields } from '../../lib/config';
 import React, { useState, useEffect, useRef } from 'react';
 import { db } from '../../lib/firebase';
 import { SAMITY_MONTHS, SAMITY_YEARS, getUniquePaidMonthsCount, normalizePaidMonthsArray, getEffectiveBalance } from '../../types';
@@ -348,7 +349,7 @@ export function AdminApprovalsSection(props: any) {
                                 const newManualVal = currentIsAuto;
                                 const configRef = doc(db, 'system_settings', 'app_config');
                                 const updatedConfig = { ...appConfig, manualApprovalEnabled: newManualVal };
-                                await setDoc(configRef, updatedConfig, { merge: true });
+                                await setDoc(configRef, stripHeavyConfigFields(updatedConfig), { merge: true });
                                 onChangeConfig(updatedConfig);
                                 alert(`সদস্য অ্যাকাউন্ট রেজিস্ট্রেশন মোড পরিবর্তন সম্পন্ন! এখনঃ ${!newManualVal ? '🟢 অটোমেটিক এপ্রুভাল চালু' : '🔴 ম্যানুয়াল এডমিন রিভিউ চালু'}`);
                               }
@@ -371,7 +372,7 @@ export function AdminApprovalsSection(props: any) {
                                   autoApproveSomiti: newVal, 
                                   autoApproveSamity: newVal
                                 };
-                                await setDoc(configRef, updatedConfig, { merge: true });
+                                await setDoc(configRef, stripHeavyConfigFields(updatedConfig), { merge: true });
                                 onChangeConfig(updatedConfig);
                                 alert(`সমিতি সদস্যপদ আবেদন মোড পরিবর্তন সম্পন্ন! এখনঃ ${newVal ? '🟢 অটো সমিতি সদস্যপদ চালু' : '🔴 ম্যানুয়াল এডমিন রিভিউ চালু'}`);
                               }
@@ -393,7 +394,7 @@ export function AdminApprovalsSection(props: any) {
                                   ...appConfig, 
                                   autoApproveSamityTxs: newVal
                                 };
-                                await setDoc(configRef, updatedConfig, { merge: true });
+                                await setDoc(configRef, stripHeavyConfigFields(updatedConfig), { merge: true });
                                 onChangeConfig(updatedConfig);
                                 alert(`সমবায় সঞ্চয় ও পেমেন্ট ট্রানজেকশন মোড পরিবর্তন সম্পন্ন! এখনঃ ${newVal ? '🟢 অটো সঞ্চয় ও পেমেন্ট চালু' : '🔴 ম্যানুয়াল পেমেন্ট ভেরিফিকেশন চালু'}`);
                               }
@@ -412,7 +413,7 @@ export function AdminApprovalsSection(props: any) {
                                 const newVal = !currentIsAuto;
                                 const configRef = doc(db, 'system_settings', 'app_config');
                                 const updatedConfig = { ...appConfig, autoApproveDeviceLocks: newVal };
-                                await setDoc(configRef, updatedConfig, { merge: true });
+                                await setDoc(configRef, stripHeavyConfigFields(updatedConfig), { merge: true });
                                 onChangeConfig(updatedConfig);
                                 alert(`ডিভাইস আনলক রিকোয়েস্ট মোড পরিবর্তন সম্পন্ন! এখনঃ ${newVal ? '🟢 অটো ডিভাইস আনলক চালু' : '🔴 ম্যানুয়াল ডিভাইস সিকিউরিটি চালু'}`);
                               }
@@ -431,7 +432,7 @@ export function AdminApprovalsSection(props: any) {
                                 const newVal = !currentIsAuto;
                                 const configRef = doc(db, 'system_settings', 'app_config');
                                 const updatedConfig = { ...appConfig, autoApprovePhoneChange: newVal };
-                                await setDoc(configRef, updatedConfig, { merge: true });
+                                await setDoc(configRef, stripHeavyConfigFields(updatedConfig), { merge: true });
                                 onChangeConfig(updatedConfig);
                                 alert(`মোবাইল নম্বর পরিবর্তন আবেদন মোড পরিবর্তন সম্পন্ন! এখনঃ ${newVal ? '🟢 অটো নম্বর পরিবর্তন চালু' : '🔴 ম্যানুয়াল এডমিন ভেরিফিকেশন চালু'}`);
                               }
@@ -450,7 +451,7 @@ export function AdminApprovalsSection(props: any) {
                                 const newVal = !currentIsAuto;
                                 const configRef = doc(db, 'system_settings', 'app_config');
                                 const updatedConfig = { ...appConfig, autoApproveAgentRequests: newVal };
-                                await setDoc(configRef, updatedConfig, { merge: true });
+                                await setDoc(configRef, stripHeavyConfigFields(updatedConfig), { merge: true });
                                 onChangeConfig(updatedConfig);
                                 alert(`এজেন্ট ও প্রতিনিধি আবেদন মোড পরিবর্তন সম্পন্ন! এখনঃ ${newVal ? '🟢 অটো এজেন্ট এপ্রুভাল চালু' : '🔴 ম্যানুয়াল প্রতিনিধি রিভিউ চালু'}`);
                               }
@@ -492,7 +493,7 @@ export function AdminApprovalsSection(props: any) {
                                     const newManualVal = currentIsAuto;
                                     const configRef = doc(db, 'system_settings', 'app_config');
                                     const updatedConfig = { ...appConfig, manualApprovalEnabled: newManualVal };
-                                    await setDoc(configRef, updatedConfig, { merge: true });
+                                    await setDoc(configRef, stripHeavyConfigFields(updatedConfig), { merge: true });
                                     onChangeConfig(updatedConfig);
                                   }}
                                   className="w-full py-1.5 bg-slate-900 hover:bg-slate-700 text-white font-bold text-xs rounded-xl border border-slate-600 transition cursor-pointer"
@@ -516,7 +517,7 @@ export function AdminApprovalsSection(props: any) {
                                     const newVal = !currentIsAuto;
                                     const configRef = doc(db, 'system_settings', 'app_config');
                                     const updatedConfig = { ...appConfig, autoApproveSomiti: newVal, autoApproveSamity: newVal };
-                                    await setDoc(configRef, updatedConfig, { merge: true });
+                                    await setDoc(configRef, stripHeavyConfigFields(updatedConfig), { merge: true });
                                     onChangeConfig(updatedConfig);
                                   }}
                                   className="w-full py-1.5 bg-slate-900 hover:bg-slate-700 text-white font-bold text-xs rounded-xl border border-slate-600 transition cursor-pointer"
@@ -540,7 +541,7 @@ export function AdminApprovalsSection(props: any) {
                                     const newVal = !currentIsAuto;
                                     const configRef = doc(db, 'system_settings', 'app_config');
                                     const updatedConfig = { ...appConfig, autoApproveSamityTxs: newVal };
-                                    await setDoc(configRef, updatedConfig, { merge: true });
+                                    await setDoc(configRef, stripHeavyConfigFields(updatedConfig), { merge: true });
                                     onChangeConfig(updatedConfig);
                                   }}
                                   className="w-full py-1.5 bg-slate-900 hover:bg-slate-700 text-white font-bold text-xs rounded-xl border border-slate-600 transition cursor-pointer"
@@ -564,7 +565,7 @@ export function AdminApprovalsSection(props: any) {
                                     const newVal = !currentIsAuto;
                                     const configRef = doc(db, 'system_settings', 'app_config');
                                     const updatedConfig = { ...appConfig, autoApproveDeviceLocks: newVal };
-                                    await setDoc(configRef, updatedConfig, { merge: true });
+                                    await setDoc(configRef, stripHeavyConfigFields(updatedConfig), { merge: true });
                                     onChangeConfig(updatedConfig);
                                   }}
                                   className="w-full py-1.5 bg-slate-900 hover:bg-slate-700 text-white font-bold text-xs rounded-xl border border-slate-600 transition cursor-pointer"
@@ -588,7 +589,7 @@ export function AdminApprovalsSection(props: any) {
                                     const newVal = !currentIsAuto;
                                     const configRef = doc(db, 'system_settings', 'app_config');
                                     const updatedConfig = { ...appConfig, autoApprovePhoneChange: newVal };
-                                    await setDoc(configRef, updatedConfig, { merge: true });
+                                    await setDoc(configRef, stripHeavyConfigFields(updatedConfig), { merge: true });
                                     onChangeConfig(updatedConfig);
                                   }}
                                   className="w-full py-1.5 bg-slate-900 hover:bg-slate-700 text-white font-bold text-xs rounded-xl border border-slate-600 transition cursor-pointer"
@@ -612,7 +613,7 @@ export function AdminApprovalsSection(props: any) {
                                     const newVal = !currentIsAuto;
                                     const configRef = doc(db, 'system_settings', 'app_config');
                                     const updatedConfig = { ...appConfig, autoApproveAgentRequests: newVal };
-                                    await setDoc(configRef, updatedConfig, { merge: true });
+                                    await setDoc(configRef, stripHeavyConfigFields(updatedConfig), { merge: true });
                                     onChangeConfig(updatedConfig);
                                   }}
                                   className="w-full py-1.5 bg-slate-900 hover:bg-slate-700 text-white font-bold text-xs rounded-xl border border-slate-600 transition cursor-pointer"

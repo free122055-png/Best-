@@ -1830,7 +1830,7 @@ export const BNBTelecomScreen = React.memo(function BNBTelecomScreen({
     </>
   )}
 
-      {/* Full-Screen Al Mayadin Payment Receipt Modal */}
+      {/* Full-Screen BNB Payment Receipt Modal */}
       <BNBPaymentReceiptModal
         isOpen={isReceiptOpen}
         onClose={() => setIsReceiptOpen(false)}

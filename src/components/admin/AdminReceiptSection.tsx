@@ -301,7 +301,7 @@ export function AdminReceiptSection(props: any) {
 
   return (
     <>
-        {adminTab === 'receipt_admin' && (
+        {(adminTab === 'receipt_admin' || adminTab === 'config') && (
           <div className="space-y-6 text-left text-slate-800">
             {/* Success & Error alerts */}
             {receiptSuccess && (

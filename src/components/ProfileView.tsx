@@ -1050,7 +1050,7 @@ export default function ProfileView({ user, onUpdate, onTriggerAdmin, appConfig 
         {/* Line 2: Member ID, Photo Crop, Avatar & Remove Button (2য় লাইন) */}
         <div className="flex items-center justify-center gap-2 text-[10px] sm:text-[10.5px] font-medium text-emerald-200/90 flex-wrap pt-1.5 border-t border-emerald-800/40">
           <span className="font-mono font-bold text-emerald-300">
-            সমবায় আইডিঃ {user.memberId}
+            ইউজার আইডিঃ {user.memberId}
           </span>
           <span className="text-emerald-500/60">•</span>
           <button

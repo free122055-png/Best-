@@ -491,7 +491,7 @@ export default function LockScreen({
             )}
           </div>
           <h1 className="text-base font-black tracking-wider text-emerald-850 uppercase text-center">
-            {appConfig?.appName || 'BNB BUSINESS NETWORK BANGLADESH'}
+            {appConfig?.appName || 'BNB Business Network Bangladesh'}
           </h1>
           <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">DIGITAL SAMITY SYSTEM</p>
         </div>

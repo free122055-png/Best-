@@ -274,7 +274,7 @@ export const RationCardView = React.memo(function RationCardView({ liveUser, syn
                     BNB
                   </h2>
                   <p className="text-[10px] text-slate-800 font-extrabold tracking-wider leading-none mt-1 uppercase">
-                    AL MAYADIN BAZAR
+                    BNB BUSINESS NETWORK BANGLADESH
                   </p>
                 </div>
               </div>

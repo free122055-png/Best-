@@ -120,6 +120,14 @@ class NavigationManager {
           const handled = item.handler();
           if (handled) {
             // Handled by active sub-modal, tab, or sub-page!
+            this.lastBackPressTime = 0;
+            if (this.exitTimer) {
+              clearTimeout(this.exitTimer);
+              this.exitTimer = null;
+            }
+            if (this.showExitToastCallback) {
+              this.showExitToastCallback(false);
+            }
             return true;
           }
         } catch (err) {

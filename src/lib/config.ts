@@ -1,8 +1,16 @@
 
 export function stripHeavyConfigFields(configObj: any): any {
   if (!configObj || typeof configObj !== 'object') return configObj;
-  const { customGridIcons, sectionIcons, mandatoryNoticeResponses, ...clean } = configObj;
-  return clean;
+  const { customGridIcons, sectionIcons, mandatoryNoticeResponses, noticeResponses, ...clean } = configObj;
+  
+  const result: Record<string, any> = {};
+  for (const [key, value] of Object.entries(clean)) {
+    if (typeof value === 'string' && value.length > 20000 && value.startsWith('data:')) {
+      continue;
+    }
+    result[key] = value;
+  }
+  return result;
 }
 
 import { db } from './firebase';
@@ -147,7 +155,7 @@ export const DEFAULT_CONFIG: AppConfig = {
     about: "BNB লক্ষ্যমাত্রা সেকশন নোটিশ: প্রতিষ্ঠানের কর্পোরেট লক্ষ্য, ভিশন, আগামী দিনের পরিকল্পনা এবং নিয়মনীতি বিস্তারিত পড়ুন।",
     courier: "BNB কুরিয়ার সেকশন নোটিশ: সারাদেশে সুপার ফাস্ট পার্সেল ও লজিস্টিকস ডেলিভারি বুকিং সহজেই গ্রহণ করুন।"
   },
-  appName: "BNB Al Mayadin Bazar",
+  appName: "BNB Business Network Bangladesh",
   personalMfsNumber: "01865911728",
   personalBankCard: "4840610010369801",
   supportPhone: "01865911728",
@@ -409,7 +417,19 @@ export async function loadAppConfig(): Promise<AppConfig> {
 
     let data: any = {};
     if (docSnap && docSnap.exists()) {
-      data = docSnap.data() as any;
+      const rawDocData = docSnap.data() as any;
+      if (rawDocData.customGridIcons || rawDocData.sectionIcons || rawDocData.mandatoryNoticeResponses) {
+        const legacyIcons = { ...(rawDocData.customGridIcons || {}), ...(rawDocData.sectionIcons || {}) };
+        if (Object.keys(legacyIcons).length > 0) {
+          setDoc(iconsRef, legacyIcons, { merge: true }).catch(() => null);
+        }
+        updateDoc(configRef, {
+          customGridIcons: deleteField(),
+          sectionIcons: deleteField(),
+          mandatoryNoticeResponses: deleteField()
+        }).catch(() => null);
+      }
+      data = rawDocData;
     } else if (mainSnap && mainSnap.exists()) {
       data = mainSnap.data() as any;
     }
@@ -419,39 +439,10 @@ export async function loadAppConfig(): Promise<AppConfig> {
       iconsData = (iconsSnap.data() as Record<string, string>) || {};
     }
 
-    // Migration: If legacy oversized customGridIcons/sectionIcons/mandatoryNoticeResponses exist in app_config, move & delete to keep document < 20 KB
-    const legacyIcons = { ...(data.customGridIcons || {}), ...(data.sectionIcons || {}) };
-    const legacyResponses = data.mandatoryNoticeResponses;
-
-    if (Object.keys(legacyIcons).length > 0 || legacyResponses) {
-      console.log("[Config Migration] Migrating heavy fields out of app_config to shrink document size below 1MB limit...");
-      
-      if (Object.keys(legacyIcons).length > 0) {
-        iconsData = { ...legacyIcons, ...iconsData };
-        await setDoc(iconsRef, iconsData, { merge: true }).catch(() => null);
-      }
-
-      if (legacyResponses) {
-        await setDoc(responsesRef, legacyResponses, { merge: true }).catch(() => null);
-      }
-
-      const cleanupPayload = {
-        customGridIcons: deleteField(),
-        sectionIcons: deleteField(),
-        mandatoryNoticeResponses: deleteField()
-      };
-
-      if (docSnap && docSnap.exists()) {
-        await updateDoc(configRef, cleanupPayload).catch(() => null);
-      }
-      if (mainSnap && mainSnap.exists()) {
-        await updateDoc(mainConfigRef, cleanupPayload).catch(() => null);
-      }
-
-      delete data.customGridIcons;
-      delete data.sectionIcons;
-      delete data.mandatoryNoticeResponses;
-    }
+    // Migration: Safely strip heavy fields from local data object to prevent writing oversized payload back to Firestore
+    delete data.customGridIcons;
+    delete data.sectionIcons;
+    delete data.mandatoryNoticeResponses;
 
     if (!iconsData.samity) {
       iconsData.samity = "/samity_logo.svg";
@@ -477,7 +468,7 @@ export async function loadAppConfig(): Promise<AppConfig> {
     }
     if (updated) {
       try {
-        const { sectionIcons: _discard, ...toSave } = data;
+        const toSave = stripHeavyConfigFields(data);
         await setDoc(configRef, toSave, { merge: true });
       } catch (e) {
         console.error("Failed to migrate app config in Firestore:", e);

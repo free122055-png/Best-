@@ -669,7 +669,7 @@ export default function BNBAutoSalaryPay({ user, onBack, syncLiveProfile, appCon
                   Company ID: {config.companyId}
                 </p>
                 <div className="flex flex-wrap items-center gap-2 mt-2">
-                  <span className="text-[10.5px] font-black text-slate-500">Al Mayadin Wallet Balance</span>
+                  <span className="text-[10.5px] font-black text-slate-500">BNB Wallet Balance</span>
                   <div className="flex items-center gap-1 text-[#00a884] font-black text-sm">
                     <span>৳</span>
                     <span>{formatMoney(user?.balance || 0)}</span>
@@ -1019,7 +1019,7 @@ export default function BNBAutoSalaryPay({ user, onBack, syncLiveProfile, appCon
                   <div>
                     <span className="text-[10px] font-extrabold text-slate-400 block">পেমেন্ট মাধ্যম</span>
                     <span className="text-[12px] font-black text-slate-600 mt-1 block">
-                      {selectedEmployee.status === 'Paid' ? 'Al Mayadin Wallet' : '-'}
+                      {selectedEmployee.status === 'Paid' ? 'BNB Wallet' : '-'}
                     </span>
                   </div>
                 </div>

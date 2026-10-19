@@ -1,3 +1,4 @@
+import { stripHeavyConfigFields } from '../lib/config';
 import { AdminNoticesBapSection } from './admin/AdminNoticesBapSection';
 import { AdminDashboardOverview } from './admin/AdminDashboardOverview';
 import { AdminSamitySection } from './admin/AdminSamitySection';
@@ -19,7 +20,6 @@ import { AdminBottomModals } from './admin/AdminBottomModals';
 import AdminSalarySection from './admin/AdminSalarySection';
 import AdminAutoRechargeSection from './admin/AdminAutoRechargeSection';
 import AdminBillPaySection from './admin/AdminBillPaySection';
-import { BNBSmsGatewayDashboard } from './BNBSmsGatewayDashboard';
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { db } from '../lib/firebase';
 import { SAMITY_MONTHS, SAMITY_YEARS, getUniquePaidMonthsCount, normalizePaidMonthsArray, getEffectiveBalance } from '../types';
@@ -1613,7 +1613,7 @@ export default function AdminPanel(props: AdminPanelProps) {
           };
           
           const configRef = doc(db, 'system_settings', 'app_config');
-          await setDoc(configRef, updatedConfig, { merge: true });
+          await setDoc(configRef, stripHeavyConfigFields(updatedConfig), { merge: true });
           onChangeConfig(updatedConfig);
           setCfgOneSignalAppId("");
           setCfgOneSignalRestApiKey("");
@@ -1915,7 +1915,7 @@ export default function AdminPanel(props: AdminPanelProps) {
         };
         
         const configRef = doc(db, 'system_settings', 'app_config');
-        await setDoc(configRef, updatedConfig, { merge: true });
+        await setDoc(configRef, stripHeavyConfigFields(updatedConfig), { merge: true });
         onChangeConfig(updatedConfig);
         
         setIntegSuccessMessage(`✅ জেসন সফলভাবে পড়া হয়েছে এবং "${name}" গেটওয়েটি "${targetSectionKey}" সেকশনের জন্য স্বয়ংক্রিয়ভাবে সেভ ও সক্রিয় করা হয়েছে! আলাদা কোনো ফর্ম পূরণ বা সাবমিট করতে হবে না।`);
@@ -2012,7 +2012,7 @@ export default function AdminPanel(props: AdminPanelProps) {
           };
           
           const configRef = doc(db, 'system_settings', 'app_config');
-          await setDoc(configRef, updatedConfig, { merge: true });
+          await setDoc(configRef, stripHeavyConfigFields(updatedConfig), { merge: true });
           onChangeConfig(updatedConfig);
           alert('সফটওয়্যার ইন্টিগ্রেশনটি সফলভাবে ডিলিট করা হয়েছে। সেকশনটি এখন ডিফল্ট মোডে সক্রিয়।');
         } catch (err: any) {
@@ -4018,7 +4018,7 @@ export default function AdminPanel(props: AdminPanelProps) {
 
   useEffect(() => {
     const banners = dbQardBanners.length > 0 ? dbQardBanners : [
-      { id: 1, tag: "সঞ্চয় ও বিনিয়োগ", title: "Al Mayadin Bazar", description: "নিরাপদে আপনার আমানত সঞ্চয় করুন ও সহজ ঋণের সুবিধা গ্রহণ করুন।", image: "https://images.unsplash.com/photo-1579621970563-ebec7560ff3e?auto=format&fit=crop&q=80&w=650" },
+      { id: 1, tag: "সঞ্চয় ও বিনিয়োগ", title: "BNB Business Network Bangladesh", description: "নিরাপদে আপনার আমানত সঞ্চয় করুন ও সহজ ঋণের সুবিধা গ্রহণ করুন।", image: "https://images.unsplash.com/photo-1579621970563-ebec7560ff3e?auto=format&fit=crop&q=80&w=650" },
       { id: 2, tag: "টেলিকম অফার", title: "BNB টেলিকম রিচার্জ", description: "সব অপারেটরে আকর্ষণীয় ক্যাশব্যাক ও সুপার ফাস্ট ফ্লেক্সিলোড ড্রাইভে অফার!", image: "https://images.unsplash.com/photo-1511707171634-5f897ff02aa9?auto=format&fit=crop&q=80&w=650" },
       { id: 3, tag: "সুদমুক্ত ঋণ", title: "করযে হাসানা কল্যাণ তহবিল", description: "সব মেম্বারদের জন্য বিপদের সময়ে স্বস্তি ও সুদমুক্ত করযে হাসানা ঋণ সমাধান!", image: "https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?auto=format&fit=crop&q=80&w=650" }
     ];
@@ -4167,7 +4167,13 @@ export default function AdminPanel(props: AdminPanelProps) {
 
   const fetchTransactionsFromDb = async (): Promise<Transaction[]> => {
     try {
-      const querySnapshot = await getDocs(collection(db, 'transactions'));
+      let querySnapshot;
+      try {
+        const qTxs = query(collection(db, 'transactions'), orderBy('createdAt', 'desc'), limit(200));
+        querySnapshot = await getDocs(qTxs);
+      } catch (e) {
+        querySnapshot = await getDocs(query(collection(db, 'transactions'), limit(200)));
+      }
       const list = querySnapshot.docs.map(docSnap => {
         const data = docSnap.data();
         return {
@@ -4188,23 +4194,19 @@ export default function AdminPanel(props: AdminPanelProps) {
   // Main initial load function (Only pulls catalog & admin data.
   // Dynamic collections are handled in real-time by the active onSnapshot listeners!)
   const loadData = async () => {
-    setLoading(true);
+    // Instant loading: Render Admin UI immediately without blocking
+    setLoading(false);
     try {
-      await fetchTransactionsFromDb();
-
-      await Promise.all([
-        fetchNotices(),
-        fetchOffers(),
-        fetchBapReportsAndGroups(),
-        fetchProducts(),
-        fetchAdminNotifications(),
-        fetchEscrowDisputes(),
-        fetchAdminAgents()
-      ]);
+      fetchTransactionsFromDb();
+      fetchNotices();
+      fetchOffers();
+      fetchBapReportsAndGroups();
+      fetchProducts();
+      fetchAdminNotifications();
+      fetchEscrowDisputes();
+      fetchAdminAgents();
     } catch (err) {
       console.error("Error loading admin data:", err);
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -6293,7 +6295,7 @@ export default function AdminPanel(props: AdminPanelProps) {
           try { unsubTransactions(); } catch (e) {}
           unsubTransactions = null;
         }
-        const qTransactions = collection(db, 'transactions');
+        const qTransactions = query(collection(db, 'transactions'), limit(200));
         unsubTransactions = onSnapshot(qTransactions, (snapshot) => {
           const list = snapshot.docs.map(docSnap => {
             const data = docSnap.data();
@@ -6323,10 +6325,7 @@ export default function AdminPanel(props: AdminPanelProps) {
 
     setupTransactionListener();
 
-    // Background sync heartbeat every 4 seconds to guarantee all admins stay 100% in sync
-    const txHeartbeat = setInterval(() => {
-      fetchTransactionsFromDb();
-    }, 4000);
+// Removed 4s heavy setInterval heartbeat to prevent lag
 
     // Immediate re-fetch when tab regains focus or visibility
     const onWindowFocusOrVisible = () => {
@@ -6356,7 +6355,7 @@ export default function AdminPanel(props: AdminPanelProps) {
     const unsubscribeTxs = () => {
       isTxsSubscribed = false;
       clearTimeout(txReconnectTimer);
-      clearInterval(txHeartbeat);
+      // clearInterval(txHeartbeat);
       window.removeEventListener('focus', onWindowFocusOrVisible);
       document.removeEventListener('visibilitychange', onVisibilityChange);
       window.removeEventListener('amb_admin_sync_tick', onCrossSyncTick);
@@ -7056,7 +7055,7 @@ export default function AdminPanel(props: AdminPanelProps) {
     {
       id: 1,
       tag: "সঞ্চয় ও বিনিয়োগ",
-      title: "Al Mayadin Bazar",
+      title: "BNB Business Network Bangladesh",
       description: "নিরাপদে আপনার আমানত সঞ্চয় করুন ও সহজ ঋণের সুবিধা গ্রহণ করুন।",
       bgGradient: "from-emerald-950 via-emerald-900 to-teal-950",
       image: "https://images.unsplash.com/photo-1579621970563-ebec7560ff3e?auto=format&fit=crop&q=80&w=650"
@@ -7105,7 +7104,7 @@ export default function AdminPanel(props: AdminPanelProps) {
     {
       id: 1,
       tag: "সঞ্চয় ও বিনিয়োগ",
-      title: "Al Mayadin Bazar",
+      title: "BNB Business Network Bangladesh",
       description: "নিরাপদে আপনার আমানত সঞ্চয় করুন ও সহজ ঋণের সুবিধা গ্রহণ করুন।",
       bgGradient: "from-emerald-950 via-emerald-900 to-teal-950",
       image: "https://images.unsplash.com/photo-1579621970563-ebec7560ff3e?auto=format&fit=crop&q=80&w=650"
@@ -7167,7 +7166,7 @@ export default function AdminPanel(props: AdminPanelProps) {
     {
       id: 2,
       tag: "সঞ্চয় ও বিনিয়োগ",
-      title: "Al Mayadin Bazar",
+      title: "BNB Business Network Bangladesh",
       description: "নিরাপদে আপনার আমানত সঞ্চয় করুন ও সহজ ঋণের সুবিধা গ্রহণ করুন।",
       bgGradient: "from-emerald-950 via-emerald-900 to-teal-950",
       image: "https://images.unsplash.com/photo-1579621970563-ebec7560ff3e?auto=format&fit=crop&q=80&w=650"
@@ -7194,7 +7193,7 @@ export default function AdminPanel(props: AdminPanelProps) {
     {
       id: 2,
       tag: "সঞ্চয় ও বিনিয়োগ",
-      title: "Al Mayadin Bazar",
+      title: "BNB Business Network Bangladesh",
       description: "নিরাপদে আপনার আমানত সঞ্চয় করুন ও সহজ ঋণের সুবিধা গ্রহণ করুন।",
       bgGradient: "from-emerald-950 via-emerald-900 to-teal-950",
       image: "https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?auto=format&fit=crop&q=80&w=650"
@@ -8040,7 +8039,7 @@ export default function AdminPanel(props: AdminPanelProps) {
             return { ...u, balance: curBal + approvedAmount, mainBalance: curBal + approvedAmount };
           } else if (tx.type === 'coop_savings_deposit' || tx.type === 'samity_deposit') {
             const curBal = getEffectiveBalance(u);
-            const isMainWalletPay = !tx.paymentMethod || tx.paymentMethod === 'Main Balance' || tx.paymentMethod === 'Al Mayadin Wallet' || tx.paymentMethod === 'মেইন ব্যালেন্স' || tx.paymentMethod === 'Wallet' || tx.paymentMethod === 'ক্যাশ/মেইন ওয়ালেট';
+            const isMainWalletPay = !tx.paymentMethod || tx.paymentMethod === 'Main Balance' || tx.paymentMethod === 'BNB Wallet' || tx.paymentMethod === 'মেইন ব্যালেন্স' || tx.paymentMethod === 'Wallet' || tx.paymentMethod === 'ক্যাশ/মেইন ওয়ালেট';
             const newBal = isMainWalletPay ? Math.max(0, curBal - approvedAmount) : curBal;
             const newSav = (u.savings || 0) + approvedAmount;
             const newPaid = normalizePaidMonthsArray(u.samityPaidMonths || [], newSav, u.monthlySavingsTarget || 1000);
@@ -8130,7 +8129,7 @@ export default function AdminPanel(props: AdminPanelProps) {
             const existingPaid = freshUser.samityPaidMonths || [];
             const updatedPaid = normalizePaidMonthsArray(existingPaid, newSavings, targetRate);
             
-            const isMainWalletPay = !tx.paymentMethod || tx.paymentMethod === 'Main Balance' || tx.paymentMethod === 'Al Mayadin Wallet' || tx.paymentMethod === 'মেইন ব্যালেন্স' || tx.paymentMethod === 'Wallet' || tx.paymentMethod === 'ক্যাশ/মেইন ওয়ালেট';
+            const isMainWalletPay = !tx.paymentMethod || tx.paymentMethod === 'Main Balance' || tx.paymentMethod === 'BNB Wallet' || tx.paymentMethod === 'মেইন ব্যালেন্স' || tx.paymentMethod === 'Wallet' || tx.paymentMethod === 'ক্যাশ/মেইন ওয়ালেট';
             if (isMainWalletPay) {
               liveBal = Math.max(0, liveBal - approvedAmount);
             }
@@ -8152,7 +8151,7 @@ export default function AdminPanel(props: AdminPanelProps) {
             });
           } else if (tx.type === 'loan_repayment') {
             const currentDue = Number(freshUser.dueLoan) || 0;
-            const isMainWalletPay = !tx.paymentMethod || tx.paymentMethod === 'Main Balance' || tx.paymentMethod === 'Al Mayadin Wallet' || tx.paymentMethod === 'মেইন ব্যালেন্স' || tx.paymentMethod === 'Wallet';
+            const isMainWalletPay = !tx.paymentMethod || tx.paymentMethod === 'Main Balance' || tx.paymentMethod === 'BNB Wallet' || tx.paymentMethod === 'মেইন ব্যালেন্স' || tx.paymentMethod === 'Wallet';
             if (isMainWalletPay) {
               liveBal = Math.max(0, liveBal - approvedAmount);
             }
@@ -8220,7 +8219,7 @@ export default function AdminPanel(props: AdminPanelProps) {
                 typeLabel: 'সমিতি স্থানান্তর ব্যালেন্স লাভ',
                 status: 'success',
                 isApproved: true,
-                paymentMethod: 'Al Mayadin Wallet',
+                paymentMethod: 'BNB Wallet',
                 phone: (tx as any).userPhone || '',
                 createdAt: new Date().toISOString(),
                 description: `মেম্বার ${tx.userName || ''} (${tx.memberId || ''}) হতে স্থানান্তর ব্যালেন্স গ্রহণ`
@@ -8484,7 +8483,7 @@ export default function AdminPanel(props: AdminPanelProps) {
           targetTx.type === 'bill_pay' as any ||
           (targetTx.type === 'coop_savings_deposit' as any && (
             targetTx.paymentMethod === 'Main Balance' || 
-            targetTx.paymentMethod === 'Al Mayadin Wallet' || 
+            targetTx.paymentMethod === 'BNB Wallet' || 
             targetTx.paymentMethod === 'মেইন ব্যালেন্স'
           ));
 
@@ -11488,10 +11487,7 @@ export default function AdminPanel(props: AdminPanelProps) {
           <AdminDashboardOverview {...adminScopeProps} />
         )}
 
-        {/* SMS GATEWAY & AUTOMATIC PAYMENT CONTROL DASHBOARD */}
-        <div className="my-6">
-          <BNBSmsGatewayDashboard db={db} user={currentUser} />
-        </div>
+
 
         {/* 1. SAMITY SECTION */}
         <AdminSamitySection {...adminScopeProps} />

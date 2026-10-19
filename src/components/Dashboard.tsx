@@ -1208,7 +1208,16 @@ const getTxt = (key: string, fallback: string) => {
     return false;
   }, modalStack.length > 0, 30);
 
-  // Note: Tab navigation history (Home -> A -> B -> C -> B -> A -> Home) is handled by the App layer history stack handler (priority 10)
+  // Dedicated Tab Back Handler: When on any non-home tab (e.g. 'add_money', 'deposit', 'loan', 'history', 'profile'),
+  // pressing the system Back button or gesture returns cleanly to Home Dashboard instead of exiting the app!
+  useBackHandler(() => {
+    if (activeTab && activeTab !== 'home') {
+      setActiveTab('home');
+      if (setSelectedAction) setSelectedAction(null);
+      return true;
+    }
+    return false;
+  }, Boolean(activeTab && activeTab !== 'home'), 20);
 
   // Qard Hasana state variables
   const [qardTab, setQardTab] = useState<'info' | 'donate' | 'apply' | 'my_applications' | 'history'>('info');
@@ -1753,6 +1762,32 @@ const getTxt = (key: string, fallback: string) => {
       }
     };
   }, []);
+
+  // Auto-reconcile pending ZiniPay payments when user focuses window or returns to Dashboard
+  useEffect(() => {
+    const handleReconcile = () => {
+      const uId = liveUser?.uid || user?.uid;
+      if (uId) {
+        fetch(apiUrl('/api/payment/reconcile-pending'), {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ userId: uId, phone: liveUser?.phone || user?.phone })
+        }).then(r => r.json()).then(res => {
+          if (res?.reconciledCount > 0) {
+            syncLiveProfile();
+          }
+        }).catch(() => {});
+      }
+    };
+
+    handleReconcile();
+    window.addEventListener('focus', handleReconcile);
+    window.addEventListener('bnb_balance_updated', handleReconcile);
+    return () => {
+      window.removeEventListener('focus', handleReconcile);
+      window.removeEventListener('bnb_balance_updated', handleReconcile);
+    };
+  }, [liveUser?.uid, user?.uid]);
 
   // Form input states
   const [depositAmount, setDepositAmount] = useState('');
@@ -3826,7 +3861,7 @@ const getTxt = (key: string, fallback: string) => {
   return (
     <div className="bg-slate-50 min-h-screen flex flex-col relative text-slate-800 font-sans" id="dashboard-root">
       {/* 1. Unified Deep Green Header containing Header controls + Announcement Ticker seamlessly */}
-      <header className="bg-[#0b6623] text-white sticky top-0 z-40 shadow-md font-sans select-none w-full max-w-full overflow-x-hidden box-border">
+      <header className="bg-[#0b6623] text-white sticky top-0 z-40 shadow-md font-sans select-none w-full max-w-full overflow-x-hidden box-border pt-[max(12px,env(safe-area-inset-top))]">
         {/* Top Row: Navigation, Title, Balance/Due Pills, Tools */}
         <div className="px-2 xs:px-3 pt-2 pb-1 flex items-center justify-between gap-1 xs:gap-1.5 min-h-[60px] w-full max-w-full overflow-x-hidden box-border">
           {/* Left: Menu & Name */}
@@ -4707,33 +4742,16 @@ const getTxt = (key: string, fallback: string) => {
             {/* BNB Payment Gateway (Tick Image) */}
 
             <JenifyPaymentGateway 
-              onConfirm={async (amount) => {
-                if (loading) return;
-                setLoading(true);
-                try {
-                  const res = await fetch(apiUrl('/api/payment/create'), {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                      amount,
-                      userId: liveUser?.uid,
-                      phone: liveUser?.phone || '',
-                      origin: getReturnOrigin()
-                    })
-                  });
-                  const data = await res.json();
-                  if (data && data.success && data.payment_url) {
-                    window.location.href = data.payment_url;
-                  } else {
-                    alert(data.error || 'পেমেন্ট গেটওয়ে সচল নেই। আবার চেষ্টা করুন।');
-                  }
-                } catch (err) {
-                  alert('সার্ভার সংযোগ ত্রুটি। আপনার ইন্টারনেট চেক করুন।');
-                } finally {
-                  setLoading(false);
-                }
+              currentUser={liveUser || user}
+              onBack={() => {
+                setActiveTab('home');
+                if (setSelectedAction) setSelectedAction(null);
               }}
-              isLoading={loading}
+              onPaymentSuccess={(amount, newBal, trxId) => {
+                syncLiveProfile();
+                setActiveTab('home');
+                if (setSelectedAction) setSelectedAction(null);
+              }}
             />
           </motion.div>
         )}

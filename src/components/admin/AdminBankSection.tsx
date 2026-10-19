@@ -1300,7 +1300,7 @@ return (
               <p className="text-xs text-slate-500 mt-1">সব সমবায় সদস্যদের জন্য ইস্যুকৃত ভার্চুয়াল ডেবিট ও ক্রেডিট প্রি-পেইড কার্ড ফ্রিজ, আনফ্রিজ এবং এটিএম দৈনিক লিমিট নির্ধারণ করুন।</p>
             </div>
 
-            {/* Al Mayadin Payment Method & Import Controls Box */}
+            {/* BNB Payment Method & Import Controls Box */}
             <div className="bg-white border border-slate-200 p-6 rounded-3xl text-left shadow-xs space-y-2">
               <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>

@@ -583,27 +583,7 @@ export function AdminDashboardOverview(props: any) {
 
                 return (
                   <div className="space-y-2 mb-2.5">
-                    {/* Google Play Console Financial Features Guide & Rejection Prevention Banner */}
-                    <div className="bg-gradient-to-r from-amber-600 via-emerald-700 to-teal-800 text-white p-2.5 sm:p-3 rounded-xl shadow-md flex items-center justify-between gap-2">
-                      <div className="flex items-center gap-2 min-w-0">
-                        <span className="text-xl sm:text-2xl shrink-0">🛡️</span>
-                        <div className="min-w-0">
-                          <h4 className="text-[11px] sm:text-xs font-black tracking-tight truncate">
-                            প্লে কনসোল "Financial Features" পলিসি ও রিজেক্ট সমাধান গাইড
-                          </h4>
-                          <p className="text-[9px] sm:text-[10px] text-emerald-100 font-medium truncate">
-                            কোথায় অপশন পাবেন, কীভাবে ডিক্লেয়ার করবেন এবং ৭ বার রিজেক্ট হওয়ার হাত থেকে চিরতরে বাঁচার উপায়।
-                          </p>
-                        </div>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => setShowPlayConsoleFinancialModal(true)}
-                        className="bg-white text-emerald-950 font-black text-[9.5px] sm:text-[10.5px] px-2.5 py-1 rounded-lg shadow-sm hover:bg-emerald-50 transition shrink-0 cursor-pointer active:scale-95"
-                      >
-                        গাইড দেখুন ↗
-                      </button>
-                    </div>
+
 
                     <div className="grid grid-cols-4 gap-1 sm:gap-2">
                     {/* Box 1: অটো জরিমানা */}
@@ -738,27 +718,6 @@ export function AdminDashboardOverview(props: any) {
               );
             })()}
 
-              {/* Notice Ticker Bar ("ঘোষণা") */}
-              <div className="bg-emerald-50/80 border border-emerald-200/80 rounded-2xl p-2 sm:p-2.5 flex items-center gap-3 mb-3 shadow-3xs">
-                <button 
-                  type="button"
-                  onClick={() => { 
-                    if (!isMasterAdmin && !hasPermission('config')) {
-                      alert('🔒 শুধুমাত্র মাস্টার এডমিন ঘোষণা ও নোটিশ এডিট করতে পারবেন।');
-                      return;
-                    }
-                    setAdminTab('config'); 
-                    setViewingGrid(false); 
-                  }}
-                  className="bg-[#00a884] hover:bg-[#009675] text-white text-[11px] font-black px-3 py-1 rounded-xl flex items-center gap-1 shadow-2xs shrink-0 cursor-pointer"
-                >
-                  ঘোষণা {isMasterAdmin ? <Pencil className="w-3 h-3 text-emerald-100" /> : '📢'}
-                </button>
-                <div className="text-xs font-black text-slate-800 truncate flex items-center gap-1.5">
-                  <span className="text-slate-600 font-bold">ন না</span>
-                  <span className="text-rose-600 font-black">❌ {appConfig?.noticeText || "আপস টেস্ট চলতেছে"}</span>
-                </div>
-              </div>
 
               {/* ✨ 3 x 4 = 12 Box Financial Dashboard & Balance Control */}
               <div className="bg-white border border-slate-200/90 rounded-3xl p-4 sm:p-5 shadow-xs text-left mb-4 font-sans space-y-4">
@@ -1530,57 +1489,10 @@ export function AdminDashboardOverview(props: any) {
                   </div>
                 )}
 
-                {/* 13. Super Shop Admin */}
-                {hasPermission('shop_admin') && (
-                  <div 
-                    onClick={() => { setAdminTab('shop_admin'); setViewingGrid(false); }}
-                    className="bg-white border border-slate-200 hover:border-pink-400 rounded-2xl p-2.5 sm:p-3 flex flex-col justify-between hover:shadow-md transition-all duration-200 cursor-pointer text-center items-center group active:scale-95 min-h-[130px] sm:min-h-[145px] shadow-2xs relative overflow-hidden"
-                  >
-                    <div className="w-11 h-11 sm:w-12 sm:h-12 bg-gradient-to-br from-pink-500 to-rose-500 rounded-2xl flex items-center justify-center text-white shadow-md shadow-pink-100 group-hover:scale-105 transition-transform shrink-0 relative overflow-hidden">
-                      {appConfig?.sectionIcons?.shop ? (
-                        <img src={appConfig.sectionIcons.shop} alt="Shop" className="w-full h-full object-cover rounded-2xl" referrerPolicy="no-referrer" />
-                      ) : (
-                        <ShoppingBag className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
-                      )}
-                    </div>
-                    <div className="space-y-1 w-full text-center mt-2 font-sans">
-                      <span className="text-[8px] sm:text-[9.5px] font-black text-pink-700 bg-pink-50 border border-pink-100 px-1.5 py-0.5 rounded-md inline-block leading-none truncate max-w-full">
-                        পণ্য অর্ডার
-                      </span>
-                      <h4 className="text-xs sm:text-sm font-black text-slate-800 leading-tight block tracking-tight text-center">
-                        BNB সুপার শপ
-                      </h4>
-                      <p className="text-[8px] sm:text-[9.5px] text-slate-400 font-extrabold leading-none truncate">
-                        আমানত দিয়ে ক্রয়
-                      </p>
-                    </div>
-                  </div>
-                )}
 
 
 
-                {/* 13. Member Directory */}
-                {hasPermission('general') && (
-                  <div 
-                    onClick={() => { setAdminTab('general'); setViewingGrid(false); }}
-                    className="bg-white border border-slate-200 hover:border-emerald-400 rounded-2xl p-2.5 sm:p-3 flex flex-col justify-between hover:shadow-md transition-all duration-200 cursor-pointer text-center items-center group active:scale-95 min-h-[130px] sm:min-h-[145px] shadow-2xs relative overflow-hidden"
-                  >
-                    <div className="w-11 h-11 sm:w-12 sm:h-12 bg-gradient-to-br from-[#00a884] to-teal-750 rounded-2xl flex items-center justify-center text-white shadow-md shadow-emerald-100 group-hover:scale-105 transition-transform shrink-0">
-                      <UserCheck className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
-                    </div>
-                    <div className="space-y-1 w-full text-center mt-2 font-sans">
-                      <span className="text-[8px] sm:text-[9.5px] font-black text-[#00a884] bg-teal-50 border border-teal-100 px-1.5 py-0.5 rounded-md inline-block leading-none truncate max-w-full">
-                        সদস্য খাতা
-                      </span>
-                      <h4 className="text-xs sm:text-sm font-black text-slate-800 leading-tight block tracking-tight text-center">
-                        সদস্য ডিরেক্টরি
-                      </h4>
-                      <p className="text-[8px] sm:text-[9.5px] text-slate-400 font-extrabold leading-none truncate">
-                        প্রোফাইল ও পিন এডিট
-                      </p>
-                    </div>
-                  </div>
-                )}
+                
 
                 {/* 14. Approvals */}
                 {hasPermission('approvals') && (
@@ -1640,28 +1552,7 @@ export function AdminDashboardOverview(props: any) {
                   </div>
                 )}
 
-                {/* 15.5 System Reset & Initialization (Master Admin Only) */}
-                {isMasterAdmin && (
-                  <div 
-                    onClick={() => { setAdminTab('system_reset'); setViewingGrid(false); }}
-                    className="bg-rose-50/80 border border-rose-200 hover:border-rose-400 rounded-2xl p-2.5 sm:p-3 flex flex-col justify-between hover:shadow-md transition-all duration-200 cursor-pointer text-center items-center group active:scale-95 min-h-[130px] sm:min-h-[145px] shadow-2xs relative overflow-hidden"
-                  >
-                    <div className="w-11 h-11 sm:w-12 sm:h-12 bg-gradient-to-br from-rose-600 to-red-800 rounded-2xl flex items-center justify-center text-white shadow-md shadow-rose-200 group-hover:scale-105 transition-transform shrink-0">
-                      <RefreshCw className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
-                    </div>
-                    <div className="space-y-1 w-full text-center mt-2 font-sans">
-                      <span className="text-[8px] sm:text-[9.5px] font-black text-rose-800 bg-rose-100 border border-rose-200 px-1.5 py-0.5 rounded-md inline-block leading-none truncate max-w-full">
-                        নতুন সূচনা (Publish Start)
-                      </span>
-                      <h4 className="text-xs sm:text-sm font-black text-rose-900 leading-tight block tracking-tight text-center">
-                        সিস্টেম ও হিসাব রিসেট
-                      </h4>
-                      <p className="text-[8px] sm:text-[9.5px] text-rose-500 font-extrabold leading-none truncate">
-                        ব্যালেন্স ও হিস্টোরি জিরো
-                      </p>
-                    </div>
-                  </div>
-                )}
+                
 
                 {/* 16. Banner Settings */}
                 {hasPermission('banners_admin') && (
@@ -1686,51 +1577,9 @@ export function AdminDashboardOverview(props: any) {
                   </div>
                 )}
 
-                {/* 17. Receipt Designer */}
-                {hasPermission('receipt_admin') && (
-                  <div 
-                    onClick={() => { setAdminTab('receipt_admin'); setViewingGrid(false); }}
-                    className="bg-white border border-slate-200 hover:border-purple-400 rounded-2xl p-2.5 sm:p-3 flex flex-col justify-between hover:shadow-md transition-all duration-200 cursor-pointer text-center items-center group active:scale-95 min-h-[130px] sm:min-h-[145px] shadow-2xs relative overflow-hidden"
-                  >
-                    <div className="w-11 h-11 sm:w-12 sm:h-12 bg-gradient-to-br from-purple-600 to-indigo-700 rounded-2xl flex items-center justify-center text-white shadow-md shadow-purple-100 group-hover:scale-105 transition-transform shrink-0">
-                      <Receipt className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
-                    </div>
-                    <div className="space-y-1 w-full text-center mt-2 font-sans">
-                      <span className="text-[8px] sm:text-[9.5px] font-black text-purple-700 bg-purple-50 border border-purple-100 px-1.5 py-0.5 rounded-md inline-block leading-none truncate max-w-full">
-                        রসিদ ও ভাউচার
-                      </span>
-                      <h4 className="text-xs sm:text-sm font-black text-slate-800 leading-tight block tracking-tight text-center">
-                        রসিদ থিম ডিজাইন
-                      </h4>
-                      <p className="text-[8px] sm:text-[9.5px] text-slate-400 font-extrabold leading-none truncate">
-                        কালার ও টেক্সট কাস্টমাইজ
-                      </p>
-                    </div>
-                  </div>
-                )}
 
-                {/* 18. All Transaction Audit */}
-                {hasPermission('all_history_admin') && (
-                  <div 
-                    onClick={() => { setAdminTab('all_history_admin'); setViewingGrid(false); }}
-                    className="bg-white border border-slate-200 hover:border-rose-400 rounded-2xl p-2.5 sm:p-3 flex flex-col justify-between hover:shadow-md transition-all duration-200 cursor-pointer text-center items-center group active:scale-95 min-h-[130px] sm:min-h-[145px] shadow-2xs relative overflow-hidden"
-                  >
-                    <div className="w-11 h-11 sm:w-12 sm:h-12 bg-gradient-to-br from-rose-600 to-indigo-950 rounded-2xl flex items-center justify-center text-white shadow-md shadow-rose-100 group-hover:scale-105 transition-transform shrink-0">
-                      <History className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
-                    </div>
-                    <div className="space-y-1 w-full text-center mt-2 font-sans">
-                      <span className="text-[8px] sm:text-[9.5px] font-black text-rose-700 bg-rose-50 border border-rose-100 px-1.5 py-0.5 rounded-md inline-block leading-none truncate max-w-full">
-                        লেনদেন ও অডিট খাতা
-                      </span>
-                      <h4 className="text-xs sm:text-sm font-black text-slate-800 leading-tight block tracking-tight text-center">
-                        সর্বমোট লেনদেন ইতিহাস
-                      </h4>
-                      <p className="text-[8px] sm:text-[9.5px] text-slate-400 font-extrabold leading-none truncate">
-                        পুরো সিস্টেম অডিট
-                      </p>
-                    </div>
-                  </div>
-                )}
+
+                
 
                 {/* 19. Push Notification */}
                 {(hasPermission('push_admin') || hasPermission('config')) && (
@@ -1757,28 +1606,7 @@ export function AdminDashboardOverview(props: any) {
 
 
 
-                {/* 22. Software Integration Gateway */}
-                {(hasPermission('integration_admin') || hasPermission('config')) && (
-                  <div 
-                    onClick={() => { setAdminTab('integration_admin'); setViewingGrid(false); }}
-                    className="bg-white border border-slate-200 hover:border-cyan-400 rounded-2xl p-2.5 sm:p-3 flex flex-col justify-between hover:shadow-md transition-all duration-200 cursor-pointer text-center items-center group active:scale-95 min-h-[130px] sm:min-h-[145px] shadow-2xs relative overflow-hidden"
-                  >
-                    <div className="w-11 h-11 sm:w-12 sm:h-12 bg-gradient-to-br from-cyan-500 to-indigo-900 rounded-2xl flex items-center justify-center text-white shadow-md shadow-cyan-100 group-hover:scale-105 transition-transform shrink-0">
-                      <Cpu className="w-5 h-5 sm:w-6 sm:h-6 text-cyan-200 animate-pulse" />
-                    </div>
-                    <div className="space-y-1 w-full text-center mt-2 font-sans">
-                      <span className="text-[8px] sm:text-[9.5px] font-black text-cyan-800 bg-cyan-50 border border-cyan-100 px-1.5 py-0.5 rounded-md inline-block leading-none truncate max-w-full">
-                        সফ্টওয়্যার গেটওয়ে
-                      </span>
-                      <h4 className="text-xs sm:text-sm font-black text-slate-800 leading-tight block tracking-tight text-center">
-                        সফটওয়্যার ইন্টিগ্রেশন
-                      </h4>
-                      <p className="text-[8px] sm:text-[9.5px] text-slate-400 font-extrabold leading-none truncate">
-                        জেসন ফাইল অটো-ফিট
-                      </p>
-                    </div>
-                  </div>
-                )}
+                
               </div>
 
             {/* 4. Logo set uploader box */}
