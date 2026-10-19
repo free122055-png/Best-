@@ -29,6 +29,7 @@ import { navigationManager, useBackHandler } from './lib/navigationManager';
 import { ShieldCheck, ShieldAlert, X, RefreshCw, Lock, LogOut, Eye, EyeOff, AlertCircle, AlertTriangle } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { App as CapApp } from '@capacitor/app';
+import { apiUrl } from './config/api';
 
 // Session marker & persistence manager
 if (typeof window !== 'undefined') {
@@ -78,12 +79,11 @@ export default function App() {
         if (window.location.search.includes('payment_status=')) {
           return false;
         }
-        const lastUserRaw = localStorage.getItem('amb_last_user');
-        if (lastUserRaw) {
-          const parsed = JSON.parse(lastUserRaw);
-          if (parsed?.isAppLocked && sessionStorage.getItem('amb_session_unlocked') !== 'true') {
-            return true;
-          }
+        const rememberedUid = localStorage.getItem('amb_user_uid');
+        const rememberedPhone = localStorage.getItem('amb_user_phone');
+        // Require explicit PIN/password unlock for any remembered user when opening the app
+        if ((rememberedUid || rememberedPhone) && sessionStorage.getItem('amb_session_unlocked') !== 'true') {
+          return true;
         }
       }
     } catch (e) {}
@@ -144,7 +144,30 @@ export default function App() {
     error?: string;
   } | null>(null);
 
+  // Authoritative live balance refresher from Firestore
+  const syncFreshUserBalance = useCallback(async (pAmount?: number, pTrxId?: string) => {
+    const storedUid = localStorage.getItem('amb_user_uid');
+    if (!storedUid) return;
+    try {
+      const snap = await getDoc(doc(db, 'users', storedUid));
+      if (snap.exists()) {
+        const uData = snap.data() as User;
+        const effectiveBal = getEffectiveBalance(uData);
+        uData.balance = effectiveBal;
+        (uData as any).mainBalance = effectiveBal;
+        setCurrentUser((prev) => prev ? { ...prev, ...uData, balance: effectiveBal, mainBalance: effectiveBal } : null);
+        localStorage.setItem('amb_user_balance', String(effectiveBal));
+        window.dispatchEvent(new CustomEvent('amb_admin_sync_tick', { detail: { time: Date.now() } }));
+        window.dispatchEvent(new CustomEvent('bnb_balance_updated', { detail: { amount: pAmount || 0, newBalance: effectiveBal } }));
+      }
+    } catch (e) {
+      console.warn('Live balance refresh error:', e);
+    }
+  }, []);
+
+  // Multi-platform Payment Handshake: Supports Web URL, Android Deep Links (bnbnetwork://) & App Resume
   useEffect(() => {
+    // 1. Web return handler
     if (typeof window !== 'undefined' && window.location.search.includes('payment_status=')) {
       try {
         const urlParams = new URLSearchParams(window.location.search);
@@ -163,23 +186,9 @@ export default function App() {
             error: pError
           });
 
-          // Immediate live wallet balance sync upon successful payment return
           if (pStatus === 'success') {
-            const storedUid = localStorage.getItem('amb_user_uid');
-            if (storedUid) {
-              getDoc(doc(db, 'users', storedUid)).then((snap) => {
-                if (snap.exists()) {
-                  const uData = snap.data() as User;
-                  const effectiveBal = getEffectiveBalance(uData);
-                  uData.balance = effectiveBal;
-                  (uData as any).mainBalance = effectiveBal;
-                  setCurrentUser((prev) => prev ? { ...prev, ...uData, balance: effectiveBal, mainBalance: effectiveBal } : null);
-                  localStorage.setItem('amb_user_balance', String(effectiveBal));
-                  window.dispatchEvent(new CustomEvent('amb_admin_sync_tick', { detail: { time: Date.now() } }));
-                  window.dispatchEvent(new CustomEvent('bnb_balance_updated', { detail: { amount: pAmount || 0, newBalance: effectiveBal } }));
-                }
-              }).catch((e) => console.warn('Payment success balance refresh error:', e));
-            }
+            localStorage.removeItem('amb_pending_zinipay_invoice');
+            syncFreshUserBalance(pAmount, pTrxId);
           }
         }
       } catch (e) {
@@ -195,7 +204,91 @@ export default function App() {
       setSelectedAction(null);
       setIsLocked(false);
     }
-  }, []);
+
+    // 2. Android Native Deep Link Listener (bnbnetwork://)
+    let urlListenerSub: any = null;
+    let stateListenerSub: any = null;
+
+    try {
+      CapApp.addListener('appUrlOpen', (event) => {
+        try {
+          const rawUrl = event?.url || '';
+          if (rawUrl.includes('payment') || rawUrl.includes('payment-success') || rawUrl.includes('payment_status=')) {
+            const cleanUrl = rawUrl.replace('bnbnetwork://', 'https://app.local/');
+            const parsed = new URL(cleanUrl);
+            const pStatus = (parsed.searchParams.get('status') || parsed.searchParams.get('payment_status') || (cleanUrl.includes('payment-success') ? 'success' : cleanUrl.includes('payment-cancel') ? 'cancelled' : 'failed')) as any;
+            const pAmount = parsed.searchParams.get('amount') ? parseFloat(parsed.searchParams.get('amount')!) : undefined;
+            const pTrxId = parsed.searchParams.get('trxId') || undefined;
+
+            setPaymentNotice({
+              status: pStatus,
+              amount: pAmount,
+              trxId: pTrxId,
+              gateway: 'Online Gateway'
+            });
+
+            if (pStatus === 'success') {
+              localStorage.removeItem('amb_pending_zinipay_invoice');
+              syncFreshUserBalance(pAmount, pTrxId);
+            }
+            setTabHistory(['home']);
+            setSelectedAction(null);
+            setIsLocked(false);
+          }
+        } catch (deepLinkErr) {
+          console.warn('Deep link parse error:', deepLinkErr);
+        }
+      }).then(sub => { urlListenerSub = sub; }).catch(() => {});
+
+      // 3. App Resume / Foreground Listener: When returning from bKash/Nagad/Browser, auto-sync fresh balance
+      CapApp.addListener('appStateChange', (state) => {
+        if (state.isActive) {
+          syncFreshUserBalance();
+
+          // Check if there was a pending ZiniPay invoice to reconcile immediately
+          try {
+            const pendingRaw = localStorage.getItem('amb_pending_zinipay_invoice');
+            if (pendingRaw) {
+              const pendingInv = JSON.parse(pendingRaw);
+              const storedUid = localStorage.getItem('amb_user_uid');
+              if (pendingInv && pendingInv.invoice_id) {
+                fetch(apiUrl('/api/payment/check-status'), {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    val_id: pendingInv.val_id,
+                    invoice_id: pendingInv.invoice_id,
+                    userId: storedUid || ''
+                  })
+                }).then(r => r.json()).then(data => {
+                  if (data && (data.status === 'completed' || data.success)) {
+                    localStorage.removeItem('amb_pending_zinipay_invoice');
+                    const amt = Number(data.amount || pendingInv.amount);
+                    setPaymentNotice({
+                      status: 'success',
+                      amount: amt,
+                      trxId: data.trxId || pendingInv.invoice_id,
+                      gateway: 'Online Gateway'
+                    });
+                    syncFreshUserBalance(amt, data.trxId || pendingInv.invoice_id);
+                  }
+                }).catch(() => {});
+              }
+            }
+          } catch (e) {}
+        }
+      }).then(sub => { stateListenerSub = sub; }).catch(() => {});
+    } catch (capErr) {}
+
+    return () => {
+      if (urlListenerSub && typeof urlListenerSub.remove === 'function') {
+        urlListenerSub.remove();
+      }
+      if (stateListenerSub && typeof stateListenerSub.remove === 'function') {
+        stateListenerSub.remove();
+      }
+    };
+  }, [syncFreshUserBalance]);
 
   // Real-time synchronization of the app configuration settings
   useEffect(() => {
@@ -872,6 +965,9 @@ export default function App() {
               localStorage.setItem('amb_user_uid', finalUserData.uid);
               localStorage.setItem('amb_last_user', JSON.stringify(finalUserData));
               setCurrentUser(finalUserData);
+              if (sessionStorage.getItem('amb_session_unlocked') !== 'true') {
+                setIsLocked(true);
+              }
               if (finalUserData.role === 'admin' || finalUserData.role === 'sub_admin') {
                 if (localStorage.getItem('amb_admin_mode') !== 'false') {
                   localStorage.setItem('amb_admin_mode', 'true');
@@ -1156,6 +1252,7 @@ export default function App() {
       } else {
         setIsLocked(false);
       }
+      sessionStorage.setItem('amb_session_unlocked', 'true');
       const cleanPhone = userData.phone?.replace(/\D/g, '') || '';
       const isAdminAccount = (userData.role === 'admin' || userData.uid === 'admin_master') && 
                              (cleanPhone.endsWith('00011112222') || cleanPhone.endsWith('11112222') || userData.uid === 'admin_master');
@@ -1214,6 +1311,7 @@ export default function App() {
     localStorage.removeItem('amb_all_users_backup');
     localStorage.removeItem('amb_last_user');
     localStorage.removeItem('amb_admin_mode');
+    sessionStorage.removeItem('amb_session_unlocked');
     sessionStorage.removeItem('amb_fresh_login_location_needed');
     
     setCurrentUser(null);
@@ -1383,6 +1481,7 @@ export default function App() {
               <LockScreen 
                 user={currentUser} 
                 onUnlock={() => {
+                  sessionStorage.setItem('amb_session_unlocked', 'true');
                   setIsLocked(false);
                   setIsLoggingOutLock(false);
                   if (currentUser.role === 'admin' || currentUser.uid === 'admin_master') {

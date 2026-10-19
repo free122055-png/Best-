@@ -3861,7 +3861,7 @@ const getTxt = (key: string, fallback: string) => {
   return (
     <div className="bg-slate-50 min-h-screen flex flex-col relative text-slate-800 font-sans" id="dashboard-root">
       {/* 1. Unified Deep Green Header containing Header controls + Announcement Ticker seamlessly */}
-      <header className="bg-[#0b6623] text-white sticky top-0 z-40 shadow-md font-sans select-none w-full max-w-full overflow-x-hidden box-border pt-[max(12px,env(safe-area-inset-top))]">
+      <header className="bg-[#0b6623] text-white sticky top-0 z-40 shadow-md font-sans select-none w-full max-w-full overflow-x-hidden box-border pt-[max(38px,env(safe-area-inset-top))]">
         {/* Top Row: Navigation, Title, Balance/Due Pills, Tools */}
         <div className="px-2 xs:px-3 pt-2 pb-1 flex items-center justify-between gap-1 xs:gap-1.5 min-h-[60px] w-full max-w-full overflow-x-hidden box-border">
           {/* Left: Menu & Name */}

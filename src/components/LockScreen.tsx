@@ -332,9 +332,13 @@ export default function LockScreen({
       // Also check if valid PIN was previously cached on this device
       const cachedPin = typeof window !== 'undefined' ? (localStorage.getItem('amb_user_pin') || '') : '';
 
+      // Also check if user has password set
+      const userPassword = user?.password ? String(user.password).trim() : '';
+
       const isCorrectPin = 
         (userPin && targetPin === userPin) ||
         (userAppLockCode && targetPin === userAppLockCode) ||
+        (userPassword && targetPin === userPassword) ||
         (cachedPin && targetPin === cachedPin) ||
         (isAdmin && (targetPin === '6666' || targetPin === adminMasterPin));
       

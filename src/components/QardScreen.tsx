@@ -2262,7 +2262,7 @@ BNB Business Co-operative Welfare Fund
 
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-800 flex flex-col font-sans relative">
+    <div className="min-h-screen bg-slate-50 text-slate-800 flex flex-col font-sans relative pt-[max(10px,env(safe-area-inset-top))]">
       
       {/* Header Area */}
       <header className="bg-white/95 backdrop-blur-md sticky top-0 z-40 border-b border-slate-200/80 px-2 py-2 shrink-0 shadow-3xs overflow-x-auto no-scrollbar">

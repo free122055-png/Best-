@@ -3293,7 +3293,7 @@ export const SamityScreen = React.memo(function SamityScreen({
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-800 font-sans flex flex-col relative" id="samity-screen-root">
+    <div className="min-h-screen bg-slate-50 text-slate-800 font-sans flex flex-col relative pt-[max(10px,env(safe-area-inset-top))]" id="samity-screen-root">
       
       {/* 1. Header (1. হেডার) styled absolutely matching the forest-green app header - Ultra Compact */}
       <header className="bg-gradient-to-r from-teal-700 via-teal-800 to-emerald-800 text-white px-3 py-2.5 rounded-b-2xl shadow-md relative overflow-hidden z-20">
@@ -4558,9 +4558,9 @@ export const SamityScreen = React.memo(function SamityScreen({
                 {(appConfig?.samityPolicyConfig?.penaltyTiers && appConfig.samityPolicyConfig.penaltyTiers.length > 0
                   ? appConfig.samityPolicyConfig.penaltyTiers
                   : [
-                      { id: '1', rangeLabel: '১ থেকে ১০ তারিখঃ', fineText: 'কোনো জরিমানা নেই (০ BDT - নিয়মিত কিস্তির সময়)', bgClass: 'bg-emerald-50/40 border-emerald-100 text-emerald-800' },
-                      { id: '2', rangeLabel: '১১ তারিখ থেকে ৩০ দিনঃ', fineText: 'প্রতিদিন ৳১ জরিমানা (বকেয়ার ১ম থেকে ৩০ দিন / ৪০তম দিন পর্যন্ত)', bgClass: 'bg-amber-50/40 border-amber-100 text-amber-800' },
-                      { id: '3', rangeLabel: '৪০তম দিন থেকেঃ', fineText: 'প্রতিদিন ৳১০ জরিমানা', bgClass: 'bg-rose-50/40 border-rose-100 text-rose-800' }
+                      { id: '1', rangeLabel: '১ থেকে ১৫ তারিখঃ', fineText: 'কোনো জরিমানা নেই (০ BDT - নিয়মিত কিস্তির সময়, শেষ তারিখ ১৫ই চলতি মাস)', bgClass: 'bg-emerald-50/40 border-emerald-100 text-emerald-800' },
+                      { id: '2', rangeLabel: '১৬ তারিখ থেকে প্রথম ৩০ দিনঃ', fineText: 'প্রতিদিন ৳১ জরিমানা (১৬ থেকে ৪৫তম দিন পর্যন্ত)', bgClass: 'bg-amber-50/40 border-amber-100 text-amber-800' },
+                      { id: '3', rangeLabel: '৩০ দিন পার হলে (৪৬তম দিন থেকে)ঃ', fineText: 'প্রতিদিন ৳১০ জরিমানা', bgClass: 'bg-rose-50/40 border-rose-100 text-rose-800' }
                     ]
                 ).map((tier, idx) => (
                   <div key={tier.id || idx} className={`flex justify-between items-center p-2.5 rounded-xl border ${tier.bgClass || 'bg-slate-50 border-slate-200 text-slate-800'}`}>
@@ -4578,16 +4578,16 @@ export const SamityScreen = React.memo(function SamityScreen({
             {/* Custom Rules List */}
             <div className="bg-white border border-slate-150 p-4.5 rounded-3xl space-y-2.5 shadow-3xs">
               <span className="text-[10px] font-extrabold text-purple-600 uppercase tracking-widest block">
-                3. বিশেষ ইনভেস্টার শর্তাবলী
+                3. কিস্তি, অটো পেমেন্ট ও জরিমানা নীতিমালা
               </span>
               <div className="space-y-2">
                 {(appConfig?.samityPolicyConfig?.customRules && appConfig.samityPolicyConfig.customRules.length > 0
                   ? appConfig.samityPolicyConfig.customRules
                   : [
-                      "25শে ডিসেম্বরের পূর্বে আপনার সঞ্চিত টাকা উত্তোলন করতে পারবেন না। আপনার জমাকৃত টাকা ডিসেম্বরের 25-30 তারিখের মধ্যে স্বয়ংক্রিয়ভাবে মেইন ব্যালেন্সে জমা হবে।",
-                      "প্রতি মাসের 1 থেকে 9 তারিখের মধ্যে স্বয়ংক্রিয়ভাবে অটো-ডেবিট কিস্তি জমা নেওয়া হয়।",
-                      "10 তারিখ থেকে বিলম্বে কিস্তি জমায় জরিমানা পলিসি প্রযোজ্য হবে।",
-                      "বিশেষ প্রয়োজনে অটো সঞ্চয় বন্ধ করতে এডমিন অনুমতির জন্য হেল্পলাইনে যোগাযোগ করুন।"
+                      "প্রতি মাসের ১ থেকে ১০ তারিখ পর্যন্ত সদস্যকে নিজের ইচ্ছায় কিস্তি পরিশোধ করার সুযোগ দেওয়া হয়।",
+                      "১০ তারিখ পার হওয়ার পর চলতি মাসের কিস্তি পরিশোধ না করা থাকলে এবং মেইন ব্যালেন্সে পর্যাপ্ত টাকা থাকলে ১১ তারিখে স্বয়ংক্রিয়ভাবে ১টি কিস্তি কেটে নেওয়া হয়।",
+                      "১৫ তারিখ হলো কিস্তি পরিশোধের শেষ তারিখ (Due Date)।",
+                      "১৬ তারিখ থেকে প্রতিদিন ১ টাকা জরিমানা শুরু হয় (প্রথম ৩০ দিন প্রতিদিন ১ টাকা, ৩০ দিন অতিক্রান্ত হলে ৪৬তম দিন থেকে প্রতিদিন ১০ টাকা)।"
                     ]
                 ).map((ruleItem, rIdx) => (
                   <div key={rIdx} className="bg-purple-50/50 border border-purple-100 p-3 rounded-2xl flex items-start gap-2 text-xs font-semibold text-purple-950">
@@ -6792,8 +6792,8 @@ export const SamityScreen = React.memo(function SamityScreen({
                     <span className="bg-rose-600 text-white text-[9px] px-1.5 py-0.2 rounded font-mono">Red ক্যাটাগরি</span>
                   </div>
                   <ul className="space-y-1 text-[10.5px] font-semibold text-rose-900 leading-tight">
-                    <li>• <strong>মাসিক কিস্তি:</strong> ৳৪,০০০ (প্রতি মাসের ১-১০ তারিখের মধ্যে)</li>
-                    <li>• <strong>৩ মাস পর পর কিস্তি:</strong> ৳১০,০০০ (বছরে ৪ কিস্তি)</li>
+                    <li>• <strong>মাসিক কিস্তি:</strong> ৳৪,০০০ (১-১০ তারিখ নিজস্ব পেমেন্ট সময়, ১১ তারিখ অটো পেমেন্ট, ১৫ তারিখ শেষ সময়)</li>
+                    <li>• <strong>৩ মাস পর পর কিস্তি:</strong> ৳১০,০০০ (বছরে ৪ কিস্তি: জানুয়ারি, এপ্রিল, জুলাই, অক্টোবর)</li>
                     <li>• <strong>কিস্তির মাস:</strong> জানুয়ারি • এপ্রিল • জুলাই • অক্টোবর</li>
                     <li>• <strong>নমিনি:</strong> ফর্মে সর্বোচ্চ ৩ জনের নাম দিতে পারবেন।</li>
                   </ul>
@@ -7022,8 +7022,8 @@ export const SamityScreen = React.memo(function SamityScreen({
                     <span className="bg-blue-600 text-white text-[9px] px-1.5 py-0.2 rounded font-mono">Blue ক্যাটাগরি</span>
                   </div>
                   <ul className="space-y-1 text-[10.5px] font-semibold text-blue-900 leading-tight">
-                    <li>• <strong>মাসিক কিস্তি:</strong> ৳২,০০০ (প্রতি মাসের ১-১০ তারিখের মধ্যে)</li>
-                    <li>• <strong>৩ মাস পর পর কিস্তি:</strong> ৳৫,০০০ (বছরে ৪ কিস্তি)</li>
+                    <li>• <strong>মাসিক কিস্তি:</strong> ৳২,০০০ (১-১০ তারিখ নিজস্ব পেমেন্ট সময়, ১১ তারিখ অটো পেমেন্ট, ১৫ তারিখ শেষ সময়)</li>
+                    <li>• <strong>৩ মাস পর পর কিস্তি:</strong> ৳৫,০০০ (বছরে ৪ কিস্তি: জানুয়ারি, এপ্রিল, জুলাই, অক্টোবর)</li>
                     <li>• <strong>কিস্তির মাস:</strong> জানুয়ারি • এপ্রিল • জুলাই • অক্টোবর</li>
                     <li>• <strong>নমিনি:</strong> ফর্মে সর্বোচ্চ ২ জনের নাম দিতে পারবেন।</li>
                   </ul>
@@ -7252,7 +7252,7 @@ export const SamityScreen = React.memo(function SamityScreen({
                     <span className="bg-emerald-600 text-white text-[9px] px-1.5 py-0.2 rounded font-mono">Green ক্যাটাগরি</span>
                   </div>
                   <ul className="space-y-1 text-[10.5px] font-semibold text-emerald-900 leading-tight">
-                    <li>• <strong>মাসিক কিস্তি:</strong> ৳১,০০০ (সবার জন্য প্রতি মাসে বাধ্যতামূলক)</li>
+                    <li>• <strong>মাসিক কিস্তি:</strong> ৳১,০০০ (১-১০ তারিখ নিজস্ব পেমেন্ট সময়, ১১ তারিখ অটো পেমেন্ট, ১৫ তারিখ শেষ সময়)</li>
                     <li>• <strong>৩ মাস পর পর কিস্তি:</strong> কোনো অতিরিক্ত কিস্তি নেই।</li>
                     <li>• <strong>নমিনি:</strong> ফর্মে সর্বোচ্চ ১ জনের নাম দিতে পারবেন।</li>
                   </ul>

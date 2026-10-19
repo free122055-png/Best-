@@ -2,21 +2,44 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     
-    // Agent Locations Collection Security Rule
+    // Helper functions for hardened security
+    function isSignedIn() {
+      return request.auth != null;
+    }
+    
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    // Agent Locations: public read, owner write
     match /agentLocations/{userId} {
       allow read: if true;
-      allow write: if true || (request.auth != null && request.auth.uid == userId);
+      allow write: if isSignedIn() && request.auth.uid == userId;
     }
 
-    // Permanent lifetime protection for users collection: accounts are permanent for life and can NEVER be deleted
+    // Users Collection: Users can read and update their own profile, but CANNOT modify balance, walletBalance, role, or memberId
     match /users/{userId} {
-      allow read, create, update: if true;
-      allow delete: if false; // Permanent lifetime protection: accounts can NEVER be deleted or removed
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && request.auth.uid == userId;
+      allow update: if isOwner(userId) && 
+                    !request.resource.data.diff(resource.data).affectedKeys().hasAny(['balance', 'walletBalance', 'role', 'memberId']);
+      allow delete: if false; // Permanent lifetime protection
     }
 
-    // Let all operations succeed so we are immune to auth-provider setup issues in the sandbox/iframe
+    // Transactions, Payment Orders, and Gateway logs can ONLY be written by Admin SDK (Server)
+    match /transactions/{transactionId} {
+      allow read: if isSignedIn();
+      allow write: if false; // Server Admin SDK bypasses rules
+    }
+
+    match /payment_orders/{orderId} {
+      allow read: if isSignedIn();
+      allow write: if false; // Server Admin SDK bypasses rules
+    }
+
+    // Global Default Deny catch-all
     match /{document=**} {
-      allow read, write: if true;
+      allow read, write: if false;
     }
   }
 }

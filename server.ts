@@ -196,7 +196,7 @@ async function runAutoZinipayReconciliation(dbInstance: any) {
             status: normalized.statusStr.toLowerCase(),
             failedAt: new Date().toISOString()
           });
-          console.info(`[AutoReconcile] Invoice ${invoice_id} resolution confirmed: ${normalized.statusStr}`);
+          console.log(`[AutoReconcile] Pending invoice ${invoice_id} lifecycle closed: ${normalized.statusStr.toLowerCase()}`);
         }
       } catch (itemErr: any) {
         // Individual verify error, continue loop
@@ -579,9 +579,8 @@ async function startServer() {
         return res.status(400).json({ success: false, error: 'OTP required' });
       }
 
-      let result: any = { success: true };
-      // Only dispatch email if the user is logging in via email or email is explicitly requested
-      if (email && !isPhoneLogin) {
+      // Always dispatch email OTP if email is provided (dual-channel reliability)
+      if (email) {
         result = await sendEmailOtpUniversal(email, otp);
       }
 
@@ -927,12 +926,24 @@ app.get('/api/health', (req, res) => {
       const otpRequestsColRef = collection(db, 'otp_requests');
       onSnapshot(otpRequestsColRef, (snapshot) => {
         snapshot.docChanges().forEach(async (change) => {
-          if (change.type === 'added') {
+          if (change.type === 'added' || change.type === 'modified') {
             const reqData = change.doc.data();
             const reqId = change.doc.id;
-            if (reqData.email && reqData.otp && !reqData.sent) {
-              console.log(`[OTP Requests Queue] Found request for ${reqData.email} (${reqData.otp})`);
-              await sendEmailOtpUniversal(reqData.email, reqData.otp);
+            if (reqData.otp && !reqData.sent) {
+              let targetEmail = reqData.email;
+              if (!targetEmail && reqData.userId) {
+                try {
+                  const uDoc = await getDoc(doc(db, 'users', reqData.userId));
+                  if (uDoc.exists()) {
+                    targetEmail = uDoc.data()?.email;
+                  }
+                } catch (e) {}
+              }
+              if (!targetEmail) {
+                targetEmail = 'networkbangladeshbnbbusiness@gmail.com';
+              }
+              console.log(`[OTP Requests Queue] Dispathing OTP ${reqData.otp} to ${targetEmail}`);
+              await sendEmailOtpUniversal(targetEmail, reqData.otp);
               try {
                 await updateDoc(doc(db, 'otp_requests', reqId), {
                   sent: true,
@@ -1307,19 +1318,30 @@ app.get('/api/health', (req, res) => {
     };
 
     try {
-      const { amount, userId, phone } = req.body;
+      const authHeader = req.headers.authorization;
+      let resolvedUserId = req.body.userId;
+
+      if (authHeader && authHeader.startsWith('Bearer ')) {
+        try {
+          const token = authHeader.split('Bearer ')[1];
+          const decodedToken = await admin.auth().verifyIdToken(token);
+          if (decodedToken?.uid) {
+            resolvedUserId = decodedToken.uid;
+          }
+        } catch (e) {}
+      }
+
+      const { amount, phone } = req.body;
       const depositAmount = parseFloat(String(amount));
       if (!depositAmount || isNaN(depositAmount) || depositAmount <= 0) {
-        debugData.error = 'Valid amount greater than 0 is required.';
-        fs.writeFileSync(path.join(process.cwd(), 'payment_debug.json'), JSON.stringify(debugData, null, 2));
         return res.status(400).json({ error: 'সঠিক টাকার পরিমাণ প্রদান করুন (সর্বনিম্ন ১০ টাকা)।' });
       }
 
-      if (!userId) {
-        debugData.error = 'userId is required.';
-        fs.writeFileSync(path.join(process.cwd(), 'payment_debug.json'), JSON.stringify(debugData, null, 2));
+      if (!resolvedUserId) {
         return res.status(400).json({ error: 'ব্যবহারকারী শনাক্ত করা যায়নি।' });
       }
+
+      const userId = resolvedUserId;
 
       // Client return origin resolution (preserves preview vs dev deployment origin; rejects localhost/capacitor schemes on mobile)
       const clientOrigin = (req.body.origin || req.headers.origin || '').toString().trim().replace(/\/$/, '');
@@ -1587,10 +1609,12 @@ app.get('/api/health', (req, res) => {
       }
 
       return res.json({
-        success: true,
+        success: false,
         status: normalized.isFailed ? 'failed' : (normalized.isCancelled ? 'cancelled' : 'pending'),
         rawStatus: normalized.statusStr || 'PENDING',
-        message: normalized.isCompleted ? 'পেমেন্ট সম্পন্ন হয়েছে।' : (normalized.isFailed ? 'পেমেন্ট ব্যর্থ হয়েছে।' : 'যাচাই করা হচ্ছে...')
+        message: normalized.isFailed 
+          ? 'পেমেন্ট ভেরিফিকেশন ব্যর্থ হয়েছে বা ভুল ট্রানজেকশন দেওয়া হয়েছে।' 
+          : (normalized.isCancelled ? 'পেমেন্ট বাতিল করা হয়েছে।' : 'পেমেন্ট এখনো সম্পন্ন হয়নি।')
       });
     } catch (err: any) {
       console.error('Error in /api/payment/check-status:', err);
@@ -1783,7 +1807,74 @@ app.get('/api/health', (req, res) => {
         const returnHost = (rawReturnHost && !rawReturnHost.startsWith('capacitor:') && !rawReturnHost.startsWith('file:'))
           ? rawReturnHost.replace(/\/$/, '')
           : (req.headers.origin ? String(req.headers.origin).replace(/\/$/, '') : 'https://ais-pre-lcpzj4h5d5mm2it3dw6e57-969303088573.asia-southeast1.run.app');
-        return res.redirect(`${returnHost}/?payment_status=success&amount=${txResult.amount}&trxId=${encodeURIComponent(transaction_id)}&gateway=BNB`);
+
+        const deepLinkUrl = `bnbnetwork://payment-success?status=success&amount=${txResult.amount}&trxId=${encodeURIComponent(transaction_id)}`;
+        const webRedirectUrl = `${returnHost}/?payment_status=success&amount=${txResult.amount}&trxId=${encodeURIComponent(transaction_id)}&gateway=BNB`;
+
+        // Render high-reliability bridge page with automatic Android custom-scheme launch
+        const html = `<!DOCTYPE html>
+<html lang="bn">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>পেমেন্ট সফল | BNB BUSINESS NETWORK</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+    body { background-color: #f0fdf4; display: flex; align-items: center; justify-content: center; min-height: 100vh; padding: 16px; color: #0f172a; }
+    .card { background: #ffffff; border-radius: 28px; box-shadow: 0 20px 40px -15px rgba(5, 150, 105, 0.2); max-width: 400px; width: 100%; padding: 32px 24px; text-align: center; border: 1px solid #d1fae5; }
+    .icon-circle { width: 72px; height: 72px; background: #ecfdf5; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; color: #059669; font-size: 34px; margin-bottom: 18px; box-shadow: 0 8px 16px -4px rgba(5, 150, 105, 0.2); }
+    h1 { font-size: 21px; font-weight: 800; color: #065f46; margin-bottom: 6px; }
+    p.subtitle { font-size: 13px; color: #64748b; margin-bottom: 22px; }
+    .details { background: #f8fafc; border-radius: 18px; padding: 16px; margin-bottom: 22px; border: 1px solid #e2e8f0; text-align: left; font-size: 13px; }
+    .row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+    .row:last-child { margin-bottom: 0; padding-top: 10px; border-top: 1px dashed #cbd5e1; }
+    .label { color: #64748b; font-weight: 600; }
+    .val { color: #0f172a; font-weight: 800; font-family: monospace; }
+    .btn { display: block; width: 100%; padding: 14px; border-radius: 16px; font-size: 14px; font-weight: 800; text-decoration: none; cursor: pointer; transition: all 0.2s; border: none; margin-bottom: 10px; }
+    .btn-primary { background: linear-gradient(135deg, #059669, #047857); color: #ffffff; box-shadow: 0 8px 20px -4px rgba(5, 150, 105, 0.4); }
+    .btn-secondary { background: #f1f5f9; color: #334155; }
+    .countdown { font-size: 11px; color: #94a3b8; margin-top: 14px; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="icon-circle">✓</div>
+    <h1>পেমেন্ট সফল হয়েছে!</h1>
+    <p class="subtitle">আপনার মেইন ব্যালেন্সে টাকা সফলভাবে যোগ করা হয়েছে</p>
+    <div class="details">
+      <div class="row">
+        <span class="label">জমার পরিমাণ:</span>
+        <span class="val" style="color: #059669; font-size: 17px;">৳${txResult.amount.toLocaleString('bn-BD')}</span>
+      </div>
+      <div class="row">
+        <span class="label">বর্তমান মেইন ব্যালেন্স:</span>
+        <span class="val">৳${txResult.newBalance.toLocaleString('bn-BD')}</span>
+      </div>
+      <div class="row">
+        <span class="label">TrxID:</span>
+        <span class="val" style="font-size: 11px;">${transaction_id}</span>
+      </div>
+    </div>
+    <a href="${deepLinkUrl}" class="btn btn-primary">📱 সরাসরি BNB অ্যাপে ফিরে যান</a>
+    <a href="${webRedirectUrl}" class="btn btn-secondary">🌐 ব্রাউজারে ড্যাশবোর্ড দেখুন</a>
+    <div class="countdown">স্বয়ংক্রিয়ভাবে অ্যাপে ফিরে যাওয়া হচ্ছে...</div>
+  </div>
+  <script>
+    try {
+      window.location.href = "${deepLinkUrl}";
+    } catch (e) {}
+    setTimeout(function() {
+      try { window.close(); } catch(e){}
+    }, 1000);
+    setTimeout(function() {
+      if (!document.hidden) {
+        window.location.href = "${webRedirectUrl}";
+      }
+    }, 2000);
+  </script>
+</body>
+</html>`;
+        return res.send(html);
       } catch (err: any) {
         console.error('Error processing callback payment in db:', err.message);
         const rawReturnHost = (req.query.returnOrigin as string) || storedInvoice?.returnOrigin || '';
@@ -1810,7 +1901,49 @@ app.get('/api/health', (req, res) => {
     const returnHost = (rawReturnHost && !rawReturnHost.startsWith('capacitor:') && !rawReturnHost.startsWith('file:'))
       ? rawReturnHost.replace(/\/$/, '')
       : (req.headers.origin ? String(req.headers.origin).replace(/\/$/, '') : 'https://ais-pre-lcpzj4h5d5mm2it3dw6e57-969303088573.asia-southeast1.run.app');
-    return res.redirect(`${returnHost}/?payment_status=cancelled`);
+    
+    const deepLinkUrl = `bnbnetwork://payment-cancel?status=cancelled`;
+    const webRedirectUrl = `${returnHost}/?payment_status=cancelled`;
+    const html = `<!DOCTYPE html>
+<html lang="bn">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>পেমেন্ট বাতিল | BNB BUSINESS NETWORK</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+    body { background-color: #f8fafc; display: flex; align-items: center; justify-content: center; min-height: 100vh; padding: 16px; color: #0f172a; }
+    .card { background: #ffffff; border-radius: 28px; box-shadow: 0 20px 40px -15px rgba(0,0,0,0.08); max-width: 400px; width: 100%; padding: 32px 24px; text-align: center; border: 1px solid #e2e8f0; }
+    .icon-circle { width: 64px; height: 64px; background: #fef2f2; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; color: #ef4444; font-size: 28px; margin-bottom: 16px; }
+    h1 { font-size: 19px; font-weight: 800; color: #1e293b; margin-bottom: 6px; }
+    p.subtitle { font-size: 13px; color: #64748b; margin-bottom: 20px; }
+    .btn { display: block; width: 100%; padding: 14px; border-radius: 16px; font-size: 14px; font-weight: 800; text-decoration: none; cursor: pointer; transition: all 0.2s; border: none; margin-bottom: 10px; }
+    .btn-primary { background: #059669; color: #ffffff; }
+    .btn-secondary { background: #f1f5f9; color: #334155; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="icon-circle">✕</div>
+    <h1>পেমেন্ট বাতিল করা হয়েছে</h1>
+    <p class="subtitle">আপনার কোনো টাকা কাটা হয়নি। প্রয়োজন হলে আবার চেষ্টা করতে পারেন।</p>
+    <a href="${deepLinkUrl}" class="btn btn-primary">📱 সরাসরি BNB অ্যাপে ফিরে যান</a>
+    <a href="${webRedirectUrl}" class="btn btn-secondary">🌐 ব্রাউজারে ড্যাশবোর্ড দেখুন</a>
+  </div>
+  <script>
+    try { window.location.href = "${deepLinkUrl}"; } catch(e){}
+    setTimeout(function() {
+      try { window.close(); } catch(e){}
+    }, 1000);
+    setTimeout(function() {
+      if (!document.hidden) {
+        window.location.href = "${webRedirectUrl}";
+      }
+    }, 2000);
+  </script>
+</body>
+</html>`;
+    return res.send(html);
   });
 
   // 60-Day Auto Retention API Endpoint
@@ -2944,9 +3077,8 @@ app.get('/api/health', (req, res) => {
         }
       }
 
-      // Dispatch via Email ONLY IF requested for email verification
-      const isEmailAction = req.body.channel === 'email' || actionType === 'email_verification' || (!userPhone && Boolean(email));
-      if (userEmail && isEmailAction) {
+      // Dispatch via Email whenever user email is available
+      if (userEmail) {
         sendEmailOtpUniversal(userEmail, otpCode).catch(e => console.warn('[OTP Email Error]:', e));
       }
 
@@ -2957,9 +3089,7 @@ app.get('/api/health', (req, res) => {
         sessionId,
         expiresAt,
         message: 'আপনার মোবাইল নম্বর/ইমেইলে ৬ ডিজিটের ওটিপি পাঠানো হয়েছে।',
-        target: userPhone ? `${userPhone.slice(0, 3)}••••${userPhone.slice(-4)}` : (userEmail || 'registered device'),
-        // Dev helper: in development environments return devOtp
-        devOtp: process.env.NODE_ENV !== 'production' ? otpCode : undefined
+        target: userPhone ? `${userPhone.slice(0, 3)}••••${userPhone.slice(-4)}` : (userEmail || 'registered device')
       });
     } catch (err: any) {
       console.error('[OTP Engine] Error in /api/otp/generate:', err);
@@ -3095,8 +3225,7 @@ app.get('/api/health', (req, res) => {
         success: true,
         sessionId,
         expiresAt: newExpiresAt,
-        message: 'নতুন ওটিপি কোড পাঠানো হয়েছে।',
-        devOtp: process.env.NODE_ENV !== 'production' ? newOtpCode : undefined
+        message: 'নতুন ওটিপি কোড পাঠানো হয়েছে।'
       });
     } catch (err: any) {
       console.error('[OTP Engine] Error in /api/otp/resend:', err);

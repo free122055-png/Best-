@@ -643,7 +643,7 @@ export const BNBTelecomScreen = React.memo(function BNBTelecomScreen({
   ];
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-850 font-sans flex flex-col relative" id="telecom-screen-root">
+    <div className="min-h-screen bg-slate-50 text-slate-850 font-sans flex flex-col relative pt-[max(10px,env(safe-area-inset-top))]" id="telecom-screen-root">
       
       {/* Dynamic Header */}
       <header className="bg-white border-b border-slate-200/80 px-4 py-3 flex items-center justify-between sticky top-0 z-40 backdrop-blur-md">

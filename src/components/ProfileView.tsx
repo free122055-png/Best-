@@ -940,7 +940,7 @@ export default function ProfileView({ user, onUpdate, onTriggerAdmin, appConfig 
             onClick={() => setShowGeneralMemberModal(true)}
             className={`px-1 sm:px-2 py-2 rounded-xl border transition-all cursor-pointer flex flex-col items-center justify-center text-center shadow-md active:scale-95 ${
               memberCategoryMeta.key === 'regular' || (!memberCategoryMeta.key)
-                ? 'bg-gradient-to-b from-slate-600 via-slate-700 to-slate-800 text-white border-slate-300 shadow-slate-900/70 ring-2 ring-slate-300'
+                ? 'bg-white text-slate-900 border-slate-300 shadow-slate-400/50 ring-2 ring-slate-300 font-black'
                 : 'bg-gradient-to-b from-slate-800/90 to-slate-900/90 hover:from-slate-700 hover:to-slate-800 text-slate-100 border-slate-500/70 shadow-slate-950/60'
             }`}
             title="সাধারণ সদস্যের নিয়মাবলী ও সুযোগ সুবিধা"

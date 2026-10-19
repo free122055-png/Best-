@@ -85,38 +85,39 @@ export function getUnpaidSamityMonths(
 }
 
 /**
- * Fine calculation based on user rules:
- * - 1st to 10th: 0 fine (grace period / নিয়মিত কিস্তির সময়)
- * - 11th onwards for 30 days (11 তারিখ থেকে 30 দিন, অর্থাৎ 39তম দিন পর্যন্ত): প্রতিদিন ৳1 জরিমানা
- * - 40th day onwards (11 তারিখ থেকে 30 দিন অতিক্রান্ত হলে, অর্থাৎ 40তম দিন থেকে): প্রতিদিন ৳10 জরিমানা
+ * Fine calculation based on updated user rules:
+ * - 1st to 15th: 0 fine (নিয়মিত কিস্তির সময়, শেষ তারিখ ১৫ই অক্টোবর/চলতি মাস)
+ * - 16th onwards: 16 তারিখ থেকে প্রতিদিন ১ টাকা জরিমানা শুরু (বকেয়ার ১ম দিন = ৳১)
+ * - 16th to 45th day (প্রথম ৩০ বকেয়া দিন): প্রতিদিন ৳১ জরিমানা
+ * - 46th day onwards (৩০ দিন পার হওয়ার পর): প্রতিদিন ৳১০ জরিমানা
  */
 export function calculateSamityFine(dayOfMonth: number, totalDaysElapsed?: number): { fineAmount: number; statusText: string; isPenalty: boolean; daysLate: number } {
   const elapsed = typeof totalDaysElapsed === 'number' ? totalDaysElapsed : dayOfMonth;
 
-  if (elapsed <= 10) {
-    return { fineAmount: 0, statusText: '১-১০ তারিখ: নিয়মিত কিস্তির সময় (কোনো জরিমানা নেই)', isPenalty: false, daysLate: 0 };
+  if (elapsed <= 15) {
+    return { fineAmount: 0, statusText: '১-১৫ তারিখ: নিয়মিত কিস্তির সময় (কোনো জরিমানা নেই)', isPenalty: false, daysLate: 0 };
   }
 
-  // 11 তারিখ থেকে বকেয়া দিন গণনা (11 তারিখ = বকেয়ার ১ম দিন)
-  const daysLate = elapsed - 10;
+  // ১৬ তারিখ থেকে বকেয়া দিন গণনা (১৬ তারিখ = বকেয়ার ১ম দিন)
+  const daysLate = elapsed - 15;
 
-  // 11 তারিখ থেকে 30 দিন (অর্থাৎ 11 থেকে 39তম দিন পর্যন্ত): প্রতিদিন ৳1 জরিমানা
-  if (elapsed < 40) {
+  // ১৬ তারিখ থেকে ৩০ দিন (অর্থাৎ ১৬ থেকে ৪৫তম দিন পর্যন্ত): প্রতিদিন ৳১ জরিমানা
+  if (daysLate <= 30) {
     const fine = daysLate * 1;
     return { 
       fineAmount: fine, 
-      statusText: `১১ তারিখ থেকে ৩০ দিন: প্রতিদিন ৳১ জরিমানা (বকেয়া: ${daysLate} দিন = ৳${fine})`, 
+      statusText: `১৬ তারিখ থেকে ৩০ দিন: প্রতিদিন ৳১ জরিমানা (বকেয়া: ${daysLate} দিন = ৳${fine})`, 
       isPenalty: true, 
       daysLate 
     };
   }
 
-  // ৪০তম দিন থেকে (11 তারিখ থেকে 30 দিন পূর্ণ হওয়ার পর): প্রতিদিন ৳10 জরিমানা
-  const daysAt10Rate = elapsed - 40 + 1; // 40তম দিনে 1 দিন, 41তম দিনে 2 দিন
-  const fine = 29 * 1 + (daysAt10Rate * 10);
+  // ৩০ দিন অতিক্রান্ত হলে (অর্থাৎ ৪৬তম দিন থেকে / বকেয়ার ৩১তম দিন থেকে): প্রতিদিন ৳১০ জরিমানা
+  const daysAt10Rate = daysLate - 30;
+  const fine = (30 * 1) + (daysAt10Rate * 10);
   return { 
     fineAmount: fine, 
-    statusText: `৪০তম দিন থেকে: প্রতিদিন ৳১০ জরিমানা (বকেয়া: ${daysLate} দিন = ৳${fine})`, 
+    statusText: `৩০ দিন অতিক্রান্ত (৪৬তম দিন থেকে): প্রতিদিন ৳১০ জরিমানা (বকেয়া: ${daysLate} দিন = ৳${fine})`, 
     isPenalty: true, 
     daysLate 
   };
@@ -143,32 +144,32 @@ export function calculateOverdueDaysAndFine(targetYear: number, targetMonthIdx: 
     return { daysLate: 0, fineAmount: 0, statusText: 'ভবিষ্যৎ মাস (কোনো জরিমানা নেই)' };
   }
 
-  // If target month is in past: calculate total elapsed days from the 10th of that target month
-  const dueDate = new Date(targetYear, targetMonthIdx, 10);
+  // If target month is in past: calculate total elapsed days from the 15th of that target month
+  const dueDate = new Date(targetYear, targetMonthIdx, 15);
   const diffMs = now.getTime() - dueDate.getTime();
   const daysLate = Math.max(0, Math.floor(diffMs / (1000 * 60 * 60 * 24)));
 
   if (daysLate <= 0) {
-    return { daysLate: 0, fineAmount: 0, statusText: '১-১০ তারিখ: নিয়মিত কিস্তির সময় (কোনো জরিমানা নেই)' };
+    return { daysLate: 0, fineAmount: 0, statusText: '১-১৫ তারিখ: নিয়মিত কিস্তির সময় (কোনো জরিমানা নেই)' };
   }
 
-  // 11 তারিখ থেকে 30 দিন (অর্থাৎ 29 দিন পর্যন্ত): প্রতিদিন ৳1 জরিমানা
-  if (daysLate < 30) {
+  // ১৬ তারিখ থেকে প্রথম ৩০ দিন: প্রতিদিন ৳১ জরিমানা
+  if (daysLate <= 30) {
     const fine = daysLate * 1;
     return { 
       daysLate, 
       fineAmount: fine, 
-      statusText: `১১ তারিখ থেকে ৩০ দিন: প্রতিদিন ৳১ জরিমানা (বকেয়া: ${daysLate} দিন = ৳${fine})` 
+      statusText: `১৬ তারিখ থেকে প্রথম ৩০ দিন: প্রতিদিন ৳১ জরিমানা (বকেয়া: ${daysLate} দিন = ৳${fine})` 
     };
   }
 
-  // 40তম দিন থেকে (11 তারিখ থেকে 30 দিন অতিক্রান্ত হলে): প্রতিদিন ৳10 জরিমানা
-  const daysAt10Rate = daysLate - 30 + 1;
-  const fine = 29 * 1 + (daysAt10Rate * 10);
+  // ৩০ দিন অতিক্রান্ত হলে: প্রতিদিন ৳১০ জরিমানা
+  const daysAt10Rate = daysLate - 30;
+  const fine = (30 * 1) + (daysAt10Rate * 10);
   return { 
     daysLate, 
     fineAmount: fine, 
-    statusText: `৪০তম দিন থেকে: প্রতিদিন ৳১০ জরিমানা (বকেয়া: ${daysLate} দিন = ৳${fine})` 
+    statusText: `৩০ দিন অতিক্রান্ত: প্রতিদিন ৳১০ জরিমানা (বকেয়া: ${daysLate} দিন = ৳${fine})` 
   };
 }
 
@@ -213,12 +214,11 @@ export function isUserQuarterlyPaid(user: User, year: number, qId: string): bool
 }
 
 /**
- * Returns STRICTLY OVERDUE or eligible current months for AUTO-DEDUCTION.
- * Absolute Rules:
- * 1. Future months (e.g. November, December when in October) can NEVER be auto-deducted!
- * 2. Current Month (e.g. October): If today is 1st to 10th (or anytime if unpaid), it IS eligible for auto-deduction
- *    IF AND ONLY IF member's balance has at least the full installment amount!
- * 3. Broken deductions are strictly prohibited (সম্পূর্ণ কিস্তির টাকা একাউন্টে থাকতে হবে)।
+ * Returns STRICTLY eligible current month for AUTO-DEDUCTION based on new rules:
+ * 1. 1st to 10th: User has freedom to pay manually. No auto deduction!
+ * 2. 11th onwards: If current month installment is NOT paid, current month is candidate for auto-deduction.
+ * 3. Auto payment NEVER auto-deducts past unpaid months or future months!
+ * 4. Auto payment deducts strictly ONE current month installment at a time.
  */
 export function getOverdueSamityMonthsForAutoDeduction(user: User): Array<{ id: string; monthNum: number; name: string; short: string; year: number; index: number }> {
   if (!user) return [];
@@ -227,36 +227,28 @@ export function getOverdueSamityMonthsForAutoDeduction(user: User): Array<{ id: 
   const currentMonthIdx = now.getMonth(); // 0-indexed (8 = September, 9 = October)
   const currentDay = now.getDate(); // 1 to 31
 
-  const overdueList: Array<{ id: string; monthNum: number; name: string; short: string; year: number; index: number }> = [];
+  // RULE 1: On 1st to 10th, member has manual payment period. NO auto deduction!
+  if (currentDay < 11) {
+    return [];
+  }
 
-  // Check months up to currentMonthIdx
-  SAMITY_MONTHS.forEach((m, idx) => {
-    // RULE 1: STRICT BAN ON FUTURE MONTHS (idx > currentMonthIdx)
-    if (idx > currentMonthIdx) {
-      return;
-    }
+  const currentMonth = SAMITY_MONTHS[currentMonthIdx];
+  if (!currentMonth) return [];
 
-    // If unpaid, add to candidate list for auto-deduction
-    const isPaid = isUserMonthPaid(user, currentYear, m.id, idx);
-    if (!isPaid) {
-      overdueList.push({
-        id: m.id,
-        monthNum: m.monthNum,
-        name: m.name,
-        short: m.short,
-        year: currentYear,
-        index: idx
-      });
-    }
-  });
+  // RULE 2: Check if current month is paid
+  const isPaid = isUserMonthPaid(user, currentYear, currentMonth.id, currentMonthIdx);
+  if (!isPaid) {
+    return [{
+      id: currentMonth.id,
+      monthNum: currentMonth.monthNum,
+      name: currentMonth.name,
+      short: currentMonth.short,
+      year: currentYear,
+      index: currentMonthIdx
+    }];
+  }
 
-  // Sort chronologically (earliest unpaid month first)
-  overdueList.sort((a, b) => {
-    if (a.year !== b.year) return a.year - b.year;
-    return a.index - b.index;
-  });
-
-  return overdueList;
+  return [];
 }
 
 export interface AutoDeductionResult {
@@ -363,10 +355,10 @@ export async function processUserSamitySavingsAutoDeduction(
   }
 
   if (targetUnpaidMonths.length === 0) {
-    const isWithinGrace = currentDay <= 10;
-    const msg = isWithinGrace
-      ? 'চলতি মাসের ১০ তারিখ পর্যন্ত কিস্তি পরিশোধের নিয়মিত সময় চলছে (কোনো জরিমানা নেই)। বর্তমানে কোনো বকেয়া কিস্তি নেই।'
-      : 'বর্তমানে কোনো বকেয়া কিস্তি নেই। অগ্রিম বা ভবিষ্যৎ মাসের টাকা অটোমেটিক কাটা সম্পূর্ণ নিষিদ্ধ।';
+    const isWithinManualPeriod = currentDay <= 10;
+    const msg = isWithinManualPeriod
+      ? 'প্রতি মাসের ১ থেকে ১০ তারিখ পর্যন্ত সদস্যকে নিজের ইচ্ছায় কিস্তি পরিশোধের সুযোগ দেওয়া রয়েছে। বর্তমানে কোনো বকেয়া কিস্তি নেই।'
+      : 'বর্তমানে কোনো বকেয়া কিস্তি নেই। চলতি মাসের ১টি কিস্তি ইতোমধ্যে পরিশোধিত।';
     return {
       success: false,
       userId: user.uid,
@@ -424,7 +416,7 @@ export async function processUserSamitySavingsAutoDeduction(
       }
 
       if (freshUnpaidList.length === 0) {
-        const isWithinGrace = new Date().getDate() <= 9;
+        const isWithinManualPeriod = new Date().getDate() <= 10;
         return {
           success: false,
           userId: user.uid,
@@ -434,9 +426,9 @@ export async function processUserSamitySavingsAutoDeduction(
           newMainBalance: liveBal,
           newSavingsBalance: Number(freshData.savings) || 0,
           reason: 'already_processed' as const,
-          message: isWithinGrace
-            ? 'চলতি মাসের ৯ তারিখ পর্যন্ত কিস্তি দেওয়ার সুযোগ রয়েছে। এই সময়ে কোনো অটোমেটিক কর্তন করা হবে না।'
-            : 'কোনো বকেয়া কিস্তি অবশিষ্ট নেই।'
+          message: isWithinManualPeriod
+            ? 'প্রতি মাসের ১০ তারিখ পর্যন্ত নিজের ইচ্ছায় কিস্তি দেওয়ার সময় রয়েছে। ১১ তারিখে স্বয়ংক্রিয় ১টি কিস্তি কাটা হবে।'
+            : 'চলতি মাসের কিস্তি ইতোমধ্যে পরিশোধিত রয়েছে।'
         };
       }
 

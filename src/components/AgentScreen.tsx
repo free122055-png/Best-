@@ -2067,6 +2067,7 @@ const assignUniqueAgentCoordinates = (list: Agent[]): Agent[] => {
                 onSelectAgent={setHighlightedAgentId}
                 zoomLevel={zoomLevel}
                 userLocation={userLocation}
+                manualAddress={[profThana, profDist, profCity].filter(Boolean).join(', ')}
               />
             </div>
 

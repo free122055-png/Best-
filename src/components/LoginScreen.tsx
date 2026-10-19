@@ -4,11 +4,14 @@ import { doc, getDoc, setDoc, updateDoc, getDocs, collection, query, where, addD
 import { RecaptchaVerifier, signInWithPhoneNumber, ConfirmationResult } from 'firebase/auth';
 import { Capacitor, CapacitorHttp } from '@capacitor/core';
 import { User, AppConfig } from '../types';
-import { ShieldCheck, UserPlus, LogIn, Mail, KeyRound, Globe, Lock, ArrowRight, AlertTriangle, CheckCircle2, User as UserIcon, Sparkles, Moon, Sun, ArrowLeft } from 'lucide-react';
+import { ShieldCheck, UserPlus, LogIn, Mail, KeyRound, Globe, Lock, ArrowRight, AlertTriangle, CheckCircle2, User as UserIcon, Sparkles, Moon, Sun, ArrowLeft, Eye, EyeOff } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { BNBLogo } from './BNBLogo';
-import { normalizeMemberId, normalizePhoneNumber, saveUserToLocalBackup, convertBengaliToEnglishDigits, getNextSequentialMemberId, getClientDeviceId, getDeviceFingerprint } from '../lib/memberUtils';
+import { normalizeMemberId, normalizePhoneNumber, saveUserToLocalBackup, convertBengaliToEnglishDigits, getNextSequentialMemberId, getClientDeviceId, getDeviceFingerprint, findUserInFirestoreByPhone } from '../lib/memberUtils';
 import { LegacyEmailMigrationModal } from './LegacyEmailMigrationModal';
+import ForgotPasswordModal from './ForgotPasswordModal';
+import { sendEmailOtpDirect } from '../lib/emailOtpService';
+import { apiUrl } from '../config/api';
 
 interface LoginScreenProps {
   authUid?: string;
@@ -47,6 +50,7 @@ export default function LoginScreen({
     return '';
   });
   const [otpInput, setOtpInput] = useState('');
+  const [showForgotPassword, setShowForgotPassword] = useState(false);
   const [sentOtpCode, setSentOtpCode] = useState('');
   const [foundUser, setFoundUser] = useState<User | null>(null);
   const [confirmationResult, setConfirmationResult] = useState<ConfirmationResult | null>(null);
@@ -83,118 +87,118 @@ export default function LoginScreen({
     }
   }, [appConfig?.emailMigrationPopupEnabled]);
 
-  // Handle Send OTP for Login (Supports Account Number and Email, both via mandatory OTP)
+  // Helper to locate user across phone formats, account IDs, emails, and direct doc IDs
+  const locateUser = async (rawInput: string): Promise<User | null> => {
+    const trimmedInput = rawInput.trim();
+    if (!trimmedInput) return null;
+
+    const cleanInput = trimmedInput.toLowerCase();
+    const isEmail = cleanInput.includes('@');
+    const cleanDigits = convertBengaliToEnglishDigits(trimmedInput).replace(/\D/g, '');
+
+    // 1. Check local storage cached user
+    const lastUserRaw = localStorage.getItem('amb_last_user');
+    if (lastUserRaw) {
+      try {
+        const cached = JSON.parse(lastUserRaw);
+        if (
+          (isEmail && cached.email?.toLowerCase() === cleanInput) ||
+          (cached.memberId?.toUpperCase() === trimmedInput.toUpperCase()) ||
+          (cached.memberId?.toLowerCase() === cleanInput) ||
+          (cleanDigits.length >= 10 && cached.phone?.replace(/\D/g, '').endsWith(cleanDigits.slice(-10)))
+        ) {
+          return cached;
+        }
+      } catch (e) {}
+    }
+
+    if (!db) return null;
+
+    // 2. Direct email queries
+    if (isEmail) {
+      try {
+        const qEmail = query(collection(db, 'users'), where('email', '==', cleanInput), limit(1));
+        const snapEmail = await getDocs(qEmail);
+        if (!snapEmail.empty) {
+          return { uid: snapEmail.docs[0].id, ...(snapEmail.docs[0].data() as any) } as User;
+        }
+        const qEmailRaw = query(collection(db, 'users'), where('email', '==', trimmedInput), limit(1));
+        const snapEmailRaw = await getDocs(qEmailRaw);
+        if (!snapEmailRaw.empty) {
+          return { uid: snapEmailRaw.docs[0].id, ...(snapEmailRaw.docs[0].data() as any) } as User;
+        }
+      } catch (e) {}
+    }
+
+    // 3. Member ID and Account Number queries
+    const upperInput = trimmedInput.toUpperCase();
+    const queriesToTry = [
+      query(collection(db, 'users'), where('memberId', '==', upperInput), limit(1)),
+      query(collection(db, 'users'), where('memberId', '==', trimmedInput), limit(1)),
+      query(collection(db, 'users'), where('memberId', '==', cleanInput), limit(1)),
+      query(collection(db, 'users'), where('accountNumber', '==', upperInput), limit(1)),
+      query(collection(db, 'users'), where('accountNumber', '==', trimmedInput), limit(1)),
+      query(collection(db, 'users'), where('accountNo', '==', upperInput), limit(1))
+    ];
+
+    if (cleanDigits.length > 0 && cleanDigits.length <= 8) {
+      const paddedId = `BNB${cleanDigits.padStart(8, '0')}`;
+      queriesToTry.push(query(collection(db, 'users'), where('memberId', '==', paddedId), limit(1)));
+    }
+
+    if (cleanDigits.length >= 10) {
+      const last10 = cleanDigits.slice(-10);
+      queriesToTry.push(query(collection(db, 'users'), where('phone', '==', `+880${last10}`), limit(1)));
+      queriesToTry.push(query(collection(db, 'users'), where('phone', '==', `0${last10}`), limit(1)));
+      queriesToTry.push(query(collection(db, 'users'), where('phone', '==', cleanDigits), limit(1)));
+      queriesToTry.push(query(collection(db, 'users'), where('phone', '==', `+${cleanDigits}`), limit(1)));
+    }
+
+    try {
+      const results = await Promise.all(queriesToTry.map(q => getDocs(q).catch(() => null)));
+      for (const res of results) {
+        if (res && !res.empty) {
+          return { uid: res.docs[0].id, ...(res.docs[0].data() as any) } as User;
+        }
+      }
+    } catch (e) {}
+
+    // 4. Try robust findUserInFirestoreByPhone helper (checks secret admin phone & all normalized patterns)
+    try {
+      const foundByPhone = await findUserInFirestoreByPhone(trimmedInput);
+      if (foundByPhone?.user) {
+        return foundByPhone.user;
+      }
+    } catch (e) {}
+
+    // 5. Direct doc ID lookup in 'users'
+    try {
+      const directDoc = await getDoc(doc(db, 'users', trimmedInput));
+      if (directDoc.exists()) {
+        return { uid: directDoc.id, ...(directDoc.data() as any) } as User;
+      }
+    } catch (e) {}
+
+    return null;
+  };
+
+  // Handle Send OTP for Login (Mandatory Multi-Channel: Direct Native Resend + Real-time Firestore Queue + Phone SIM SMS)
   const handleSendOtp = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
     setSuccessMessage('');
     const rawInput = email.trim();
     if (!rawInput) {
-      setError('অনুগ্রহ করে আপনার অ্যাকাউন্ট নম্বর অথবা ইমেইল প্রদান করুন।');
+      setError('অনুগ্রহ করে আপনার অ্যাকাউন্ট নম্বর, মোবাইল নম্বর অথবা ইমেইল প্রদান করুন।');
       return;
     }
-
-    const cleanInput = rawInput.toLowerCase();
-    const isEmail = cleanInput.includes('@');
-    const cleanDigits = convertBengaliToEnglishDigits(rawInput).replace(/\D/g, '');
-    const isPhone = !isEmail && cleanDigits.length >= 10 && cleanDigits.length <= 14;
 
     setLoading(true);
 
     try {
-      let targetUser: User | null = null;
-
-      // 1. Local storage cache inspection
-      const lastUserRaw = localStorage.getItem('amb_last_user');
-      if (lastUserRaw) {
-        try {
-          const cached = JSON.parse(lastUserRaw);
-          if (
-            (isEmail && cached.email?.toLowerCase() === cleanInput) ||
-            (cached.memberId?.toUpperCase() === rawInput.toUpperCase()) ||
-            (cached.memberId?.toLowerCase() === cleanInput) ||
-            (isPhone && cached.phone?.replace(/\D/g, '').endsWith(cleanDigits.slice(-10)))
-          ) {
-            targetUser = cached;
-          }
-        } catch (e) {}
-      }
-
-      // 2. Comprehensive search in Firestore
-      if (!targetUser && db) {
-        if (isEmail) {
-          // Direct email search (case-insensitive & exact)
-          const qEmail = query(collection(db, 'users'), where('email', '==', cleanInput), limit(1));
-          const snapEmail = await getDocs(qEmail);
-          if (!snapEmail.empty) {
-            targetUser = { uid: snapEmail.docs[0].id, ...(snapEmail.docs[0].data() as any) } as User;
-          } else {
-            const qEmailRaw = query(collection(db, 'users'), where('email', '==', rawInput), limit(1));
-            const snapEmailRaw = await getDocs(qEmailRaw);
-            if (!snapEmailRaw.empty) {
-              targetUser = { uid: snapEmailRaw.docs[0].id, ...(snapEmailRaw.docs[0].data() as any) } as User;
-            }
-          }
-        } else {
-          // Account Number / Member ID / Phone search
-          const upperInput = rawInput.toUpperCase();
-          const queriesToTry = [
-            query(collection(db, 'users'), where('memberId', '==', upperInput), limit(1)),
-            query(collection(db, 'users'), where('memberId', '==', rawInput), limit(1)),
-            query(collection(db, 'users'), where('memberId', '==', cleanInput), limit(1)),
-            query(collection(db, 'users'), where('accountNumber', '==', upperInput), limit(1)),
-            query(collection(db, 'users'), where('accountNumber', '==', rawInput), limit(1)),
-            query(collection(db, 'users'), where('accountNo', '==', upperInput), limit(1))
-          ];
-
-          // If numeric input (e.g. "28" or "00000028"), also search BNB and BNB padded IDs
-          if (cleanDigits.length > 0 && cleanDigits.length <= 8) {
-            const paddedId = `BNB${cleanDigits.padStart(8, '0')}`;
-            queriesToTry.push(query(collection(db, 'users'), where('memberId', '==', paddedId), limit(1)));
-            const ambPaddedId = `BNB${cleanDigits.padStart(8, '0')}`;
-            queriesToTry.push(query(collection(db, 'users'), where('memberId', '==', ambPaddedId), limit(1)));
-          }
-
-          // If 10-11 digit phone number
-          if (cleanDigits.length >= 10 && cleanDigits.length <= 11) {
-            const standardPhone = cleanDigits.length === 11 && cleanDigits.startsWith('0') ? `+88${cleanDigits}` : cleanDigits;
-            queriesToTry.push(query(collection(db, 'users'), where('phone', '==', standardPhone), limit(1)));
-            queriesToTry.push(query(collection(db, 'users'), where('phone', '==', cleanDigits), limit(1)));
-          }
-
-          // 12-digit special samity auto account (ends with 0)
-          if (cleanDigits.length === 12 && cleanDigits.endsWith('0')) {
-            const basePhone = cleanDigits.slice(0, 11);
-            queriesToTry.push(query(collection(db, 'users'), where('phone', '==', `+88${basePhone}`), limit(1)));
-            queriesToTry.push(query(collection(db, 'users'), where('phone', '==', basePhone), limit(1)));
-          }
-
-          const results = await Promise.all(queriesToTry.map(q => getDocs(q).catch(() => null)));
-          for (const res of results) {
-            if (res && !res.empty) {
-              targetUser = { uid: res.docs[0].id, ...(res.docs[0].data() as any) } as User;
-              break;
-            }
-          }
-
-          // Check direct doc ID match if still not found
-          if (!targetUser) {
-            try {
-              const directDoc = await getDoc(doc(db, 'users', rawInput));
-              if (directDoc.exists()) {
-                targetUser = { uid: directDoc.id, ...(directDoc.data() as any) } as User;
-              }
-            } catch (dErr) {}
-          }
-        }
-      }
-
+      const targetUser = await locateUser(rawInput);
       if (!targetUser) {
-        setError(
-          isEmail
-            ? 'প্রদত্ত ইমেইল ঠিকানায় কোনো অ্যাকাউন্ট পাওয়া যায়নি। সঠিক ইমেইল দিন অথবা নতুন একাউন্ট খুলুন।'
-            : 'প্রদত্ত অ্যাকাউন্ট নম্বরে কোনো মেম্বার পাওয়া যায়নি। সঠিক অ্যাকাউন্ট নম্বর দিন (উদাঃ BNB00000028)।'
-        );
+        setError('প্রদত্ত তথ্যে কোনো অ্যাকাউন্ট পাওয়া যায়নি। সঠিক অ্যাকাউন্ট নম্বর (উদাঃ BNB00000028), মোবাইল নম্বর অথবা ইমেইল দিন।');
         setLoading(false);
         return;
       }
@@ -202,132 +206,93 @@ export default function LoginScreen({
       setFoundUser(targetUser);
 
       const userDisplayName = targetUser.name || 'সম্মানিত সদস্য';
-      const userPhone = targetUser.phone || (isPhone ? cleanDigits : '');
-      const userEmail = targetUser.email || (isEmail ? cleanInput : '');
-      const isPhoneLogin = !isEmail;
+      const userPhone = targetUser.phone || '';
+      const userEmail = targetUser.email || (rawInput.includes('@') ? rawInput.trim().toLowerCase() : '');
 
-      // 1. PHONE LOGIN: Send OTP directly to SIM via Firebase Phone Authentication
-      if (isPhoneLogin) {
-        let rawDigits = convertBengaliToEnglishDigits(userPhone || cleanDigits).replace(/\D/g, '');
-        let formattedPhone = rawDigits;
+      // If user has NO registered email in profile
+      if (!userEmail) {
+        setLoading(false);
+        setError('আপনার অ্যাকাউন্টে কোনো ইমেইল যুক্ত পাওয়া যায়নি। ওটিপি গ্রহণের জন্য অনুগ্রহ করে আপনার ইমেইল দিয়ে চেষ্টা করুন অথবা নিচে "পাসওয়ার্ড ভুলে গেছেন? রিসেট করুন" বাটনে ক্লিক করুন।');
+        return;
+      }
+
+      const targetEmail = userEmail.trim().toLowerCase();
+
+      // Format phone for Bangladesh or international standards
+      let formattedPhone = '';
+      if (userPhone) {
+        let rawDigits = convertBengaliToEnglishDigits(userPhone).replace(/\D/g, '');
         if (rawDigits.length === 11 && rawDigits.startsWith('0')) {
           formattedPhone = `+88${rawDigits}`;
         } else if (rawDigits.length === 10) {
           formattedPhone = `+880${rawDigits}`;
         } else if (rawDigits.startsWith('880')) {
           formattedPhone = `+${rawDigits}`;
-        } else if (!rawDigits.startsWith('+')) {
+        } else if (rawDigits.startsWith('+')) {
+          formattedPhone = rawDigits;
+        } else if (rawDigits) {
           formattedPhone = `+88${rawDigits}`;
         }
+      }
 
-        try {
-          if (typeof window !== 'undefined') {
+      // 1. Generate authoritative 6-digit OTP
+      const generatedOtp = Math.floor(100000 + Math.random() * 900000).toString();
+      setSentOtpCode(generatedOtp);
+
+      // Mask email for privacy display
+      const maskEmail = (em: string) => {
+        const parts = em.split('@');
+        if (parts.length !== 2) return em;
+        const namePart = parts[0];
+        const masked = namePart.length > 2 ? `${namePart.slice(0, 2)}••••${namePart.slice(-1)}` : `${namePart}•`;
+        return `${masked}@${parts[1]}`;
+      };
+      const displayEmail = maskEmail(targetEmail);
+
+      // 2. Multi-channel authoritative OTP dispatch (Fast non-blocking)
+      sendEmailOtpDirect({
+        email: targetEmail,
+        otp: generatedOtp,
+        userName: userDisplayName,
+        phone: formattedPhone || userPhone,
+        memberId: targetUser.memberId || rawInput,
+        userId: targetUser.uid,
+        reason: 'login'
+      }).catch(() => {});
+
+      // 4. Background Firebase Phone Auth SIM SMS attempt if phone exists (non-blocking)
+      if (formattedPhone) {
+        if (typeof window !== 'undefined') {
+          try {
             if (!(window as any).recaptchaVerifier) {
               (window as any).recaptchaVerifier = new RecaptchaVerifier(auth, 'recaptcha-container', {
                 size: 'invisible',
                 callback: () => {}
               });
             }
-          }
-
-          const appVerifier = (window as any).recaptchaVerifier;
-          const confirmation = await signInWithPhoneNumber(auth, formattedPhone, appVerifier);
-          setConfirmationResult(confirmation);
-          setSentOtpCode(''); // No demo code! Real SMS is sent to SIM.
-          setDeliveryInfo({
-            deliveredTo: formattedPhone,
-            channel: 'phone',
-            targetPhone: formattedPhone
-          });
-          setStep('verify-otp');
-          setSuccessMessage(`আপনার সিমে (${formattedPhone}) ফায়ারবেজ থেকে সরাসরি এসএমএস ওটিপি পাঠানো হয়েছে। মেসেজ চেক করে কোড দিন।`);
-
-          if (typeof window !== 'undefined') {
-            localStorage.setItem('amb_saved_login_email', rawInput);
-          }
-        } catch (fbPhoneErr: any) {
-          console.error('Firebase Phone Auth Error:', fbPhoneErr);
-          if (typeof window !== 'undefined' && (window as any).recaptchaVerifier) {
-            try {
-              (window as any).recaptchaVerifier.clear();
-            } catch (cErr) {}
-            (window as any).recaptchaVerifier = null;
-          }
-
-          let errMsg = 'ফায়ারবেজ থেকে সিমে ওটিপি পাঠাতে সমস্যা হয়েছে।';
-          if (fbPhoneErr?.code === 'auth/invalid-phone-number') {
-            errMsg = 'মোবাইল নম্বরটি সঠিক ফরম্যাটে নেই। সঠিক ১১ ডিজিটের মোবাইল নম্বর দিন (উদাঃ 01712345678)।';
-          } else if (fbPhoneErr?.code === 'auth/too-many-requests') {
-            errMsg = 'অতিরিক্ত অনুরোধের কারণে ওটিপি সাময়িকভাবে স্থগিত। কিছুক্ষণ পর চেষ্টা করুন।';
-          } else if (fbPhoneErr?.code === 'auth/quota-exceeded') {
-            errMsg = 'Firebase SMS কোটা অতিক্রম হয়েছে। অনুগ্রহ করে সাপোর্ট টিমে যোগাযোগ করুন।';
-          } else if (fbPhoneErr?.message) {
-            errMsg = fbPhoneErr.message;
-          }
-          setError(errMsg);
-        } finally {
-          setLoading(false);
+            const appVerifier = (window as any).recaptchaVerifier;
+            signInWithPhoneNumber(auth, formattedPhone, appVerifier).then(confirmation => {
+              setConfirmationResult(confirmation);
+            }).catch(() => {});
+          } catch (e) {}
         }
-        return;
       }
 
-      // 2. EMAIL LOGIN: Send real 6-digit OTP to user's registered Email address
-      const generatedOtp = Math.floor(100000 + Math.random() * 900000).toString();
-      setSentOtpCode(generatedOtp);
-      setConfirmationResult(null);
+      // 5. Update UI state & prompt user instantly
+      setDeliveryInfo({
+        deliveredTo: displayEmail,
+        channel: 'email',
+        targetPhone: formattedPhone,
+        targetEmail: targetEmail
+      });
 
-      try {
-        const payload = {
-          email: cleanInput,
-          otp: generatedOtp,
-          userName: userDisplayName,
-          phone: userPhone,
-          accountNumber: targetUser.memberId || rawInput,
-          isPhoneLogin: false,
-          channel: 'email'
-        };
+      setSuccessMessage(`আপনার নিবন্ধিত ইমেইলে (${displayEmail}) ৬ সংখ্যার ওটিপি কোড পাঠানো হয়েছে। ইনবক্স অথবা স্প্যাম ফোল্ডার চেক করুন।`);
 
-        const endpointUrl = Capacitor.isNativePlatform()
-          ? 'https://ais-pre-lcpzj4h5d5mm2it3dw6e57-969303088573.asia-southeast1.run.app/api/send-otp'
-          : '/api/send-otp';
-
-        if (Capacitor.isNativePlatform()) {
-          await CapacitorHttp.post({
-            url: endpointUrl,
-            headers: { 'Content-Type': 'application/json' },
-            data: payload
-          });
-        } else {
-          await fetch(endpointUrl, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload)
-          });
-        }
-
-        setDeliveryInfo({
-          deliveredTo: cleanInput,
-          channel: 'email',
-          targetEmail: cleanInput
-        });
-        setStep('verify-otp');
-        setSuccessMessage(`আপনার ইমেইলে (${cleanInput}) ৬ ডিজিটের ওটিপি কোড পাঠানো হয়েছে।`);
-
-        if (typeof window !== 'undefined') {
-          localStorage.setItem('amb_saved_login_email', rawInput);
-        }
-      } catch (sendErr: any) {
-        console.warn('Send Email OTP network warning:', sendErr);
-        setDeliveryInfo({
-          deliveredTo: cleanInput,
-          channel: 'email',
-          targetEmail: cleanInput
-        });
-        setStep('verify-otp');
-        setSuccessMessage(`আপনার ইমেইলে (${cleanInput}) ওটিপি কোড পাঠানো হয়েছে।`);
-      } finally {
-        setLoading(false);
+      setStep('verify-otp');
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('amb_saved_login_email', rawInput);
       }
+      setLoading(false);
     } catch (err: any) {
       console.error('Login error:', err);
       setError('লগইন প্রসেসে ত্রুটি হয়েছে। অনুগ্রহ করে পুনরায় চেষ্টা করুন।');
@@ -364,11 +329,12 @@ export default function LoginScreen({
       localStorage.setItem('bnb_user_member_id', userWithToken.memberId || 'BNB00000000');
       localStorage.setItem('amb_active_session_token', newSessionToken);
       localStorage.setItem('amb_last_user', JSON.stringify(userWithToken));
+      sessionStorage.setItem('amb_session_unlocked', 'true');
     }
     onLoginSuccess(userWithToken);
   };
 
-  // Verify OTP (Real verification against Firebase SIM confirmation or Email OTP)
+  // Verify OTP (Dual check: Email OTP code OR Firebase Phone Auth SMS confirmation)
   const handleVerifyOtp = async (e?: React.FormEvent, directCode?: string) => {
     if (e) e.preventDefault();
     const code = directCode || otpInput.trim();
@@ -386,37 +352,35 @@ export default function LoginScreen({
     setError('');
 
     try {
-      if (confirmationResult) {
-        // Real Firebase Phone Auth SMS code verification directly with Firebase servers!
-        await confirmationResult.confirm(code);
+      let isVerified = false;
+
+      // 1. Primary check against generated session/email OTP code
+      if (sentOtpCode && code === sentOtpCode) {
+        isVerified = true;
+      }
+
+      // 2. If not matched, try Firebase Phone Auth confirmation
+      if (!isVerified && confirmationResult) {
+        try {
+          await confirmationResult.confirm(code);
+          isVerified = true;
+        } catch (fbConfirmErr) {
+          console.warn('Firebase SMS verification error:', fbConfirmErr);
+        }
+      }
+
+      if (isVerified) {
         if (foundUser) {
           executeLogin(foundUser);
         } else {
           setError('ইউজার সেশন পাওয়া যায়নি।');
         }
-      } else if (sentOtpCode) {
-        // Email OTP verification
-        if (code === sentOtpCode) {
-          if (foundUser) {
-            executeLogin(foundUser);
-          } else {
-            setError('ইউজার সেশন পাওয়া যায়নি।');
-          }
-        } else {
-          setError('প্রদত্ত ওটিপি কোডটি সঠিক নয়। অনুগ্রহ করে পুনরায় চেক করুন।');
-        }
       } else {
-        setError('ওটিপি সেশন পাওয়া যায়নি। পুনরায় ওটিপি পাঠিয়ে চেষ্টা করুন।');
+        setError('প্রদত্ত ওটিপি কোডটি সঠিক নয়। অনুগ্রহ করে আপনার সিমে বা ইমেইলে আসা কোডটি পুনরায় চেক করুন।');
       }
     } catch (verifyErr: any) {
       console.error('OTP Verification Error:', verifyErr);
-      if (verifyErr?.code === 'auth/invalid-verification-code') {
-        setError('সিমে আসা ওটিপি কোডটি সঠিক নয়। দয়া করে এসএমএস চেক করে সঠিক কোড দিন।');
-      } else if (verifyErr?.code === 'auth/code-expired') {
-        setError('ওটিপির মেয়াদ শেষ হয়ে গেছে। "পুনরায় পাঠান" বাটনে ক্লিক করুন।');
-      } else {
-        setError(verifyErr?.message || 'ওটিপি যাচাইয়ে ত্রুটি হয়েছে।');
-      }
+      setError(verifyErr?.message || 'ওটিপি যাচাইয়ে ত্রুটি হয়েছে।');
     } finally {
       setLoading(false);
     }
@@ -480,6 +444,7 @@ export default function LoginScreen({
         telecomBalance: 0,
         superShopBalance: 0,
         dueLoan: 0,
+        password: regPassword.trim(),
         pin: regPin.trim(),
         status: 'active',
         samityStatus: 'none',
@@ -815,9 +780,9 @@ export default function LoginScreen({
                 </form>
               </motion.div>
             ) : !isRegistering ? (
-              /* LOGIN FORM (EXACT MATCH WITH REFERENCE IMAGE) */
+              /* LOGIN FORM (MANDATORY SECURE OTP LOGIN) */
               <motion.form
-                key="login-form"
+                key="login-form-otp"
                 initial={{ opacity: 0, y: 8 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -8 }}
@@ -828,10 +793,10 @@ export default function LoginScreen({
                 <div>
                   <div className="flex items-center justify-between mb-2 px-1">
                     <label className="block text-xs sm:text-sm font-extrabold text-slate-900 text-left">
-                      অ্যাকাউন্ট নম্বর অথবা ইমেইল (Account No. or Email)
+                      অ্যাকাউন্ট নম্বর, মোবাইল নম্বর অথবা ইমেইল
                     </label>
                     <span className="text-[10.5px] font-bold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
-                      উভয়টাই ওটিপি মাধ্যমে
+                      নিরাপদ ওটিপি যাচাই
                     </span>
                   </div>
                   <div className="relative">
@@ -843,13 +808,25 @@ export default function LoginScreen({
                       required
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
-                      placeholder="অ্যাকাউন্ট নম্বর বা ইমেইল দিন (উদাঃ BNB00000028 বা email@gmail.com)"
+                      placeholder="অ্যাকাউন্ট নম্বর, মোবাইল অথবা ইমেইল দিন"
                       className="w-full pl-13 pr-5 py-3.5 sm:py-4 bg-white border-2 border-slate-200/90 rounded-full text-slate-950 text-xs sm:text-sm font-bold placeholder-slate-400 focus:outline-none focus:border-emerald-600 focus:ring-4 focus:ring-emerald-500/15 shadow-2xs transition-all"
                     />
                   </div>
                 </div>
 
-                {/* Primary Green Send OTP Button */}
+                {/* Forgot Password link */}
+                <div className="flex justify-end pt-0.5 px-1">
+                  <button
+                    type="button"
+                    onClick={() => setShowForgotPassword(true)}
+                    className="text-xs font-bold text-emerald-800 hover:text-emerald-950 underline cursor-pointer flex items-center gap-1"
+                  >
+                    <span>🔑</span>
+                    <span>পাসওয়ার্ড ভুলে গেছেন? রিসেট করুন</span>
+                  </button>
+                </div>
+
+                {/* Primary Action Button */}
                 <button
                   type="submit"
                   disabled={loading}
@@ -996,6 +973,16 @@ export default function LoginScreen({
           setError('');
           setShowMigrationModal(false);
         }}
+      />
+
+      {/* Forgot Password Modal (Multi-Channel OTP + Auto Login) */}
+      <ForgotPasswordModal
+        isOpen={showForgotPassword}
+        onClose={() => setShowForgotPassword(false)}
+        onLoginSuccess={(loggedInUser) => {
+          executeLogin(loggedInUser);
+        }}
+        locateUser={locateUser}
       />
     </div>
   );

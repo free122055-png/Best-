@@ -34,6 +34,7 @@ import SafiPremiumShop from '../SafiPremiumShop';
 import TelecomAdmin from '../TelecomAdmin';
 import BNBSalaryAdmin from '../BNBSalaryAdmin';
 import { HistoryRetentionSettings } from '../HistoryRetentionSettings';
+import SamityInvestmentsView from '../SamityInvestmentsView';
 import { runWalletEndToEndTests, TestResultItem } from '../../lib/walletTests';
 import { 
   ExternalLink,
@@ -330,6 +331,119 @@ export function AdminSamitySection(props: any) {
   const [assignMemberIdForApp, setAssignMemberIdForApp] = useState<string>('');
   const [appSearchQuery, setAppSearchQuery] = useState<string>('');
   const [isReviewSubmitting, setIsReviewSubmitting] = useState<boolean>(false);
+
+  // Master Hub 4-Section Controls State (null = closed by default)
+  const [hubTab, setHubTab] = useState<'investments' | 'policy_rules' | 'fine_schedule' | 'dividend_policy' | null>(null);
+
+  // 1. Policy & Rules State
+  const [samityPolicyText, setSamityPolicyText] = useState<string>(() => 
+    appConfig?.samityPolicyText || appConfig?.samityTermsAndConditions || `১. প্রতি মাসের ১ থেকে ১০ তারিখ পর্যন্ত সদস্যকে নিজের ইচ্ছায় কিস্তি পরিশোধ করার সুযোগ দেওয়া হয়।
+২. ১০ তারিখের মধ্যে কিস্তি পরিশোধ না করা থাকলে এবং মেইন ব্যালেন্সে পর্যাপ্ত টাকা থাকলে ১১ তারিখে স্বয়ংক্রিয়ভাবে ১টি কিস্তি কেটে নেওয়া হয়।
+৩. প্রতি মাসের ১৫ তারিখ হলো কিস্তি পরিশোধের শেষ তারিখ (Due Date)।
+৪. ১৬ তারিখ থেকে প্রতিদিন ১ টাকা জরিমানা শুরু হয় (প্রথম ৩০ দিন প্রতিদিন ১ টাকা, ৩০ দিন অতিক্রান্ত হলে ৪৬তম দিন থেকে প্রতিদিন ১০ টাকা)।
+৫. অনার (৳৪,০০০ + ৩ মাসে ৳১০,০০০), শেয়ার হোল্ডার (৳২,০০০ + ৩ মাসে ৳৫,০০০) এবং ইনভেস্টার (৳১,০০০) ক্যাটাগরি অনুযায়ী কিস্তি কার্যকর থাকবে।`
+  );
+  const [samityRulesTitle, setSamityRulesTitle] = useState<string>(appConfig?.samityRulesTitle || 'BNB সমবায় সমিতি ও ইনভেস্টর কোম্পানি নীতিমালা');
+
+  // 2. Fine Schedule & Deadline State
+  const [fineStartDay, setFineStartDay] = useState<number>(Number(appConfig?.fineStartDay) || 16);
+  const [fineDeadlineDay, setFineDeadlineDay] = useState<number>(Number(appConfig?.fineDeadlineDay) || 15);
+  const [lateFineAmount, setLateFineAmount] = useState<number>(Number(appConfig?.lateFineAmount) || 1);
+  const [lateFineType, setLateFineType] = useState<'fixed' | 'per_day'>(appConfig?.lateFineType || 'per_day');
+  const [lateFineEnabled, setLateFineEnabled] = useState<boolean>(appConfig?.lateFineEnabled !== false);
+  const [lateFineNoticeText, setLateFineNoticeText] = useState<string>(appConfig?.lateFineNoticeText || 'প্রতি মাসের ১৫ তারিখ কিস্তি পরিশোধের শেষ দিন। ১৬ তারিখ থেকে প্রতিদিন ১ টাকা বিলম্ব ফি (জরিমানা) প্রযোজ্য হবে।');
+
+  // 3. Dividend & Profit Share State
+  const [ownerProfitPct, setOwnerProfitPct] = useState<number>(Number(appConfig?.ownerProfitPct) || 40);
+  const [shareholderProfitPct, setShareholderProfitPct] = useState<number>(Number(appConfig?.shareholderProfitPct) || 35);
+  const [investorProfitPct, setInvestorProfitPct] = useState<number>(Number(appConfig?.investorProfitPct) || 25);
+  const [dividendPayoutDay, setDividendPayoutDay] = useState<number>(Number(appConfig?.dividendPayoutDay) || 1);
+  const [dividendPolicyNotes, setDividendPolicyNotes] = useState<string>(appConfig?.dividendPolicyNotes || 'প্রতি মাসের ১ তারিখে স্বয়ংক্রিয়ভাবে ক্যাটাগরি অনুযায়ী মুনাফা বন্টন হিসাব সম্পন্ন হবে।');
+
+  const [isSavingConfig, setIsSavingConfig] = useState<boolean>(false);
+
+  const handleSavePolicyRules = async () => {
+    setIsSavingConfig(true);
+    try {
+      const configRef = doc(db, 'system_settings', 'app_config');
+      await updateDoc(configRef, {
+        samityPolicyText,
+        samityRulesTitle,
+        samityTermsAndConditions: samityPolicyText,
+        updatedAt: new Date().toISOString()
+      }).catch(() => setDoc(configRef, {
+        samityPolicyText,
+        samityRulesTitle,
+        samityTermsAndConditions: samityPolicyText,
+        updatedAt: new Date().toISOString()
+      }, { merge: true }));
+
+      if (typeof props.onChangeConfig === 'function') {
+        props.onChangeConfig({
+          ...appConfig,
+          samityPolicyText,
+          samityRulesTitle,
+          samityTermsAndConditions: samityPolicyText
+        });
+      }
+      alert('✅ সমবায় নীতিমালা ও নিয়মাবলী সফলভাবে সেভ করা হয়েছে!');
+    } catch (err: any) {
+      alert('নীতিমালা আপডেট করতে সমস্যা হয়েছে: ' + (err?.message || err));
+    } finally {
+      setIsSavingConfig(false);
+    }
+  };
+
+  const handleSaveFineSchedule = async () => {
+    setIsSavingConfig(true);
+    try {
+      const configRef = doc(db, 'system_settings', 'app_config');
+      const finePayload = {
+        fineStartDay,
+        fineDeadlineDay,
+        lateFineAmount,
+        lateFineType,
+        lateFineEnabled,
+        lateFineNoticeText,
+        updatedAt: new Date().toISOString()
+      };
+      await updateDoc(configRef, finePayload).catch(() => setDoc(configRef, finePayload, { merge: true }));
+
+      if (typeof props.onChangeConfig === 'function') {
+        props.onChangeConfig({ ...appConfig, ...finePayload });
+      }
+      alert('✅ জরিমানা ও সময়সীমা সেটিংস সফলভাবে সেভ করা হয়েছে!');
+    } catch (err: any) {
+      alert('জরিমানা সেটিংস সেভ করতে সমস্যা হয়েছে: ' + (err?.message || err));
+    } finally {
+      setIsSavingConfig(false);
+    }
+  };
+
+  const handleSaveDividendPolicy = async () => {
+    setIsSavingConfig(true);
+    try {
+      const configRef = doc(db, 'system_settings', 'app_config');
+      const divPayload = {
+        ownerProfitPct,
+        shareholderProfitPct,
+        investorProfitPct,
+        dividendPayoutDay,
+        dividendPolicyNotes,
+        updatedAt: new Date().toISOString()
+      };
+      await updateDoc(configRef, divPayload).catch(() => setDoc(configRef, divPayload, { merge: true }));
+
+      if (typeof props.onChangeConfig === 'function') {
+        props.onChangeConfig({ ...appConfig, ...divPayload });
+      }
+      alert('✅ লভ্যাংশ বন্টন ও মুনাফা নীতি সফলভাবে সেভ করা হয়েছে!');
+    } catch (err: any) {
+      alert('মুনাফা নীতি সেভ করতে সমস্যা হয়েছে: ' + (err?.message || err));
+    } finally {
+      setIsSavingConfig(false);
+    }
+  };
 
   const handleOpenReviewModal = (user: User) => {
     setSelectedAppForReview(user);
@@ -920,8 +1034,456 @@ export function AdminSamitySection(props: any) {
             )}
 
             {samityActiveSubTab === 'member_directory' && (
-          <div className="space-y-2.5 animate-fade-in text-slate-800 font-sans text-left pb-96 sm:pb-[480px]">
+              <div className="space-y-3 animate-fade-in text-slate-800 font-sans text-left pb-96 sm:pb-[480px]">
+                
+                {/* IF A HUB TAB IS SELECTED -> OPEN FULL SEPARATE DEDICATED PAGE */}
+                {hubTab !== null ? (
+                  <div className="space-y-4 animate-fade-in">
+                    {/* Top Header Navigation Bar for Full Page Sub-Views */}
+                    <div className="bg-gradient-to-r from-[#00a884] via-emerald-700 to-teal-800 border-2 border-emerald-600 p-3 sm:p-4 rounded-3xl text-white shadow-md flex items-center justify-between gap-3">
+                      <button
+                        type="button"
+                        onClick={() => setHubTab(null)}
+                        className="px-3.5 py-2 bg-white text-emerald-950 hover:bg-emerald-50 font-black rounded-xl text-xs shadow-md transition active:scale-95 cursor-pointer flex items-center gap-1.5 shrink-0 border border-emerald-200"
+                      >
+                        ⬅️ ব্যাক (Back)
+                      </button>
 
+                      <div className="text-right min-w-0">
+                        <h3 className="text-xs sm:text-sm font-black text-amber-200 truncate">
+                          {hubTab === 'investments' && '📈 আমাদের ইনভেস্টমেন্ট প্রজেক্ট পোর্টাল'}
+                          {hubTab === 'policy_rules' && '📜 সমবায় সমিতি নিয়মাবলী এডিটর'}
+                          {hubTab === 'fine_schedule' && '⏰ জরিমানা ও জমার ডেডলাইন সেটিংস'}
+                          {hubTab === 'dividend_policy' && '📊 লভ্যাংশ ও মুনাফা বন্টন নীতি'}
+                        </h3>
+                        <p className="text-[10px] text-emerald-100 truncate">
+                          BNB ইনভেস্টার কোম্পানি ও সমবায় সমিতি মাস্টার পোর্টাল
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Quick Switch Bar between the 4 sub-pages inside */}
+                    <div className="grid grid-cols-4 gap-1 p-1 bg-emerald-50 rounded-2xl border border-emerald-200 shadow-xs">
+                      <button
+                        type="button"
+                        onClick={() => setHubTab('investments')}
+                        className={`px-1 sm:px-2 py-1.5 rounded-xl text-[9px] sm:text-[11px] font-black transition flex items-center justify-center gap-1 cursor-pointer truncate ${
+                          hubTab === 'investments'
+                            ? 'bg-[#00a884] text-white shadow-sm border border-emerald-600'
+                            : 'text-slate-700 hover:text-emerald-900 hover:bg-emerald-100/60'
+                        }`}
+                      >
+                        <span>📈</span>
+                        <span className="truncate">১. ইনভেস্ট</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setHubTab('policy_rules')}
+                        className={`px-1 sm:px-2 py-1.5 rounded-xl text-[9px] sm:text-[11px] font-black transition flex items-center justify-center gap-1 cursor-pointer truncate ${
+                          hubTab === 'policy_rules'
+                            ? 'bg-[#00a884] text-white shadow-sm border border-emerald-600'
+                            : 'text-slate-700 hover:text-emerald-900 hover:bg-emerald-100/60'
+                        }`}
+                      >
+                        <span>📜</span>
+                        <span className="truncate">২. নিয়মাবলী</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setHubTab('fine_schedule')}
+                        className={`px-1 sm:px-2 py-1.5 rounded-xl text-[9px] sm:text-[11px] font-black transition flex items-center justify-center gap-1 cursor-pointer truncate ${
+                          hubTab === 'fine_schedule'
+                            ? 'bg-[#00a884] text-white shadow-sm border border-emerald-600'
+                            : 'text-slate-700 hover:text-emerald-900 hover:bg-emerald-100/60'
+                        }`}
+                      >
+                        <span>⏰</span>
+                        <span className="truncate">৩. জরিমানা</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setHubTab('dividend_policy')}
+                        className={`px-1 sm:px-2 py-1.5 rounded-xl text-[9px] sm:text-[11px] font-black transition flex items-center justify-center gap-1 cursor-pointer truncate ${
+                          hubTab === 'dividend_policy'
+                            ? 'bg-[#00a884] text-white shadow-sm border border-emerald-600'
+                            : 'text-slate-700 hover:text-emerald-900 hover:bg-emerald-100/60'
+                        }`}
+                      >
+                        <span>📊</span>
+                        <span className="truncate">৪. লভ্যাংশ</span>
+                      </button>
+                    </div>
+
+                    {/* FULL DEDICATED PAGE 1: OUR INVESTMENTS MANAGER */}
+                    {hubTab === 'investments' && (
+                      <div className="space-y-4 bg-white p-3 sm:p-5 rounded-3xl border-2 border-emerald-200 text-slate-800 shadow-md">
+                        <div className="border-b border-emerald-100 pb-3 flex items-center justify-between gap-2">
+                          <div>
+                            <h4 className="text-sm sm:text-base font-black text-emerald-800 flex items-center gap-2">
+                              <span>📈</span>
+                              <span>আমাদের ইনভেস্ট প্রজেক্ট পোস্ট ও পোর্টফোলিও কন্ট্রোল</span>
+                            </h4>
+                            <p className="text-xs text-slate-500 mt-0.5">
+                              নতুন ইনভেস্টমেন্ট প্রজেক্ট পোস্ট করুন, ছবি/বিবরণ এডিট করুন এবং ডিলিট করুন।
+                            </p>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => setHubTab(null)}
+                            className="px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 font-black rounded-xl text-xs transition border border-emerald-300 shrink-0 cursor-pointer"
+                          >
+                            ⬅️ ব্যাক
+                          </button>
+                        </div>
+
+                        <SamityInvestmentsView
+                          user={currentUser}
+                          onBack={() => setHubTab(null)}
+                          isAdmin={true}
+                          hideHeader={false}
+                        />
+                      </div>
+                    )}
+
+                    {/* FULL DEDICATED PAGE 2: SAMITY POLICY & RULES TEXT EDITOR */}
+                    {hubTab === 'policy_rules' && (
+                      <div className="space-y-4 bg-white p-4 sm:p-6 rounded-3xl border-2 border-emerald-200 text-slate-800 shadow-md text-left">
+                        <div className="border-b border-emerald-100 pb-3 flex items-center justify-between gap-2">
+                          <div>
+                            <h4 className="text-sm sm:text-base font-black text-emerald-800 flex items-center gap-2">
+                              <span>📜</span>
+                              <span>সমবায় সমিতি ও ইনভেস্টমেন্ট কোম্পানি নিয়ম-কানুন ম্যানুয়াল এডিটর</span>
+                            </h4>
+                            <p className="text-xs text-slate-500 mt-0.5">
+                              সমবায় সমিতি, ইনভেস্টমেন্ট জমা, উত্তোলন ও জেনারেল নীতিমালার সব লেখা এখান থেকে ম্যানুয়ালি এডিট ও আপডেট করুন।
+                            </p>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => setHubTab(null)}
+                            className="px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 font-black rounded-xl text-xs transition border border-emerald-300 shrink-0 cursor-pointer"
+                          >
+                            ⬅️ ব্যাক
+                          </button>
+                        </div>
+
+                        <div className="space-y-3">
+                          <div>
+                            <label className="text-xs font-bold text-slate-700 block mb-1">
+                              নীতিমালার শিরোনাম (Policy Title):
+                            </label>
+                            <input
+                              type="text"
+                              value={samityRulesTitle}
+                              onChange={(e) => setSamityRulesTitle(e.target.value)}
+                              placeholder="যেমন: BNB সমবায় সমিতি ও ইনভেস্টর কোম্পানি নীতিমালা"
+                              className="w-full bg-emerald-50/40 border border-slate-300 rounded-xl px-3.5 py-2.5 text-xs text-slate-900 font-bold focus:border-emerald-600 outline-none"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="text-xs font-bold text-slate-700 block mb-1">
+                              সম্পূর্ণ নিয়মাবলী ও শর্তাবলী (লাইন বাই লাইন লিখে দিন):
+                            </label>
+                            <textarea
+                              rows={12}
+                              value={samityPolicyText}
+                              onChange={(e) => setSamityPolicyText(e.target.value)}
+                              placeholder="এখানে সমিতির সমস্ত নিয়ম-কানুন ক্রমানুসারে লিখে দিন..."
+                              className="w-full bg-emerald-50/40 border border-slate-300 rounded-2xl p-3.5 text-xs text-slate-900 leading-relaxed font-sans focus:border-emerald-600 outline-none"
+                            />
+                          </div>
+
+                          <button
+                            type="button"
+                            onClick={handleSavePolicyRules}
+                            disabled={isSavingConfig}
+                            className="w-full py-3 bg-[#00a884] hover:bg-[#009675] text-white font-black text-xs rounded-xl shadow-md transition active:scale-98 flex items-center justify-center gap-1.5 cursor-pointer"
+                          >
+                            <span>💾</span>
+                            <span>{isSavingConfig ? 'সেভ করা হচ্ছে...' : 'নীতি ও নিয়মাবলী সেভ করুন'}</span>
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* FULL DEDICATED PAGE 3: FINE SCHEDULE & DEADLINE CONTROL */}
+                    {hubTab === 'fine_schedule' && (
+                      <div className="space-y-4 bg-white p-4 sm:p-6 rounded-3xl border-2 border-emerald-200 text-slate-800 shadow-md text-left">
+                        <div className="border-b border-emerald-100 pb-3 flex items-center justify-between gap-2">
+                          <div>
+                            <h4 className="text-sm sm:text-base font-black text-teal-800 flex items-center gap-2">
+                              <span>⏰</span>
+                              <span>ডিপিএস/সঞ্চয় জমা দেওয়ার সময়সীমা ও জরিমানা সেটিংস</span>
+                            </h4>
+                            <p className="text-xs text-slate-500 mt-0.5">
+                              মাসের কত তারিখ থেকে কত তারিখের মধ্যে ডিপিএস জমা দিতে হবে এবং কত তারিখ পার হলে কত টাকা জরিমানা প্রযোজ্য তা নির্ধারণ করুন।
+                            </p>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => setHubTab(null)}
+                            className="px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 font-black rounded-xl text-xs transition border border-emerald-300 shrink-0 cursor-pointer"
+                          >
+                            ⬅️ ব্যাক
+                          </button>
+                        </div>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                          <div>
+                            <label className="text-xs font-bold text-slate-700 block mb-1">
+                              মাসের প্রারম্ভিক জমার দিন (Start Day):
+                            </label>
+                            <input
+                              type="number"
+                              min={1}
+                              max={31}
+                              value={fineStartDay}
+                              onChange={(e) => setFineStartDay(Number(e.target.value))}
+                              className="w-full bg-emerald-50/40 border border-slate-300 rounded-xl px-3.5 py-2 text-xs text-slate-900 font-black outline-none focus:border-teal-600"
+                            />
+                            <span className="text-[10px] text-slate-500 block mt-0.5">মাসের ১ম তারিখ থেকে জমা গ্রহণ শুরু</span>
+                          </div>
+
+                          <div>
+                            <label className="text-xs font-bold text-slate-700 block mb-1">
+                              জমা দেওয়ার শেষ সময়সীমা / ডেডলাইন (Deadline Day):
+                            </label>
+                            <input
+                              type="number"
+                              min={1}
+                              max={31}
+                              value={fineDeadlineDay}
+                              onChange={(e) => setFineDeadlineDay(Number(e.target.value))}
+                              className="w-full bg-emerald-50/40 border border-slate-300 rounded-xl px-3.5 py-2 text-xs text-slate-900 font-black outline-none focus:border-teal-600"
+                            />
+                            <span className="text-[10px] text-slate-500 block mt-0.5">যেমন: ১৫ তারিখের পর (১৬ তারিখ থেকে) বিলম্ব ফি শুরু হবে</span>
+                          </div>
+
+                          <div>
+                            <label className="text-xs font-bold text-slate-700 block mb-1">
+                              বিলম্ব ফি/জরিমানের পরিমাণ (৳):
+                            </label>
+                            <input
+                              type="number"
+                              value={lateFineAmount}
+                              onChange={(e) => setLateFineAmount(Number(e.target.value))}
+                              className="w-full bg-emerald-50/40 border border-slate-300 rounded-xl px-3.5 py-2 text-xs text-slate-900 font-black outline-none focus:border-teal-600"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="text-xs font-bold text-slate-700 block mb-1">
+                              জরিমানা গণনার ধরণ:
+                            </label>
+                            <select
+                              value={lateFineType}
+                              onChange={(e) => setLateFineType(e.target.value as any)}
+                              className="w-full bg-emerald-50/40 border border-slate-300 rounded-xl px-3.5 py-2 text-xs text-slate-900 font-bold outline-none focus:border-teal-600"
+                            >
+                              <option value="fixed">এককালীন নির্দিষ্ট জরিমানা (Fixed Fine)</option>
+                              <option value="per_day">প্রতিদিনের অতিরিক্ত জরিমানা (Per Day Fine)</option>
+                            </select>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center justify-between bg-emerald-50 p-3 rounded-2xl border border-emerald-200">
+                          <div className="space-y-0.5">
+                            <span className="text-xs font-bold text-slate-900">অটোমেটিক জরিমানা ধার্য সিস্টেম</span>
+                            <p className="text-[10px] text-slate-600">ডেডলাইন অতিক্রম করলে জরিমানের নোটিশ ও হিসাব সচল থাকবে</p>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => setLateFineEnabled(!lateFineEnabled)}
+                            className={`px-3.5 py-1.5 rounded-xl text-xs font-black transition cursor-pointer ${
+                              lateFineEnabled ? 'bg-emerald-600 text-white' : 'bg-rose-600 text-white'
+                            }`}
+                          >
+                            {lateFineEnabled ? '🟢 সচল (ON)' : '🔴 বন্ধ (OFF)'}
+                          </button>
+                        </div>
+
+                        <div>
+                          <label className="text-xs font-bold text-slate-700 block mb-1">
+                            জরিমানা সংক্রান্ত নোটিশ বার্তা:
+                          </label>
+                          <input
+                            type="text"
+                            value={lateFineNoticeText}
+                            onChange={(e) => setLateFineNoticeText(e.target.value)}
+                            className="w-full bg-emerald-50/40 border border-slate-300 rounded-xl px-3.5 py-2.5 text-xs text-slate-900 outline-none focus:border-teal-600"
+                          />
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={handleSaveFineSchedule}
+                          disabled={isSavingConfig}
+                          className="w-full py-3 bg-[#00a884] hover:bg-[#009675] text-white font-black text-xs rounded-xl shadow-md transition active:scale-98 flex items-center justify-center gap-1.5 cursor-pointer"
+                        >
+                          <span>💾</span>
+                          <span>{isSavingConfig ? 'সেভ করা হচ্ছে...' : 'জরিমানা ও সময়সীমা সেটিংস সেভ করুন'}</span>
+                        </button>
+                      </div>
+                    )}
+
+                    {/* FULL DEDICATED PAGE 4: DIVIDEND & CATEGORY PROFIT POLICY */}
+                    {hubTab === 'dividend_policy' && (
+                      <div className="space-y-4 bg-white p-4 sm:p-6 rounded-3xl border-2 border-emerald-200 text-slate-800 shadow-md text-left">
+                        <div className="border-b border-emerald-100 pb-3 flex items-center justify-between gap-2">
+                          <div>
+                            <h4 className="text-sm sm:text-base font-black text-emerald-800 flex items-center gap-2">
+                              <span>📊</span>
+                              <span>মাসিক লভ্যাংশ বন্টন ও ক্যাটাগরি মুনাফা নীতি</span>
+                            </h4>
+                            <p className="text-xs text-slate-500 mt-0.5">
+                              অনার, শেয়ার হোল্ডার এবং ইনভেস্টার ক্যাটাগরির জন্য লভ্যাংশ শতকরা (%) বন্টন হার ও নীতি আপডেট করুন।
+                            </p>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => setHubTab(null)}
+                            className="px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 font-black rounded-xl text-xs transition border border-emerald-300 shrink-0 cursor-pointer"
+                          >
+                            ⬅️ ব্যাক
+                          </button>
+                        </div>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                          <div className="bg-amber-50/60 p-3 rounded-2xl border border-amber-200 space-y-1">
+                            <span className="text-xs font-black text-amber-900">👑 অনার (Owner)</span>
+                            <label className="text-[10px] text-slate-600 block">মুনাফা শেয়ার (%):</label>
+                            <input
+                              type="number"
+                              value={ownerProfitPct}
+                              onChange={(e) => setOwnerProfitPct(Number(e.target.value))}
+                              className="w-full bg-white border border-amber-300 rounded-xl px-3 py-1.5 text-xs text-slate-900 font-black outline-none focus:border-amber-500"
+                            />
+                          </div>
+
+                          <div className="bg-blue-50/60 p-3 rounded-2xl border border-blue-200 space-y-1">
+                            <span className="text-xs font-black text-blue-900">📈 শেয়ার হোল্ডার (Shareholder)</span>
+                            <label className="text-[10px] text-slate-600 block">মুনাফা শেয়ার (%):</label>
+                            <input
+                              type="number"
+                              value={shareholderProfitPct}
+                              onChange={(e) => setShareholderProfitPct(Number(e.target.value))}
+                              className="w-full bg-white border border-blue-300 rounded-xl px-3 py-1.5 text-xs text-slate-900 font-black outline-none focus:border-blue-500"
+                            />
+                          </div>
+
+                          <div className="bg-emerald-50/60 p-3 rounded-2xl border border-emerald-200 space-y-1">
+                            <span className="text-xs font-black text-emerald-900">💼 ইনভেস্টার (Investor)</span>
+                            <label className="text-[10px] text-slate-600 block">মুনাফা শেয়ার (%):</label>
+                            <input
+                              type="number"
+                              value={investorProfitPct}
+                              onChange={(e) => setInvestorProfitPct(Number(e.target.value))}
+                              className="w-full bg-white border border-emerald-300 rounded-xl px-3 py-1.5 text-xs text-slate-900 font-black outline-none focus:border-emerald-500"
+                            />
+                          </div>
+                        </div>
+
+                        <div className="space-y-3">
+                          <div>
+                            <label className="text-xs font-bold text-slate-700 block mb-1">
+                              মাসিক লভ্যাংশ প্রদানের তারিখ (Payout Day):
+                            </label>
+                            <input
+                              type="number"
+                              min={1}
+                              max={31}
+                              value={dividendPayoutDay}
+                              onChange={(e) => setDividendPayoutDay(Number(e.target.value))}
+                              className="w-full bg-emerald-50/40 border border-slate-300 rounded-xl px-3 py-2 text-xs text-slate-900 font-black outline-none focus:border-emerald-600"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="text-xs font-bold text-slate-700 block mb-1">
+                              মুনাফা বন্টন সংক্রান্ত বিশেষ নীতি নির্দেশিকা:
+                            </label>
+                            <textarea
+                              rows={3}
+                              value={dividendPolicyNotes}
+                              onChange={(e) => setDividendPolicyNotes(e.target.value)}
+                              className="w-full bg-emerald-50/40 border border-slate-300 rounded-xl p-3 text-xs text-slate-900 outline-none focus:border-emerald-600"
+                            />
+                          </div>
+
+                          <button
+                            type="button"
+                            onClick={handleSaveDividendPolicy}
+                            disabled={isSavingConfig}
+                            className="w-full py-3 bg-[#00a884] hover:bg-[#009675] text-white font-black text-xs rounded-xl shadow-md transition active:scale-98 flex items-center justify-center gap-1.5 cursor-pointer"
+                          >
+                            <span>💾</span>
+                            <span>{isSavingConfig ? 'সেভ করা হচ্ছে...' : 'লভ্যাংশ বন্টন নীতি সেভ করুন'}</span>
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  /* WHEN NO HUB TAB IS SELECTED -> SHOW MAIN SAMITY MASTER OVERVIEW DASHBOARD */
+                  <div className="space-y-2.5 animate-fade-in">
+                    {/* ========================================================================= */}
+                    {/* 🏛️ 4-SECTION MASTER CONTROL HUB TOP BAR */}
+                    {/* ========================================================================= */}
+                    <div className="bg-gradient-to-r from-[#00a884] via-emerald-700 to-teal-800 border-2 border-emerald-600 rounded-3xl p-3 sm:p-4 text-white shadow-md space-y-3">
+                      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 border-b border-white/20 pb-2.5">
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <span className="text-lg">🏛️</span>
+                            <h3 className="text-xs sm:text-sm font-black text-amber-200 tracking-wide uppercase">
+                              BNB ইনভেস্টর কোম্পানি ও সমবায় সমিতি মাস্টার ম্যানেজমেন্ট
+                            </h3>
+                          </div>
+                          <p className="text-[10px] text-emerald-100 mt-0.5">
+                            আমাদের ইনভেস্ট প্রজেক্ট পোস্ট, সমবায় নিয়মাবলী, জরিমানা ও সময়সীমা এবং লভ্যাংশ নীতি সম্পূর্ণ ম্যানুয়ালি কন্ট্রোল করুন।
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* 4 Interactive Hub Navigation Tabs - STRICT SINGLE LINE (4 Columns) */}
+                      <div className="grid grid-cols-4 gap-1 p-1 bg-emerald-950/40 rounded-2xl border border-white/20">
+                        <button
+                          type="button"
+                          onClick={() => setHubTab('investments')}
+                          className="px-1 sm:px-2.5 py-1.5 sm:py-2 rounded-xl text-[9.5px] sm:text-[11px] font-black transition flex items-center justify-center gap-1 sm:gap-1.5 cursor-pointer whitespace-nowrap min-w-0 text-white hover:bg-white/20 active:scale-95"
+                        >
+                          <span className="text-xs shrink-0">📈</span>
+                          <span className="truncate">১. আমাদের ইনভেস্ট</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => setHubTab('policy_rules')}
+                          className="px-1 sm:px-2.5 py-1.5 sm:py-2 rounded-xl text-[9.5px] sm:text-[11px] font-black transition flex items-center justify-center gap-1 sm:gap-1.5 cursor-pointer whitespace-nowrap min-w-0 text-white hover:bg-white/20 active:scale-95"
+                        >
+                          <span className="text-xs shrink-0">📜</span>
+                          <span className="truncate">২. নিয়মাবলী</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => setHubTab('fine_schedule')}
+                          className="px-1 sm:px-2.5 py-1.5 sm:py-2 rounded-xl text-[9.5px] sm:text-[11px] font-black transition flex items-center justify-center gap-1 sm:gap-1.5 cursor-pointer whitespace-nowrap min-w-0 text-white hover:bg-white/20 active:scale-95"
+                        >
+                          <span className="text-xs shrink-0">⏰</span>
+                          <span className="truncate">৩. জরিমানা/তারিখ</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => setHubTab('dividend_policy')}
+                          className="px-1 sm:px-2.5 py-1.5 sm:py-2 rounded-xl text-[9.5px] sm:text-[11px] font-black transition flex items-center justify-center gap-1 sm:gap-1.5 cursor-pointer whitespace-nowrap min-w-0 text-white hover:bg-white/20 active:scale-95"
+                        >
+                          <span className="text-xs shrink-0">📊</span>
+                          <span className="truncate">৪. লভ্যাংশ/মুনাফা</span>
+                        </button>
+                      </div>
+                    </div>
 
             {/* 2. ⚙️ গ্লোবাল সদস্য তথ্য নিজস্ব আপডেট সুইচ (Member Profile Self-Edit Switch) - Slim Bar */}
             <div className="bg-gradient-to-r from-amber-50 via-orange-50 to-emerald-50 border border-amber-200/90 px-3 py-1.5 sm:px-3.5 sm:py-2 rounded-xl shadow-2xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-1.5 text-left">
@@ -1070,57 +1632,54 @@ export function AdminSamitySection(props: any) {
                         </span>
                       </button>
 
-                      {/* 2. 🟡 শেয়ার হোল্ডার */}
+                      {/* 2. 🔵 শেয়ার হোল্ডার */}
                       <button
                         type="button"
                         onClick={() => setGeneralMemberFilterTab(generalMemberFilterTab === 'shareholder' ? 'all' : 'shareholder')}
                         className={`py-1 px-0.5 rounded-lg transition-all flex flex-col items-center justify-center text-center cursor-pointer min-h-[52px] ${
                           generalMemberFilterTab === 'shareholder'
-                            ? 'bg-amber-600 text-white ring-2 ring-amber-400 shadow-md'
-                            : 'bg-slate-800 hover:bg-amber-950/60 text-slate-200 border border-slate-700'
+                            ? 'bg-blue-600 text-white ring-2 ring-blue-400 shadow-md font-black'
+                            : 'bg-slate-800 hover:bg-blue-950/60 text-slate-200 border border-slate-700'
                         }`}
                       >
                         <span className="text-[10px] font-black leading-tight">🟡 শেয়ার হোল্ডার</span>
-                        <span className="text-[8px] font-mono font-bold text-amber-300">৳২,০০০/মাস</span>
-                        <span className="text-[7.5px] bg-black/40 text-amber-200 px-1 py-0.2 rounded mt-0.5">
+                        <span className="text-[8px] font-mono font-bold text-blue-300">৳২,০০০/মাস</span>
+                        <span className="text-[7.5px] bg-black/40 text-blue-200 px-1 py-0.2 rounded mt-0.5">
                           {samityShareholderUsers.length} জন • নমিনি ২
                         </span>
                       </button>
 
-                      {/* 3. ⚪ ইনভেস্টার */}
+                      {/* 3. 🟢 ইনভেস্টার */}
                       <button
                         type="button"
                         onClick={() => setGeneralMemberFilterTab(generalMemberFilterTab === 'investor' ? 'all' : 'investor')}
                         className={`py-1 px-0.5 rounded-lg transition-all flex flex-col items-center justify-center text-center cursor-pointer min-h-[52px] ${
                           generalMemberFilterTab === 'investor'
-                            ? 'bg-slate-600 text-white ring-2 ring-slate-400 shadow-md'
-                            : 'bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700'
+                            ? 'bg-emerald-600 text-white ring-2 ring-emerald-400 shadow-md font-black'
+                            : 'bg-slate-800 hover:bg-emerald-950/60 text-slate-200 border border-slate-700'
                         }`}
                       >
                         <span className="text-[10px] font-black leading-tight">⚪ ইনভেস্টার</span>
-                        <span className="text-[8px] font-mono font-bold text-slate-300">৳১,০০০/মাস</span>
+                        <span className="text-[8px] font-mono font-bold text-emerald-300">৳১,০০০/মাস</span>
                         <span className="text-[7.5px] bg-black/40 text-slate-300 px-1 py-0.2 rounded mt-0.5">
                           {investorUsers.length} জন • নমিনি ১
                         </span>
                       </button>
 
-                      {/* 4. 📈 আমাদের ইনভেস্ট / সদস্য আবেদন */}
+                      {/* 4. ⚪ সাধারণ সদস্য — White */}
                       <button
                         type="button"
-                        onClick={() => {
-                          setSamityActiveSubTab('pending_applications');
-                        }}
+                        onClick={() => setGeneralMemberFilterTab(generalMemberFilterTab === 'general' ? 'all' : 'general')}
                         className={`py-1 px-0.5 rounded-lg transition-all flex flex-col items-center justify-center text-center cursor-pointer min-h-[52px] ${
-                          (samityActiveSubTab as string) === 'pending_applications'
-                            ? 'bg-indigo-600 text-white ring-2 ring-indigo-400 shadow-md'
-                            : 'bg-slate-800 hover:bg-indigo-950/60 text-slate-200 border border-slate-700'
+                          generalMemberFilterTab === 'general'
+                            ? 'bg-white text-slate-900 ring-2 ring-slate-300 shadow-md font-black'
+                            : 'bg-slate-800 hover:bg-slate-700 text-slate-100 border border-slate-700'
                         }`}
                       >
-                        <span className="text-[10px] font-black leading-tight">📈 আমাদের ইনভেস্ট</span>
-                        <span className="text-[8px] font-mono font-bold text-indigo-300">
-                          {users.filter((u: any) => u.samityStatus === 'pending' || (u.samityAppliedAt && u.samityStatus !== 'approved' && u.samityStatus !== 'rejected')).length > 0
-                            ? `⏳ ${users.filter((u: any) => u.samityStatus === 'pending' || (u.samityAppliedAt && u.samityStatus !== 'approved' && u.samityStatus !== 'rejected')).length}টি আবেদন`
-                            : 'পোর্টাল'}
+                        <span className="text-[10px] font-black leading-tight">⚪ সাধারণ সদস্য</span>
+                        <span className="text-[8px] font-mono font-bold text-slate-300">ফ্রি / বেসিক</span>
+                        <span className="text-[7.5px] bg-black/40 text-slate-200 px-1 py-0.2 rounded mt-0.5">
+                          {generalAppUsers.length} জন
                         </span>
                       </button>
                     </div>
@@ -1690,12 +2249,12 @@ export function AdminSamitySection(props: any) {
                                             🔴 ওনার (৳৪,০০০/মাস)
                                           </span>
                                         ) : u.memberCategory === 'shareholder' ? (
-                                          <span className="text-[8.5px] font-black bg-amber-600 text-white border border-amber-700 px-1.5 py-0.2 rounded inline-flex items-center gap-0.5 shadow-2xs">
-                                            🟡 শেয়ার হোল্ডার (৳২,০০০/মাস)
+                                          <span className="text-[8.5px] font-black bg-blue-600 text-white border border-blue-700 px-1.5 py-0.2 rounded inline-flex items-center gap-0.5 shadow-2xs">
+                                            🔵 শেয়ার হোল্ডার (৳২,০০০/মাস)
                                           </span>
                                         ) : u.memberCategory === 'investor' ? (
-                                          <span className="text-[8.5px] font-black bg-slate-700 text-white border border-slate-800 px-1.5 py-0.2 rounded inline-flex items-center gap-0.5 shadow-2xs">
-                                            ⚪ ইনভেস্টার (৳১,০০০/মাস)
+                                          <span className="text-[8.5px] font-black bg-emerald-600 text-white border border-emerald-700 px-1.5 py-0.2 rounded inline-flex items-center gap-0.5 shadow-2xs">
+                                            🟢 ইনভেস্টার (৳১,০০০/মাস)
                                           </span>
                                         ) : null}
 
@@ -2040,6 +2599,8 @@ export function AdminSamitySection(props: any) {
                 </div>
               );
             })()}
+                  </div>
+                )}
           </div>
         )}
       </div>

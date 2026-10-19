@@ -32,6 +32,9 @@
     "NavigationBar": {
       "backgroundColor": "#005a36",
       "style": "DARK"
+    },
+    "CapacitorHttp": {
+      "enabled": true
     }
   }
 }

@@ -71,8 +71,28 @@ const PRESET_IMAGES = [
 ];
 
 export default function SamityInvestmentsView({ user, onBack, isAdmin, hideHeader = false }: SamityInvestmentsViewProps) {
-  const [investments, setInvestments] = useState<SamityInvestment[]>([]);
-  const [loading, setLoading] = useState(true);
+  // Read cached investments for INSTANT, 0-second loading
+  const [investments, setInvestments] = useState<SamityInvestment[]>(() => {
+    try {
+      const cached = localStorage.getItem('cached_samity_investments');
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch (e) {}
+    return [];
+  });
+
+  const [loading, setLoading] = useState<boolean>(() => {
+    try {
+      const cached = localStorage.getItem('cached_samity_investments');
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (Array.isArray(parsed) && parsed.length > 0) return false;
+      }
+    } catch (e) {}
+    return false; // Default to false so it NEVER blocks UI with a stuck spinner!
+  });
   const [selectedCategory, setSelectedCategory] = useState<SamityInvestmentCategory | 'all'>('all');
   const [selectedStatus, setSelectedStatus] = useState<SamityInvestmentStatus | 'all'>('all');
   const [searchQuery, setSearchQuery] = useState('');
@@ -224,8 +244,14 @@ export default function SamityInvestmentsView({ user, onBack, isAdmin, hideHeade
 
   // 1. Real-time Subscription to `samity_investments` collection in Firestore
   useEffect(() => {
+    // Fast safety fallback so UI never stays stuck on loading spinner
+    const timer = setTimeout(() => {
+      setLoading(false);
+    }, 150);
+
     const invColRef = collection(db, 'samity_investments');
     const unsub = onSnapshot(invColRef, (snapshot) => {
+      clearTimeout(timer);
       if (!snapshot.empty) {
         const loaded: SamityInvestment[] = snapshot.docs.map(docSnap => {
           const data = docSnap.data() as any;
@@ -271,7 +297,12 @@ export default function SamityInvestmentsView({ user, onBack, isAdmin, hideHeade
           if (!a.isPinned && b.isPinned) return 1;
           return new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime();
         });
+
         setInvestments(loaded);
+        try {
+          localStorage.setItem('cached_samity_investments', JSON.stringify(loaded));
+        } catch (e) {}
+
         // Sync active open modals with fresh realtime data
         if (commentModalPost) {
           const fresh = loaded.find(p => p.id === commentModalPost.id);
@@ -287,11 +318,14 @@ export default function SamityInvestmentsView({ user, onBack, isAdmin, hideHeade
       setLoading(false);
     }, (error) => {
       console.error("Firestore onSnapshot error on samity_investments:", error);
-      setInvestments([]);
+      clearTimeout(timer);
       setLoading(false);
     });
 
-    return () => unsub();
+    return () => {
+      clearTimeout(timer);
+      unsub();
+    };
   }, []);
 
   // 2. Real View Counter: increment real views in Firestore once per post per session
@@ -898,7 +932,7 @@ export default function SamityInvestmentsView({ user, onBack, isAdmin, hideHeade
               onClick={() => setSelectedCategory(cat.id)}
               className={`px-2.5 py-1 sm:px-3 sm:py-1.5 rounded-xl font-bold whitespace-nowrap transition cursor-pointer shrink-0 text-[11px] sm:text-xs flex items-center gap-1 ${
                 isSelected 
-                  ? 'bg-slate-900 text-white shadow-xs scale-102 ring-2 ring-emerald-500/40' 
+                  ? 'bg-emerald-700 text-white shadow-xs scale-102 ring-2 ring-emerald-500/40' 
                   : 'bg-white text-slate-700 hover:bg-slate-100 border border-slate-200'
               }`}
             >
