@@ -207,16 +207,16 @@ export default function LoginScreen({
 
       const userDisplayName = targetUser.name || 'সম্মানিত সদস্য';
       const userPhone = targetUser.phone || '';
-      const userEmail = targetUser.email || (rawInput.includes('@') ? rawInput.trim().toLowerCase() : '');
+      const userEmail = targetUser.email ? targetUser.email.trim().toLowerCase() : '';
 
-      // If user has NO registered email in profile
-      if (!userEmail) {
+      // Strict security: User must have a registered email in database to login with real-time OTP
+      if (!userEmail || !userEmail.includes('@')) {
         setLoading(false);
-        setError('আপনার অ্যাকাউন্টে কোনো ইমেইল যুক্ত পাওয়া যায়নি। ওটিপি গ্রহণের জন্য অনুগ্রহ করে আপনার ইমেইল দিয়ে চেষ্টা করুন অথবা নিচে "পাসওয়ার্ড ভুলে গেছেন? রিসেট করুন" বাটনে ক্লিক করুন।');
+        setError('এই অ্যাকাউন্ট নম্বরের সাথে কোনো ইমেইল যুক্ত নেই। সুরক্ষার স্বার্থে শুধুমাত্র নিবন্ধিত ইমেইলের মাধ্যমেই রিয়েল-টাইম ওটিপি ভেরিফিকেশন করে লগইন করা সম্ভব।');
         return;
       }
 
-      const targetEmail = userEmail.trim().toLowerCase();
+      const targetEmail = userEmail;
 
       // Format phone for Bangladesh or international standards
       let formattedPhone = '';
