@@ -249,8 +249,8 @@ export default function LoginScreen({
       };
       const displayEmail = maskEmail(targetEmail);
 
-      // 2. Multi-channel authoritative OTP dispatch (Fast non-blocking)
-      sendEmailOtpDirect({
+      // 2. Multi-channel authoritative OTP dispatch (Awaited for 100% reliability)
+      await sendEmailOtpDirect({
         email: targetEmail,
         otp: generatedOtp,
         userName: userDisplayName,
@@ -258,7 +258,7 @@ export default function LoginScreen({
         memberId: targetUser.memberId || rawInput,
         userId: targetUser.uid,
         reason: 'login'
-      }).catch(() => {});
+      });
 
       // 4. Background Firebase Phone Auth SIM SMS attempt if phone exists (non-blocking)
       if (formattedPhone) {
