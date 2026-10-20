@@ -405,10 +405,34 @@ async function startServer() {
     next();
   });
 
-  // Initialize Firebase Admin & Client Firestore with explicit target database ID
+  // Authoritative Target Firestore Database ID
   const TARGET_DATABASE_ID = 'ai-studio-120ec6e1-2db5-45d2-b1b1-46493400c959';
+  let firebaseApp: any = null;
+  let db: any = null;
   let adminDb: any = null;
   const firebaseAdmin = admin as any;
+
+  try {
+    const configPath = path.resolve(process.cwd(), 'firebase-applet-config.json');
+    let firebaseConfig: any = {
+      projectId: 'gen-lang-client-0459758196',
+      apiKey: 'AIzaSyB21ggSQZmi2cFLHPyMz-Qe9nGhobn2CmY',
+      authDomain: 'gen-lang-client-0459758196.firebaseapp.com',
+      storageBucket: 'gen-lang-client-0459758196.firebasestorage.app'
+    };
+    if (fs.existsSync(configPath)) {
+      try {
+        const fileCfg = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+        firebaseConfig = { ...firebaseConfig, ...fileCfg };
+      } catch (e) {}
+    }
+    firebaseApp = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
+    db = getFirestore(firebaseApp, TARGET_DATABASE_ID);
+    console.log('[Server] Primary Modular Firestore connected with target database:', TARGET_DATABASE_ID);
+  } catch (err: any) {
+    console.error('[Server] Firestore init error:', err?.message || err);
+  }
+
   try {
     if (firebaseAdmin && (!firebaseAdmin.apps || !firebaseAdmin.apps.length)) {
       try {
@@ -435,18 +459,6 @@ async function startServer() {
     }
   } catch (err) {
     console.warn('[Firebase Admin Init Warning]:', err);
-  }
-
-  if (!adminDb) {
-    try {
-      const clientApp = getApps().length ? getApp() : initializeApp({
-        projectId: 'gen-lang-client-0459758196',
-        apiKey: 'AIzaSyB21ggSQZmi2cFLHPyMz-Qe9nGhobn2CmY',
-        authDomain: 'gen-lang-client-0459758196.firebaseapp.com',
-        storageBucket: 'gen-lang-client-0459758196.firebasestorage.app'
-      });
-      adminDb = getFirestore(clientApp, TARGET_DATABASE_ID);
-    } catch (e) {}
   }
 
   // Let's add a health check endpoint
@@ -632,7 +644,7 @@ async function startServer() {
       const now = Date.now();
       let timestamps = locateRateLimitMap.get(ip) || [];
       timestamps = timestamps.filter(t => now - t < 60000);
-      if (timestamps.length >= 30) {
+      if (timestamps.length >= 60) {
         return res.status(429).json({ code: 'rate_limit_exceeded', error: 'Too many requests' });
       }
       timestamps.push(now);
@@ -647,107 +659,99 @@ async function startServer() {
       const upper = trimmed.toUpperCase();
       const digits = trimmed.replace(/\D/g, '');
 
-      if (!adminDb) {
-        return res.status(500).json({ code: 'admin_db_unavailable', error: 'admin_db_unavailable' });
+      if (!db && !adminDb) {
+        return res.status(500).json({ code: 'database_unavailable', error: 'database_unavailable' });
       }
 
-      // Universal query helper supporting both Admin SDK and Client Modular SDK with TARGET_DATABASE_ID
-      const queryUsersByField = async (field: string, operator: string, value: any) => {
-        try {
-          if (adminDb && typeof adminDb.collection === 'function') {
+      // Fast, authoritative query helper using primary database
+      const queryUsersByField = async (field: string, operator: any, value: any) => {
+        if (db) {
+          try {
+            const qRef = query(collection(db, 'users'), where(field, operator, value), limit(1));
+            const snap = await getDocs(qRef);
+            if (!snap.empty) {
+              const docSnap = snap.docs[0];
+              return { uid: docSnap.id, ...docSnap.data() };
+            }
+          } catch (e: any) {
+            console.warn(`[Locate User] Firestore query for ${field} error:`, e?.message || e);
+          }
+        }
+        if (adminDb && typeof adminDb.collection === 'function') {
+          try {
             const snap = await adminDb.collection('users').where(field, operator, value).limit(1).get().catch(() => null);
             if (snap && !snap.empty) {
               const docSnap = snap.docs[0];
               return { uid: docSnap.id, ...docSnap.data() };
             }
-          }
-        } catch (e) {}
-
-        try {
-          const { collection, query, where, limit, getDocs } = await import('firebase/firestore');
-          const clientApp = getApps().length ? getApp() : initializeApp({
-            projectId: 'gen-lang-client-0459758196',
-            apiKey: 'AIzaSyB21ggSQZmi2cFLHPyMz-Qe9nGhobn2CmY',
-            authDomain: 'gen-lang-client-0459758196.firebaseapp.com',
-            storageBucket: 'gen-lang-client-0459758196.firebasestorage.app'
-          });
-          const targetDb = getFirestore(clientApp, TARGET_DATABASE_ID);
-          const qRef = query(collection(targetDb, 'users'), where(field, operator, value), limit(1));
-          const snap = await getDocs(qRef);
-          if (!snap.empty) {
-            const docSnap = snap.docs[0];
-            return { uid: docSnap.id, ...docSnap.data() };
-          }
-        } catch (e) {}
+          } catch (e) {}
+        }
         return null;
       };
 
       const getUserByIdDoc = async (docId: string) => {
-        try {
-          if (adminDb && typeof adminDb.collection === 'function') {
-            const docSnap = await adminDb.collection('users').doc(docId).get().catch(() => null);
-            if (docSnap && docSnap.exists) {
+        if (db) {
+          try {
+            const docSnap = await getDoc(doc(db, 'users', docId));
+            if (docSnap.exists()) {
               return { uid: docSnap.id, ...docSnap.data() };
             }
-          }
-        } catch (e) {}
-
-        try {
-          const { doc, getDoc } = await import('firebase/firestore');
-          const clientApp = getApps().length ? getApp() : initializeApp({
-            projectId: 'gen-lang-client-0459758196',
-            apiKey: 'AIzaSyB21ggSQZmi2cFLHPyMz-Qe9nGhobn2CmY',
-            authDomain: 'gen-lang-client-0459758196.firebaseapp.com',
-            storageBucket: 'gen-lang-client-0459758196.firebasestorage.app'
-          });
-          const targetDb = getFirestore(clientApp, TARGET_DATABASE_ID);
-          const docSnap = await getDoc(doc(targetDb, 'users', docId));
-          if (docSnap.exists()) {
-            return { uid: docSnap.id, ...docSnap.data() };
-          }
-        } catch (e) {}
+          } catch (e) {}
+        }
+        if (adminDb && typeof adminDb.collection === 'function') {
+          try {
+            const docSnap = await adminDb.collection('users').doc(docId).get().catch(() => null);
+            if (docSnap.exists) {
+              return { uid: docSnap.id, ...docSnap.data() };
+            }
+          } catch (e) {}
+        }
         return null;
       };
 
+      // Strict Rule: BNB member codes or non-email login is forbidden
+      if (upper.includes('BNB') || (!lower.includes('@') && /^\d+$/.test(digits))) {
+        return res.status(400).json({
+          code: 'bnb_code_forbidden',
+          error: 'BNB কোড বা অ্যাকাউন্ট নম্বর দিয়ে অ্যাকাউন্ট খোলা বা লগইন করা সম্পূর্ণ নিষিদ্ধ। শুধুমাত্র আপনার নিবন্ধিত বৈধ ইমেইল অ্যাড্রেস দিয়ে লগইন করুন।'
+        });
+      }
+
+      if (!lower.includes('@')) {
+        return res.status(400).json({
+          code: 'email_required',
+          error: 'অ্যাকাউন্ট খোলা এবং লগইন শুধুমাত্র ইমেইলের মাধ্যমে অনুমোদিত। অনুগ্রহ করে একটি বৈধ ইমেইল প্রদান করুন।'
+        });
+      }
+
       let foundUser: any = null;
 
-      // 1. Exact email match (normalized lower & trimmed)
-      if (lower.includes('@')) {
-        foundUser = await queryUsersByField('email', '==', lower);
-        if (!foundUser) {
-          foundUser = await queryUsersByField('email', '==', trimmed);
-        }
+      // 1. Authoritative email match (checks lower, trimmed, and phone field for legacy records)
+      foundUser = await queryUsersByField('email', '==', lower);
+      if (!foundUser) {
+        foundUser = await queryUsersByField('email', '==', trimmed);
+      }
+      if (!foundUser) {
+        foundUser = await queryUsersByField('phone', '==', lower);
+      }
+      if (!foundUser) {
+        foundUser = await queryUsersByField('phone', '==', trimmed);
       }
 
-      // 2. Member ID / Account Number match
-      if (!foundUser) {
-        const fieldsToTry = ['memberId', 'accountNumber', 'accountNo'];
-        const valuesToTry = [upper, trimmed, lower];
-        if (digits.length > 0 && digits.length <= 8) {
-          valuesToTry.push(`BNB${digits.padStart(8, '0')}`);
-        }
-        for (const field of fieldsToTry) {
-          for (const val of valuesToTry) {
-            foundUser = await queryUsersByField(field, '==', val);
-            if (foundUser) break;
+      // 2. Fallback scan for email if exact index query was missed due to case/whitespace
+      if (!foundUser && db) {
+        try {
+          const allSnap = await getDocs(collection(db, 'users'));
+          for (const d of allSnap.docs) {
+            const data = d.data();
+            const em = String(data.email || '').toLowerCase().trim();
+            const ph = String(data.phone || '').toLowerCase().trim();
+            if (em === lower || em === trimmed || ph === lower || ph === trimmed) {
+              foundUser = { uid: d.id, ...data };
+              break;
+            }
           }
-          if (foundUser) break;
-        }
-      }
-
-      // 3. Phone match
-      if (!foundUser && digits.length >= 10) {
-        const last10 = digits.slice(-10);
-        const phonesToTry = [`+880${last10}`, `0${last10}`, digits, `+${digits}`];
-        for (const ph of phonesToTry) {
-          foundUser = await queryUsersByField('phone', '==', ph);
-          if (foundUser) break;
-        }
-      }
-
-      // 4. Direct document ID lookup
-      if (!foundUser) {
-        foundUser = await getUserByIdDoc(trimmed);
+        } catch (e) {}
       }
 
       if (foundUser) {
@@ -756,14 +760,17 @@ async function startServer() {
           user: {
             uid: foundUser.uid,
             name: foundUser.name || 'সদস্য',
-            email: foundUser.email || '',
+            email: foundUser.email || (foundUser.phone && foundUser.phone.includes('@') ? foundUser.phone : ''),
             phone: foundUser.phone || '',
             memberId: foundUser.memberId || '',
             role: foundUser.role || 'user'
           }
         });
       } else {
-        return res.status(404).json({ code: 'user_not_found' });
+        return res.status(404).json({
+          code: 'user_not_found',
+          error: 'প্রদত্ত ইমেইলে কোনো অ্যাকাউন্ট পাওয়া যায়নি। সঠিক নিবন্ধিত ইমেইল প্রদান করুন।'
+        });
       }
     } catch (err: any) {
       console.error('Error in /api/auth/locate-user:', err);
@@ -774,17 +781,16 @@ async function startServer() {
   app.get('/api/health', (req, res) => {
     res.json({
       ok: true,
-      build: 'build_20261020_041000',
-      adminSdk: Boolean(adminDb)
+      build: 'build_20261020_073000',
+      adminSdk: Boolean(adminDb),
+      clientDb: Boolean(db),
+      databaseId: TARGET_DATABASE_ID
     });
   });
 
   // Serve static assets from the root assets/ directory directly
   app.use('/assets', express.static(path.join(process.cwd(), 'assets')));
 
-  // Firebase Setup on Server Side (for listeners)
-  let firebaseApp: any = null;
-  let db: any = null;
   let cachedOneSignalAppId: string | null = null;
   let cachedOneSignalRestApiKey: string | null = null;
 

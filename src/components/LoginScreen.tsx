@@ -101,21 +101,26 @@ export default function LoginScreen({
     const trimmedInput = rawInput.trim();
     if (!trimmedInput) return null;
 
+    // Strict Rule: BNB member codes or non-email queries are directly forbidden
+    if (trimmedInput.toUpperCase().includes('BNB') || (!trimmedInput.includes('@') && /^\d+$/.test(trimmedInput))) {
+      setError('BNB কোড বা অ্যাকাউন্ট নম্বর দিয়ে একাউন্ট খোলা বা লগইন করা সম্পূর্ণ নিষিদ্ধ! একাউন্ট খোলা এবং লগইন শুধুমাত্র আপনার নিবন্ধিত বৈধ ইমেইলের মাধ্যমে করতে হবে।');
+      return null;
+    }
+
+    if (!trimmedInput.includes('@')) {
+      setError('অনুগ্রহ করে আপনার সঠিক নিবন্ধিত ইমেইল অ্যাড্রেস প্রদান করুন (যেমন: example@gmail.com)।');
+      return null;
+    }
+
     const cleanInput = trimmedInput.toLowerCase();
     const isEmail = cleanInput.includes('@');
-    const cleanDigits = convertBengaliToEnglishDigits(trimmedInput).replace(/\D/g, '');
 
-    // 1. Check local storage cached user
+    // 1. Check local storage cached user (strictly by email)
     const lastUserRaw = localStorage.getItem('amb_last_user');
     if (lastUserRaw) {
       try {
         const cached = JSON.parse(lastUserRaw);
-        if (
-          (isEmail && cached.email?.toLowerCase() === cleanInput) ||
-          (cached.memberId?.toUpperCase() === trimmedInput.toUpperCase()) ||
-          (cached.memberId?.toLowerCase() === cleanInput) ||
-          (cleanDigits.length >= 10 && cached.phone?.replace(/\D/g, '').endsWith(cleanDigits.slice(-10)))
-        ) {
+        if (cached.email && cached.email.toLowerCase().trim() === cleanInput) {
           return cached;
         }
       } catch (e) {}
@@ -126,7 +131,7 @@ export default function LoginScreen({
       const res = await fetch(requestUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ query: trimmedInput })
+        body: JSON.stringify({ query: cleanInput })
       });
 
       const status = res.status;
@@ -142,63 +147,50 @@ export default function LoginScreen({
         data = { code: 'non_json_response', text };
       }
 
-      if (contentType.includes('application/json') && res.ok && data.found && data.user) {
+      if (res.ok && data.found && data.user) {
         setDebugInfo({ url: requestUrl, status, errorCode: '200_FOUND', rawSnippet });
         return data.user as User;
       }
 
-      if (status === 404 && data.code === 'user_not_found') {
-        setDebugInfo({ url: requestUrl, status, errorCode: 'user_not_found', rawSnippet });
-        return null; // Genuine user not found
+      if (data.code === 'bnb_code_forbidden') {
+        setError('BNB কোড বা অ্যাকাউন্ট নম্বর দিয়ে একাউন্ট খোলা বা লগইন করা সম্পূর্ণ নিষিদ্ধ! শুধুমাত্র আপনার নিবন্ধিত বৈধ ইমেইল অ্যাড্রেস দিয়ে লগইন করুন।');
+        return null;
       }
+
+      setDebugInfo({ url: requestUrl, status, errorCode: data.code || `STATUS_${status}`, rawSnippet });
     } catch (netErr: any) {
-      console.warn('Server locateUser fetch error, falling back to client-side Firestore:', netErr);
+      console.warn('Server locateUser fetch error, immediately invoking client Firestore direct fallback:', netErr);
     }
 
-    // Robust Client-Side Firestore Fallback Search
+    // 2. High-Reliability Direct Client-Side Firestore Fallback Search
     if (!db) return null;
     try {
-      if (isEmail) {
-        const qEmail = query(collection(db, 'users'), where('email', '==', cleanInput), limit(1));
-        const snapEmail = await getDocs(qEmail);
-        if (!snapEmail.empty) {
-          return { uid: snapEmail.docs[0].id, ...(snapEmail.docs[0].data() as any) } as User;
-        }
-      }
-
-      const upperInput = trimmedInput.toUpperCase();
       const queriesToTry = [
-        query(collection(db, 'users'), where('memberId', '==', upperInput), limit(1)),
-        query(collection(db, 'users'), where('memberId', '==', trimmedInput), limit(1)),
-        query(collection(db, 'users'), where('memberId', '==', cleanInput), limit(1)),
-        query(collection(db, 'users'), where('accountNumber', '==', upperInput), limit(1)),
-        query(collection(db, 'users'), where('accountNumber', '==', trimmedInput), limit(1)),
-        query(collection(db, 'users'), where('accountNo', '==', upperInput), limit(1))
+        query(collection(db, 'users'), where('email', '==', cleanInput), limit(1)),
+        query(collection(db, 'users'), where('email', '==', trimmedInput), limit(1)),
+        query(collection(db, 'users'), where('phone', '==', cleanInput), limit(1)),
+        query(collection(db, 'users'), where('phone', '==', trimmedInput), limit(1))
       ];
 
-      if (cleanDigits.length > 0 && cleanDigits.length <= 8) {
-        const paddedId = `BNB${cleanDigits.padStart(8, '0')}`;
-        queriesToTry.push(query(collection(db, 'users'), where('memberId', '==', paddedId), limit(1)));
-      }
-
-      if (cleanDigits.length >= 10) {
-        const last10 = cleanDigits.slice(-10);
-        queriesToTry.push(query(collection(db, 'users'), where('phone', '==', `+880${last10}`), limit(1)));
-        queriesToTry.push(query(collection(db, 'users'), where('phone', '==', `0${last10}`), limit(1)));
-        queriesToTry.push(query(collection(db, 'users'), where('phone', '==', cleanDigits), limit(1)));
-        queriesToTry.push(query(collection(db, 'users'), where('phone', '==', `+${cleanDigits}`), limit(1)));
-      }
-
       const results = await Promise.all(queriesToTry.map(q => getDocs(q).catch(() => null)));
-      for (const res of results) {
-        if (res && !res.empty) {
-          return { uid: res.docs[0].id, ...(res.docs[0].data() as any) } as User;
+      for (const snap of results) {
+        if (snap && !snap.empty) {
+          const docSnap = snap.docs[0];
+          return { uid: docSnap.id, ...(docSnap.data() as any) } as User;
         }
       }
 
-      const directDoc = await getDoc(doc(db, 'users', trimmedInput)).catch(() => null);
-      if (directDoc && directDoc.exists()) {
-        return { uid: directDoc.id, ...(directDoc.data() as any) } as User;
+      // Case-insensitive deep scan on users collection for exact email match
+      const allUsersSnap = await getDocs(collection(db, 'users')).catch(() => null);
+      if (allUsersSnap && !allUsersSnap.empty) {
+        for (const docSnap of allUsersSnap.docs) {
+          const udata = docSnap.data();
+          const em = String(udata.email || '').toLowerCase().trim();
+          const ph = String(udata.phone || '').toLowerCase().trim();
+          if (em === cleanInput || ph === cleanInput) {
+            return { uid: docSnap.id, ...(udata as any) } as User;
+          }
+        }
       }
     } catch (clientErr) {
       console.warn('Client fallback search error:', clientErr);
@@ -207,14 +199,25 @@ export default function LoginScreen({
     return null;
   };
 
-  // Handle Send OTP for Login (Mandatory Multi-Channel: Direct Native Resend + Real-time Firestore Queue + Phone SIM SMS)
+  // Handle Send OTP for Login (Strictly Email-Only OTP Verification)
   const handleSendOtp = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
     setSuccessMessage('');
     const rawInput = email.trim();
     if (!rawInput) {
-      setError('অনুগ্রহ করে আপনার অ্যাকাউন্ট নম্বর, মোবাইল নম্বর অথবা ইমেইল প্রদান করুন।');
+      setError('অনুগ্রহ করে আপনার নিবন্ধিত ইমেইল অ্যাড্রেস প্রদান করুন।');
+      return;
+    }
+
+    // Strict Rule: BNB member codes or numeric IDs are forbidden
+    if (rawInput.toUpperCase().includes('BNB') || (!rawInput.includes('@') && /^\d+$/.test(rawInput))) {
+      setError('BNB কোড বা অ্যাকাউন্ট নম্বর দিয়ে অ্যাকাউন্ট খোলা বা লগইন করা সম্পূর্ণ নিষিদ্ধ! অ্যাকাউন্ট খোলা এবং লগইন শুধুমাত্র আপনার নিবন্ধিত বৈধ ইমেইল অ্যাড্রেসের মাধ্যমে করতে হবে।');
+      return;
+    }
+
+    if (!rawInput.includes('@') || !rawInput.includes('.')) {
+      setError('অনুগ্রহ করে আপনার সঠিক নিবন্ধিত ইমেইল অ্যাড্রেস প্রদান করুন (যেমন: example@gmail.com)।');
       return;
     }
 
@@ -223,7 +226,7 @@ export default function LoginScreen({
     try {
       const targetUser = await locateUser(rawInput);
       if (!targetUser) {
-        setError('প্রদত্ত তথ্যে কোনো অ্যাকাউন্ট পাওয়া যায়নি। সঠিক অ্যাকাউন্ট নম্বর (উদাঃ BNB00000028), মোবাইল নম্বর অথবা ইমেইল দিন।');
+        setError('প্রদত্ত ইমেইলে কোনো অ্যাকাউন্ট পাওয়া যায়নি। সঠিক নিবন্ধিত ইমেইল অ্যাড্রেস দিয়ে পুনরায় চেষ্টা করুন।');
         return;
       }
 
@@ -231,11 +234,11 @@ export default function LoginScreen({
 
       const userDisplayName = targetUser.name || 'সম্মানিত সদস্য';
       const userPhone = targetUser.phone || '';
-      const userEmail = targetUser.email ? targetUser.email.trim().toLowerCase() : '';
+      const userEmail = targetUser.email ? targetUser.email.trim().toLowerCase() : (targetUser.phone && targetUser.phone.includes('@') ? targetUser.phone.trim().toLowerCase() : '');
 
       // Strict security: User must have a registered email in database to login with real-time OTP
       if (!userEmail || !userEmail.includes('@')) {
-        setError('এই অ্যাকাউন্ট নম্বরের সাথে কোনো ইমেইল যুক্ত নেই। সুরক্ষার স্বার্থে শুধুমাত্র নিবন্ধিত ইমেইলের মাধ্যমেই রিয়েল-টাইম ওটিপি ভেরিফিকেশন করে লগইন করা সম্ভব।');
+        setError('এই অ্যাকাউন্টের সাথে কোনো বৈধ ইমেইল যুক্ত নেই। সুরক্ষার স্বার্থে শুধুমাত্র নিবন্ধিত ইমেইলের মাধ্যমেই রিয়েল-টাইম ওটিপি ভেরিফিকেশন করে লগইন করা সম্ভব।');
         return;
       }
 
@@ -417,6 +420,17 @@ export default function LoginScreen({
 
     if (!regName.trim() || !email.trim() || !regPhone.trim() || !regPassword.trim() || !regPin.trim()) {
       setError('অনুগ্রহ করে সকল তারকাচিহ্নিত (*) তথ্য সঠিকভাবে পূরণ করুন।');
+      return;
+    }
+
+    const cleanRegEmail = email.trim().toLowerCase();
+    if (cleanRegEmail.toUpperCase().includes('BNB')) {
+      setError('BNB কোড দিয়ে একাউন্ট খোলা সম্পূর্ণ নিষিদ্ধ! শুধুমাত্র আপনার ব্যক্তিগত বৈধ ইমেইল অ্যাড্রেস দিয়ে একাউন্ট খুলুন।');
+      return;
+    }
+
+    if (!cleanRegEmail.includes('@') || !cleanRegEmail.includes('.')) {
+      setError('অনুগ্রহ করে একটি সঠিক ও সক্রিয় ইমেইল অ্যাড্রেস প্রদান করুন (যেমন: example@gmail.com)। একাউন্ট খোলা শুধুমাত্র ইমেইলের মাধ্যমেই সম্ভব।');
       return;
     }
 
@@ -825,25 +839,28 @@ export default function LoginScreen({
                 <div>
                   <div className="flex items-center justify-between mb-2 px-1">
                     <label className="block text-xs sm:text-sm font-extrabold text-slate-900 text-left">
-                      অ্যাকাউন্ট নম্বর, মোবাইল নম্বর অথবা ইমেইল
+                      আপনার নিবন্ধিত ইমেইল অ্যাড্রেস
                     </label>
                     <span className="text-[10.5px] font-bold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
-                      নিরাপদ ওটিপি যাচাই
+                      ইমেইল ওটিপি যাচাই
                     </span>
                   </div>
                   <div className="relative">
                     <div className="absolute inset-y-0 left-0 pl-4.5 flex items-center pointer-events-none text-emerald-700">
-                      <KeyRound className="w-5 h-5 stroke-[2]" />
+                      <Mail className="w-5 h-5 stroke-[2]" />
                     </div>
                     <input
-                      type="text"
+                      type="email"
                       required
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
-                      placeholder="অ্যাকাউন্ট নম্বর, মোবাইল অথবা ইমেইল দিন"
+                      placeholder="আপনার ইমেইল দিন (যেমন: name@gmail.com)"
                       className="w-full pl-13 pr-5 py-3.5 sm:py-4 bg-white border-2 border-slate-200/90 rounded-full text-slate-950 text-xs sm:text-sm font-bold placeholder-slate-400 focus:outline-none focus:border-emerald-600 focus:ring-4 focus:ring-emerald-500/15 shadow-2xs transition-all"
                     />
                   </div>
+                  <p className="text-[11px] text-amber-700 bg-amber-50/70 border border-amber-200/60 rounded-xl px-3 py-1.5 mt-2 font-medium">
+                    ⚠️ BNB কোড বা অ্যাকাউন্ট নম্বর দিয়ে লগইন সম্পূর্ণ নিষিদ্ধ। একাউন্ট খোলা এবং লগইন শুধুমাত্র ইমেইলের মাধ্যমে করতে হবে।
+                  </p>
                 </div>
 
                 {/* Forgot Password link */}

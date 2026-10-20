@@ -80,7 +80,17 @@ export default function ForgotPasswordModal({
     setError('');
     const raw = inputVal.trim();
     if (!raw) {
-      setError('অনুগ্রহ করে আপনার অ্যাকাউন্ট নম্বর, মোবাইল অথবা ইমেইল প্রদান করুন।');
+      setError('অনুগ্রহ করে আপনার নিবন্ধিত ইমেইল অ্যাড্রেস প্রদান করুন।');
+      return;
+    }
+
+    if (raw.toUpperCase().includes('BNB') || (!raw.includes('@') && /^\d+$/.test(raw))) {
+      setError('BNB কোড বা অ্যাকাউন্ট নম্বর দিয়ে পাসওয়ার্ড রিসেট সম্পূর্ণ নিষিদ্ধ। অনুগ্রহ করে আপনার নিবন্ধিত ইমেইল অ্যাড্রেস দিন।');
+      return;
+    }
+
+    if (!raw.includes('@')) {
+      setError('অনুগ্রহ করে আপনার সঠিক নিবন্ধিত ইমেইল অ্যাড্রেস দিন (যেমন: name@gmail.com)।');
       return;
     }
 
@@ -89,7 +99,7 @@ export default function ForgotPasswordModal({
     try {
       const user = await locateUser(raw);
       if (!user) {
-        setError('প্রদত্ত তথ্যে কোনো অ্যাকাউন্ট পাওয়া যায়নি। সঠিক অ্যাকাউন্ট নম্বর (উদাঃ BNB00000028) অথবা মোবাইল দিন।');
+        setError('প্রদত্ত ইমেইলে কোনো অ্যাকাউন্ট পাওয়া যায়নি। সঠিক নিবন্ধিত ইমেইল অ্যাড্রেস দিন।');
         setLoading(false);
         return;
       }
@@ -371,23 +381,23 @@ export default function ForgotPasswordModal({
               >
                 <div>
                   <label className="block text-xs font-extrabold text-slate-800 mb-1.5 px-1">
-                    অ্যাকাউন্ট নম্বর, মোবাইল নম্বর অথবা ইমেইল *
+                    আপনার নিবন্ধিত ইমেইল অ্যাড্রেস *
                   </label>
                   <div className="relative">
                     <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-emerald-700">
                       <Mail className="w-5 h-5" />
                     </div>
                     <input
-                      type="text"
+                      type="email"
                       required
                       value={inputVal}
                       onChange={(e) => setInputVal(e.target.value)}
-                      placeholder="উদাঃ BNB00000028 বা 01712345678"
+                      placeholder="আপনার ইমেইল দিন (যেমন: name@gmail.com)"
                       className="w-full pl-12 pr-4 py-3.5 bg-slate-50 border-2 border-slate-200 rounded-full text-slate-900 text-xs sm:text-sm font-bold focus:bg-white focus:outline-none focus:border-emerald-600 focus:ring-4 focus:ring-emerald-500/10 shadow-2xs"
                     />
                   </div>
-                  <p className="text-[11px] text-slate-500 mt-1.5 px-1 font-medium">
-                    আপনার নিবন্ধিত ইমেইলে একটি ৬ সংখ্যার ওটিপি কোড পাঠানো হবে।
+                  <p className="text-[11px] text-amber-700 mt-1.5 px-1 font-medium">
+                    ⚠️ BNB কোড বা অ্যাকাউন্ট নম্বর দিয়ে পাসওয়ার্ড রিসেট সম্পূর্ণ নিষিদ্ধ। শুধুমাত্র নিবন্ধিত ইমেইল দিন।
                   </p>
                 </div>
 
