@@ -388,13 +388,19 @@ async function startServer() {
   app.use(express.json());
   app.use(express.urlencoded({ extended: true }));
 
-  // Permissive CORS middleware for Web, Mobile, Capacitor Android & iOS
+  // CORS middleware for APK & Web (capacitor://localhost, https://localhost, http://localhost, and own origin)
   app.use((req, res, next) => {
-    res.header('Access-Control-Allow-Origin', '*');
-    res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, PATCH');
-    res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization, zini-api-key');
+    const origin = req.headers.origin || '*';
+    const allowedOrigins = ['capacitor://localhost', 'https://localhost', 'http://localhost'];
+    if (allowedOrigins.includes(origin) || origin.includes('run.app') || origin.includes('localhost') || origin === '*') {
+      res.header('Access-Control-Allow-Origin', origin);
+    } else {
+      res.header('Access-Control-Allow-Origin', '*');
+    }
+    res.header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+    res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With');
     if (req.method === 'OPTIONS') {
-      return res.sendStatus(200);
+      return res.sendStatus(204);
     }
     next();
   });
@@ -3564,6 +3570,11 @@ async function startServer() {
       return res.sendFile(pubPath);
     }
     return res.status(404).send('Privacy Policy Not Found');
+  });
+
+  // Catch-all for unknown /api/* routes to guarantee JSON response with status 404
+  app.all('/api/*', (req, res) => {
+    res.status(404).json({ code: 'route_not_found', error: 'API route not found' });
   });
 
   // Vite integration as middleware depending on environment

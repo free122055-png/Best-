@@ -41,7 +41,7 @@ export default function LoginScreen({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
-  const [debugInfo, setDebugInfo] = useState<{ url: string; status: number; errorCode: string } | null>(null);
+  const [debugInfo, setDebugInfo] = useState<{ url: string; status: number; errorCode: string; rawSnippet?: string } | null>(null);
   const [healthStatus, setHealthStatus] = useState<{ build?: string; adminSdk?: boolean } | null>(null);
 
   useEffect(() => {
@@ -132,30 +132,38 @@ export default function LoginScreen({
       const status = res.status;
       const contentType = res.headers.get('content-type') || '';
       let data: any = {};
+      let rawSnippet: string | undefined = undefined;
+
       if (contentType.includes('application/json')) {
         data = await res.json().catch(() => ({}));
       } else {
         const text = await res.text().catch(() => '');
+        rawSnippet = text.slice(0, 80).replace(/\s+/g, ' ');
         data = { code: 'non_json_response', text };
       }
 
+      if (!contentType.includes('application/json')) {
+        setDebugInfo({ url: requestUrl, status, errorCode: 'NON_JSON_HTML', rawSnippet });
+        throw new Error('Server endpoint missing - server not updated');
+      }
+
       if (res.ok && data.found && data.user) {
-        setDebugInfo({ url: requestUrl, status, errorCode: '200_FOUND' });
+        setDebugInfo({ url: requestUrl, status, errorCode: '200_FOUND', rawSnippet });
         return data.user as User;
       }
 
       if (status === 404) {
         if (data.code === 'user_not_found') {
-          setDebugInfo({ url: requestUrl, status, errorCode: 'user_not_found' });
+          setDebugInfo({ url: requestUrl, status, errorCode: 'user_not_found', rawSnippet });
           return null; // Genuine user not found
         } else {
-          setDebugInfo({ url: requestUrl, status, errorCode: data.code || 'ENDPOINT_MISSING' });
+          setDebugInfo({ url: requestUrl, status, errorCode: data.code || 'ENDPOINT_MISSING', rawSnippet });
           throw new Error('Server endpoint missing - server not updated');
         }
       }
 
       const errCode = data.code || data.error || `HTTP_${status}`;
-      setDebugInfo({ url: requestUrl, status, errorCode: errCode });
+      setDebugInfo({ url: requestUrl, status, errorCode: errCode, rawSnippet });
       throw new Error(`সার্ভার ত্রুটি (${status}): ${errCode}`);
     } catch (netErr: any) {
       console.warn('Server locateUser error:', netErr);
