@@ -41,6 +41,15 @@ export default function LoginScreen({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
+  const [debugInfo, setDebugInfo] = useState<{ url: string; status: number; errorCode: string } | null>(null);
+  const [healthStatus, setHealthStatus] = useState<{ build?: string; adminSdk?: boolean } | null>(null);
+
+  useEffect(() => {
+    fetch(apiUrl('/api/health'))
+      .then(r => r.json())
+      .then(d => setHealthStatus(d))
+      .catch(() => {});
+  }, []);
 
   // Form states
   const [email, setEmail] = useState(() => {
@@ -87,7 +96,7 @@ export default function LoginScreen({
     }
   }, [appConfig?.emailMigrationPopupEnabled]);
 
-  // Helper to locate user across phone formats, account IDs, emails, and direct doc IDs
+  // Helper to locate user via server-side endpoint (bypasses Firestore security rules for unauthenticated users in production)
   const locateUser = async (rawInput: string): Promise<User | null> => {
     const trimmedInput = rawInput.trim();
     if (!trimmedInput) return null;
@@ -112,74 +121,49 @@ export default function LoginScreen({
       } catch (e) {}
     }
 
-    if (!db) return null;
-
-    // 2. Direct email queries
-    if (isEmail) {
-      try {
-        const qEmail = query(collection(db, 'users'), where('email', '==', cleanInput), limit(1));
-        const snapEmail = await getDocs(qEmail);
-        if (!snapEmail.empty) {
-          return { uid: snapEmail.docs[0].id, ...(snapEmail.docs[0].data() as any) } as User;
-        }
-        const qEmailRaw = query(collection(db, 'users'), where('email', '==', trimmedInput), limit(1));
-        const snapEmailRaw = await getDocs(qEmailRaw);
-        if (!snapEmailRaw.empty) {
-          return { uid: snapEmailRaw.docs[0].id, ...(snapEmailRaw.docs[0].data() as any) } as User;
-        }
-      } catch (e) {}
-    }
-
-    // 3. Member ID and Account Number queries
-    const upperInput = trimmedInput.toUpperCase();
-    const queriesToTry = [
-      query(collection(db, 'users'), where('memberId', '==', upperInput), limit(1)),
-      query(collection(db, 'users'), where('memberId', '==', trimmedInput), limit(1)),
-      query(collection(db, 'users'), where('memberId', '==', cleanInput), limit(1)),
-      query(collection(db, 'users'), where('accountNumber', '==', upperInput), limit(1)),
-      query(collection(db, 'users'), where('accountNumber', '==', trimmedInput), limit(1)),
-      query(collection(db, 'users'), where('accountNo', '==', upperInput), limit(1))
-    ];
-
-    if (cleanDigits.length > 0 && cleanDigits.length <= 8) {
-      const paddedId = `BNB${cleanDigits.padStart(8, '0')}`;
-      queriesToTry.push(query(collection(db, 'users'), where('memberId', '==', paddedId), limit(1)));
-    }
-
-    if (cleanDigits.length >= 10) {
-      const last10 = cleanDigits.slice(-10);
-      queriesToTry.push(query(collection(db, 'users'), where('phone', '==', `+880${last10}`), limit(1)));
-      queriesToTry.push(query(collection(db, 'users'), where('phone', '==', `0${last10}`), limit(1)));
-      queriesToTry.push(query(collection(db, 'users'), where('phone', '==', cleanDigits), limit(1)));
-      queriesToTry.push(query(collection(db, 'users'), where('phone', '==', `+${cleanDigits}`), limit(1)));
-    }
-
+    const requestUrl = apiUrl('/api/auth/locate-user');
     try {
-      const results = await Promise.all(queriesToTry.map(q => getDocs(q).catch(() => null)));
-      for (const res of results) {
-        if (res && !res.empty) {
-          return { uid: res.docs[0].id, ...(res.docs[0].data() as any) } as User;
+      const res = await fetch(requestUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query: trimmedInput })
+      });
+
+      const status = res.status;
+      const contentType = res.headers.get('content-type') || '';
+      let data: any = {};
+      if (contentType.includes('application/json')) {
+        data = await res.json().catch(() => ({}));
+      } else {
+        const text = await res.text().catch(() => '');
+        data = { code: 'non_json_response', text };
+      }
+
+      if (res.ok && data.found && data.user) {
+        setDebugInfo({ url: requestUrl, status, errorCode: '200_FOUND' });
+        return data.user as User;
+      }
+
+      if (status === 404) {
+        if (data.code === 'user_not_found') {
+          setDebugInfo({ url: requestUrl, status, errorCode: 'user_not_found' });
+          return null; // Genuine user not found
+        } else {
+          setDebugInfo({ url: requestUrl, status, errorCode: data.code || 'ENDPOINT_MISSING' });
+          throw new Error('Server endpoint missing - server not updated');
         }
       }
-    } catch (e) {}
 
-    // 4. Try robust findUserInFirestoreByPhone helper (checks secret admin phone & all normalized patterns)
-    try {
-      const foundByPhone = await findUserInFirestoreByPhone(trimmedInput);
-      if (foundByPhone?.user) {
-        return foundByPhone.user;
-      }
-    } catch (e) {}
-
-    // 5. Direct doc ID lookup in 'users'
-    try {
-      const directDoc = await getDoc(doc(db, 'users', trimmedInput));
-      if (directDoc.exists()) {
-        return { uid: directDoc.id, ...(directDoc.data() as any) } as User;
-      }
-    } catch (e) {}
-
-    return null;
+      const errCode = data.code || data.error || `HTTP_${status}`;
+      setDebugInfo({ url: requestUrl, status, errorCode: errCode });
+      throw new Error(`সার্ভার ত্রুটি (${status}): ${errCode}`);
+    } catch (netErr: any) {
+      console.warn('Server locateUser error:', netErr);
+      const isEndpointMissing = netErr.message && netErr.message.includes('Server endpoint missing');
+      const displayMsg = isEndpointMissing ? 'Server endpoint missing - server not updated' : (netErr.message || 'নেটওয়ার্ক সংযোগে সমস্যা হয়েছে।');
+      setDebugInfo({ url: requestUrl, status: netErr.status || 0, errorCode: netErr?.message || 'NETWORK_ERROR' });
+      throw new Error(displayMsg);
+    }
   };
 
   // Handle Send OTP for Login (Mandatory Multi-Channel: Direct Native Resend + Real-time Firestore Queue + Phone SIM SMS)
@@ -659,9 +643,18 @@ export default function LoginScreen({
 
           {/* Feedback messages */}
           {error && (
-            <div className="bg-rose-50 border border-rose-200 text-rose-800 text-xs p-3.5 rounded-2xl font-bold flex items-start gap-2 shadow-xs animate-fade-in">
-              <AlertTriangle className="w-4 h-4 shrink-0 text-rose-600 mt-0.5" />
-              <span>{error}</span>
+            <div className="space-y-1.5">
+              <div className="bg-rose-50 border border-rose-200 text-rose-800 text-xs p-3.5 rounded-2xl font-bold flex items-start gap-2 shadow-xs animate-fade-in">
+                <AlertTriangle className="w-4 h-4 shrink-0 text-rose-600 mt-0.5" />
+                <span>{error}</span>
+              </div>
+              {debugInfo && (
+                <div className="p-2.5 bg-neutral-900 text-amber-400 font-mono text-[10px] rounded-xl overflow-x-auto shadow-inner space-y-1">
+                  <div>Base URL: {apiUrl('')}</div>
+                  <div>Health Build: {healthStatus?.build || 'loading...'} | AdminSDK: {String(healthStatus?.adminSdk ?? 'unknown')}</div>
+                  <div>Req URL: {debugInfo.url} | Status: {debugInfo.status} | Code: {debugInfo.errorCode}</div>
+                </div>
+              )}
             </div>
           )}
 

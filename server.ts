@@ -599,8 +599,129 @@ async function startServer() {
     }
   });
 
-app.get('/api/health', (req, res) => {
-    res.json({ status: 'ok', appName: 'BNB Business Network Bangladesh' });
+  const locateRateLimitMap = new Map<string, number[]>();
+  app.post('/api/auth/locate-user', async (req, res) => {
+    try {
+      const ip = req.ip || req.headers['x-forwarded-for'] || 'unknown';
+      const now = Date.now();
+      let timestamps = locateRateLimitMap.get(ip) || [];
+      timestamps = timestamps.filter(t => now - t < 60000);
+      if (timestamps.length >= 30) {
+        return res.status(429).json({ code: 'rate_limit_exceeded', error: 'Too many requests' });
+      }
+      timestamps.push(now);
+      locateRateLimitMap.set(ip, timestamps);
+
+      const { query: rawQuery } = req.body;
+      if (!rawQuery || typeof rawQuery !== 'string') {
+        return res.status(400).json({ code: 'query_required', error: 'query_required' });
+      }
+      const trimmed = rawQuery.trim();
+      const lower = trimmed.toLowerCase();
+      const upper = trimmed.toUpperCase();
+      const digits = trimmed.replace(/\D/g, '');
+
+      if (!adminDb) {
+        return res.status(500).json({ code: 'admin_db_unavailable', error: 'admin_db_unavailable' });
+      }
+
+      const usersRef = adminDb.collection('users');
+      let foundUser: any = null;
+
+      // 1. Exact email match (normalized lower & trimmed)
+      if (lower.includes('@')) {
+        const snap = await usersRef.where('email', '==', lower).limit(1).get();
+        if (!snap.empty) {
+          const docSnap = snap.docs[0];
+          foundUser = { uid: docSnap.id, ...docSnap.data() };
+        } else {
+          const snapRaw = await usersRef.where('email', '==', trimmed).limit(1).get();
+          if (!snapRaw.empty) {
+            const docSnap = snapRaw.docs[0];
+            foundUser = { uid: docSnap.id, ...docSnap.data() };
+          }
+        }
+      }
+
+      // 2. Member ID / Account Number match
+      if (!foundUser) {
+        const memberQueries = [
+          usersRef.where('memberId', '==', upper).limit(1).get(),
+          usersRef.where('memberId', '==', trimmed).limit(1).get(),
+          usersRef.where('memberId', '==', lower).limit(1).get(),
+          usersRef.where('accountNumber', '==', upper).limit(1).get(),
+          usersRef.where('accountNumber', '==', trimmed).limit(1).get(),
+          usersRef.where('accountNo', '==', upper).limit(1).get()
+        ];
+        if (digits.length > 0 && digits.length <= 8) {
+          const paddedId = `BNB${digits.padStart(8, '0')}`;
+          memberQueries.push(usersRef.where('memberId', '==', paddedId).limit(1).get());
+        }
+
+        const snapshots = await Promise.all(memberQueries);
+        for (const snap of snapshots) {
+          if (!snap.empty) {
+            const docSnap = snap.docs[0];
+            foundUser = { uid: docSnap.id, ...docSnap.data() };
+            break;
+          }
+        }
+      }
+
+      // 3. Phone match
+      if (!foundUser && digits.length >= 10) {
+        const last10 = digits.slice(-10);
+        const phoneQueries = [
+          usersRef.where('phone', '==', `+880${last10}`).limit(1).get(),
+          usersRef.where('phone', '==', `0${last10}`).limit(1).get(),
+          usersRef.where('phone', '==', digits).limit(1).get(),
+          usersRef.where('phone', '==', `+${digits}`).limit(1).get()
+        ];
+        const snapshots = await Promise.all(phoneQueries);
+        for (const snap of snapshots) {
+          if (!snap.empty) {
+            const docSnap = snap.docs[0];
+            foundUser = { uid: docSnap.id, ...docSnap.data() };
+            break;
+          }
+        }
+      }
+
+      // 4. Direct document ID lookup
+      if (!foundUser) {
+        const docSnap = await usersRef.doc(trimmed).get();
+        if (docSnap.exists) {
+          foundUser = { uid: docSnap.id, ...docSnap.data() };
+        }
+      }
+
+      if (foundUser) {
+        return res.json({
+          found: true,
+          user: {
+            uid: foundUser.uid,
+            name: foundUser.name || 'সদস্য',
+            email: foundUser.email || '',
+            phone: foundUser.phone || '',
+            memberId: foundUser.memberId || '',
+            role: foundUser.role || 'user'
+          }
+        });
+      } else {
+        return res.status(404).json({ code: 'user_not_found' });
+      }
+    } catch (err: any) {
+      console.error('Error in /api/auth/locate-user:', err);
+      return res.status(500).json({ code: 'internal_error', error: err?.message || 'internal_error' });
+    }
+  });
+
+  app.get('/api/health', (req, res) => {
+    res.json({
+      ok: true,
+      build: 'build_20261020_041000',
+      adminSdk: Boolean(adminDb)
+    });
   });
 
   // Serve static assets from the root assets/ directory directly
