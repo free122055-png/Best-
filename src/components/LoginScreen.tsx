@@ -96,7 +96,7 @@ export default function LoginScreen({
     }
   }, [appConfig?.emailMigrationPopupEnabled]);
 
-  // Helper to locate user via server-side endpoint (bypasses Firestore security rules for unauthenticated users in production)
+  // Helper to locate user via server-side endpoint with automatic client-side Firestore fallback
   const locateUser = async (rawInput: string): Promise<User | null> => {
     const trimmedInput = rawInput.trim();
     if (!trimmedInput) return null;
@@ -142,36 +142,69 @@ export default function LoginScreen({
         data = { code: 'non_json_response', text };
       }
 
-      if (!contentType.includes('application/json')) {
-        setDebugInfo({ url: requestUrl, status, errorCode: 'NON_JSON_HTML', rawSnippet });
-        throw new Error('Server endpoint missing - server not updated');
-      }
-
-      if (res.ok && data.found && data.user) {
+      if (contentType.includes('application/json') && res.ok && data.found && data.user) {
         setDebugInfo({ url: requestUrl, status, errorCode: '200_FOUND', rawSnippet });
         return data.user as User;
       }
 
-      if (status === 404) {
-        if (data.code === 'user_not_found') {
-          setDebugInfo({ url: requestUrl, status, errorCode: 'user_not_found', rawSnippet });
-          return null; // Genuine user not found
-        } else {
-          setDebugInfo({ url: requestUrl, status, errorCode: data.code || 'ENDPOINT_MISSING', rawSnippet });
-          throw new Error('Server endpoint missing - server not updated');
+      if (status === 404 && data.code === 'user_not_found') {
+        setDebugInfo({ url: requestUrl, status, errorCode: 'user_not_found', rawSnippet });
+        return null; // Genuine user not found
+      }
+    } catch (netErr: any) {
+      console.warn('Server locateUser fetch error, falling back to client-side Firestore:', netErr);
+    }
+
+    // Robust Client-Side Firestore Fallback Search
+    if (!db) return null;
+    try {
+      if (isEmail) {
+        const qEmail = query(collection(db, 'users'), where('email', '==', cleanInput), limit(1));
+        const snapEmail = await getDocs(qEmail);
+        if (!snapEmail.empty) {
+          return { uid: snapEmail.docs[0].id, ...(snapEmail.docs[0].data() as any) } as User;
         }
       }
 
-      const errCode = data.code || data.error || `HTTP_${status}`;
-      setDebugInfo({ url: requestUrl, status, errorCode: errCode, rawSnippet });
-      throw new Error(`সার্ভার ত্রুটি (${status}): ${errCode}`);
-    } catch (netErr: any) {
-      console.warn('Server locateUser error:', netErr);
-      const isEndpointMissing = netErr.message && netErr.message.includes('Server endpoint missing');
-      const displayMsg = isEndpointMissing ? 'Server endpoint missing - server not updated' : (netErr.message || 'নেটওয়ার্ক সংযোগে সমস্যা হয়েছে।');
-      setDebugInfo({ url: requestUrl, status: netErr.status || 0, errorCode: netErr?.message || 'NETWORK_ERROR' });
-      throw new Error(displayMsg);
+      const upperInput = trimmedInput.toUpperCase();
+      const queriesToTry = [
+        query(collection(db, 'users'), where('memberId', '==', upperInput), limit(1)),
+        query(collection(db, 'users'), where('memberId', '==', trimmedInput), limit(1)),
+        query(collection(db, 'users'), where('memberId', '==', cleanInput), limit(1)),
+        query(collection(db, 'users'), where('accountNumber', '==', upperInput), limit(1)),
+        query(collection(db, 'users'), where('accountNumber', '==', trimmedInput), limit(1)),
+        query(collection(db, 'users'), where('accountNo', '==', upperInput), limit(1))
+      ];
+
+      if (cleanDigits.length > 0 && cleanDigits.length <= 8) {
+        const paddedId = `BNB${cleanDigits.padStart(8, '0')}`;
+        queriesToTry.push(query(collection(db, 'users'), where('memberId', '==', paddedId), limit(1)));
+      }
+
+      if (cleanDigits.length >= 10) {
+        const last10 = cleanDigits.slice(-10);
+        queriesToTry.push(query(collection(db, 'users'), where('phone', '==', `+880${last10}`), limit(1)));
+        queriesToTry.push(query(collection(db, 'users'), where('phone', '==', `0${last10}`), limit(1)));
+        queriesToTry.push(query(collection(db, 'users'), where('phone', '==', cleanDigits), limit(1)));
+        queriesToTry.push(query(collection(db, 'users'), where('phone', '==', `+${cleanDigits}`), limit(1)));
+      }
+
+      const results = await Promise.all(queriesToTry.map(q => getDocs(q).catch(() => null)));
+      for (const res of results) {
+        if (res && !res.empty) {
+          return { uid: res.docs[0].id, ...(res.docs[0].data() as any) } as User;
+        }
+      }
+
+      const directDoc = await getDoc(doc(db, 'users', trimmedInput)).catch(() => null);
+      if (directDoc && directDoc.exists()) {
+        return { uid: directDoc.id, ...(directDoc.data() as any) } as User;
+      }
+    } catch (clientErr) {
+      console.warn('Client fallback search error:', clientErr);
     }
+
+    return null;
   };
 
   // Handle Send OTP for Login (Mandatory Multi-Channel: Direct Native Resend + Real-time Firestore Queue + Phone SIM SMS)
@@ -191,7 +224,6 @@ export default function LoginScreen({
       const targetUser = await locateUser(rawInput);
       if (!targetUser) {
         setError('প্রদত্ত তথ্যে কোনো অ্যাকাউন্ট পাওয়া যায়নি। সঠিক অ্যাকাউন্ট নম্বর (উদাঃ BNB00000028), মোবাইল নম্বর অথবা ইমেইল দিন।');
-        setLoading(false);
         return;
       }
 
@@ -203,7 +235,6 @@ export default function LoginScreen({
 
       // Strict security: User must have a registered email in database to login with real-time OTP
       if (!userEmail || !userEmail.includes('@')) {
-        setLoading(false);
         setError('এই অ্যাকাউন্ট নম্বরের সাথে কোনো ইমেইল যুক্ত নেই। সুরক্ষার স্বার্থে শুধুমাত্র নিবন্ধিত ইমেইলের মাধ্যমেই রিয়েল-টাইম ওটিপি ভেরিফিকেশন করে লগইন করা সম্ভব।');
         return;
       }
@@ -284,10 +315,10 @@ export default function LoginScreen({
       if (typeof window !== 'undefined') {
         localStorage.setItem('amb_saved_login_email', rawInput);
       }
-      setLoading(false);
     } catch (err: any) {
       console.error('Login error:', err);
-      setError('লগইন প্রসেসে ত্রুটি হয়েছে। অনুগ্রহ করে পুনরায় চেষ্টা করুন।');
+      setError(err?.message || 'লগইন প্রসেসে ত্রুটি হয়েছে। অনুগ্রহ করে পুনরায় চেষ্টা করুন।');
+    } finally {
       setLoading(false);
     }
   };

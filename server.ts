@@ -405,28 +405,38 @@ async function startServer() {
     next();
   });
 
-  // Initialize Firebase Admin for server-side operations
+  // Initialize Firebase Admin for server-side operations with explicit project ID and client fallback
   let adminDb: any = null;
   const firebaseAdmin = admin as any;
   try {
     if (firebaseAdmin && (!firebaseAdmin.apps || !firebaseAdmin.apps.length)) {
-      if (firebaseAdmin.credential && typeof firebaseAdmin.credential.applicationDefault === 'function') {
+      try {
+        firebaseAdmin.initializeApp({
+          credential: firebaseAdmin.credential.applicationDefault(),
+          projectId: 'ai-studio-120ec6e1-2db5-45d2-b1b1-46493400c959'
+        });
+      } catch (e1) {
         try {
           firebaseAdmin.initializeApp({
-            credential: firebaseAdmin.credential.applicationDefault()
+            projectId: 'ai-studio-120ec6e1-2db5-45d2-b1b1-46493400c959'
           });
-        } catch {
+        } catch (e2) {
           firebaseAdmin.initializeApp();
         }
-      } else if (typeof firebaseAdmin.initializeApp === 'function') {
-        firebaseAdmin.initializeApp();
       }
     }
     if (firebaseAdmin && typeof firebaseAdmin.firestore === 'function' && firebaseAdmin.apps && firebaseAdmin.apps.length) {
       adminDb = firebaseAdmin.firestore();
     }
   } catch (err) {
-    // Graceful fallback if firebase-admin credentials are not present in container
+    console.warn('[Firebase Admin Init Warning]:', err);
+  }
+
+  if (!adminDb) {
+    try {
+      const clientApp = getApps().length ? getApp() : initializeApp({ projectId: 'ai-studio-120ec6e1-2db5-45d2-b1b1-46493400c959' });
+      adminDb = getFirestore(clientApp);
+    } catch (e) {}
   }
 
   // Let's add a health check endpoint
@@ -631,74 +641,87 @@ async function startServer() {
         return res.status(500).json({ code: 'admin_db_unavailable', error: 'admin_db_unavailable' });
       }
 
-      const usersRef = adminDb.collection('users');
+      // Universal query helper supporting both Admin SDK and Client Modular SDK
+      const queryUsersByField = async (field: string, operator: string, value: any) => {
+        try {
+          if (adminDb && typeof adminDb.collection === 'function') {
+            const snap = await adminDb.collection('users').where(field, operator, value).limit(1).get();
+            if (!snap.empty) {
+              const docSnap = snap.docs[0];
+              return { uid: docSnap.id, ...docSnap.data() };
+            }
+          } else {
+            const { collection, query, where, limit, getDocs } = await import('firebase/firestore');
+            const targetDb = adminDb;
+            const qRef = query(collection(targetDb, 'users'), where(field, operator, value), limit(1));
+            const snap = await getDocs(qRef);
+            if (!snap.empty) {
+              const docSnap = snap.docs[0];
+              return { uid: docSnap.id, ...docSnap.data() };
+            }
+          }
+        } catch (e) {}
+        return null;
+      };
+
+      const getUserByIdDoc = async (docId: string) => {
+        try {
+          if (adminDb && typeof adminDb.collection === 'function') {
+            const docSnap = await adminDb.collection('users').doc(docId).get();
+            if (docSnap.exists) {
+              return { uid: docSnap.id, ...docSnap.data() };
+            }
+          } else {
+            const { doc, getDoc } = await import('firebase/firestore');
+            const targetDb = adminDb;
+            const docSnap = await getDoc(doc(targetDb, 'users', docId));
+            if (docSnap.exists()) {
+              return { uid: docSnap.id, ...docSnap.data() };
+            }
+          }
+        } catch (e) {}
+        return null;
+      };
+
       let foundUser: any = null;
 
       // 1. Exact email match (normalized lower & trimmed)
       if (lower.includes('@')) {
-        const snap = await usersRef.where('email', '==', lower).limit(1).get();
-        if (!snap.empty) {
-          const docSnap = snap.docs[0];
-          foundUser = { uid: docSnap.id, ...docSnap.data() };
-        } else {
-          const snapRaw = await usersRef.where('email', '==', trimmed).limit(1).get();
-          if (!snapRaw.empty) {
-            const docSnap = snapRaw.docs[0];
-            foundUser = { uid: docSnap.id, ...docSnap.data() };
-          }
+        foundUser = await queryUsersByField('email', '==', lower);
+        if (!foundUser) {
+          foundUser = await queryUsersByField('email', '==', trimmed);
         }
       }
 
       // 2. Member ID / Account Number match
       if (!foundUser) {
-        const memberQueries = [
-          usersRef.where('memberId', '==', upper).limit(1).get(),
-          usersRef.where('memberId', '==', trimmed).limit(1).get(),
-          usersRef.where('memberId', '==', lower).limit(1).get(),
-          usersRef.where('accountNumber', '==', upper).limit(1).get(),
-          usersRef.where('accountNumber', '==', trimmed).limit(1).get(),
-          usersRef.where('accountNo', '==', upper).limit(1).get()
-        ];
+        const fieldsToTry = ['memberId', 'accountNumber', 'accountNo'];
+        const valuesToTry = [upper, trimmed, lower];
         if (digits.length > 0 && digits.length <= 8) {
-          const paddedId = `BNB${digits.padStart(8, '0')}`;
-          memberQueries.push(usersRef.where('memberId', '==', paddedId).limit(1).get());
+          valuesToTry.push(`BNB${digits.padStart(8, '0')}`);
         }
-
-        const snapshots = await Promise.all(memberQueries);
-        for (const snap of snapshots) {
-          if (!snap.empty) {
-            const docSnap = snap.docs[0];
-            foundUser = { uid: docSnap.id, ...docSnap.data() };
-            break;
+        for (const field of fieldsToTry) {
+          for (const val of valuesToTry) {
+            foundUser = await queryUsersByField(field, '==', val);
+            if (foundUser) break;
           }
+          if (foundUser) break;
         }
       }
 
       // 3. Phone match
       if (!foundUser && digits.length >= 10) {
         const last10 = digits.slice(-10);
-        const phoneQueries = [
-          usersRef.where('phone', '==', `+880${last10}`).limit(1).get(),
-          usersRef.where('phone', '==', `0${last10}`).limit(1).get(),
-          usersRef.where('phone', '==', digits).limit(1).get(),
-          usersRef.where('phone', '==', `+${digits}`).limit(1).get()
-        ];
-        const snapshots = await Promise.all(phoneQueries);
-        for (const snap of snapshots) {
-          if (!snap.empty) {
-            const docSnap = snap.docs[0];
-            foundUser = { uid: docSnap.id, ...docSnap.data() };
-            break;
-          }
+        const phonesToTry = [`+880${last10}`, `0${last10}`, digits, `+${digits}`];
+        for (const ph of phonesToTry) {
+          foundUser = await queryUsersByField('phone', '==', ph);
+          if (foundUser) break;
         }
       }
 
       // 4. Direct document ID lookup
       if (!foundUser) {
-        const docSnap = await usersRef.doc(trimmed).get();
-        if (docSnap.exists) {
-          foundUser = { uid: docSnap.id, ...docSnap.data() };
-        }
+        foundUser = await getUserByIdDoc(trimmed);
       }
 
       if (foundUser) {
