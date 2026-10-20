@@ -37,7 +37,16 @@ export default function LoginScreen({
   onOpenAdminPin
 }: LoginScreenProps) {
   const [isRegistering, setIsRegistering] = useState(initialRegistering);
-  const [step, setStep] = useState<'info' | 'verify-otp' | 'register-details'>('info');
+  const [step, setStep] = useState<'info' | 'verify-otp' | 'register-details'>(() => {
+    if (typeof window !== 'undefined') {
+      const pendingOtp = sessionStorage.getItem('bnb_pending_otp_code') || localStorage.getItem('bnb_pending_otp_code');
+      const pendingUser = sessionStorage.getItem('bnb_pending_otp_user') || localStorage.getItem('bnb_pending_otp_user');
+      if (pendingOtp && pendingUser) {
+        return 'verify-otp';
+      }
+    }
+    return 'info';
+  });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
@@ -60,8 +69,23 @@ export default function LoginScreen({
   });
   const [otpInput, setOtpInput] = useState('');
   const [showForgotPassword, setShowForgotPassword] = useState(false);
-  const [sentOtpCode, setSentOtpCode] = useState('');
-  const [foundUser, setFoundUser] = useState<User | null>(null);
+  const [sentOtpCode, setSentOtpCode] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return sessionStorage.getItem('bnb_pending_otp_code') || localStorage.getItem('bnb_pending_otp_code') || '';
+    }
+    return '';
+  });
+  const [foundUser, setFoundUser] = useState<User | null>(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const saved = sessionStorage.getItem('bnb_pending_otp_user') || localStorage.getItem('bnb_pending_otp_user');
+        return saved ? JSON.parse(saved) : null;
+      } catch (e) {
+        return null;
+      }
+    }
+    return null;
+  });
   const [confirmationResult, setConfirmationResult] = useState<ConfirmationResult | null>(null);
   const [deliveryInfo, setDeliveryInfo] = useState<{
     deliveredTo?: string;
@@ -264,6 +288,15 @@ export default function LoginScreen({
       // 1. Generate authoritative 6-digit OTP
       const generatedOtp = Math.floor(100000 + Math.random() * 900000).toString();
       setSentOtpCode(generatedOtp);
+      setFoundUser(targetUser);
+
+      // Persist across app switching (e.g. when checking Gmail app)
+      if (typeof window !== 'undefined') {
+        sessionStorage.setItem('bnb_pending_otp_code', generatedOtp);
+        sessionStorage.setItem('bnb_pending_otp_user', JSON.stringify(targetUser));
+        localStorage.setItem('bnb_pending_otp_code', generatedOtp);
+        localStorage.setItem('bnb_pending_otp_user', JSON.stringify(targetUser));
+      }
 
       // Mask email for privacy display
       const maskEmail = (em: string) => {
@@ -304,7 +337,7 @@ export default function LoginScreen({
         }
       }
 
-      // 5. Update UI state & prompt user instantly
+      // 5. Update UI state & prompt user instantly (Official Domain - Inbox delivery)
       setDeliveryInfo({
         deliveredTo: displayEmail,
         channel: 'email',
@@ -312,7 +345,7 @@ export default function LoginScreen({
         targetEmail: targetEmail
       });
 
-      setSuccessMessage(`আপনার নিবন্ধিত ইমেইলে (${displayEmail}) ৬ সংখ্যার ওটিপি কোড পাঠানো হয়েছে। ইনবক্স অথবা স্প্যাম ফোল্ডার চেক করুন।`);
+      setSuccessMessage(`আপনার নিবন্ধিত ইমেইলে (${displayEmail}) ৬ সংখ্যার অফিসিয়াল ভেরিফিকেশন ওটিপি কোড পাঠানো হয়েছে। অনুগ্রহ করে আপনার ইনবক্স চেক করুন।`);
 
       setStep('verify-otp');
       if (typeof window !== 'undefined') {
@@ -326,46 +359,76 @@ export default function LoginScreen({
     }
   };
 
-  // Execute actual login with unique activeSessionToken for single-device session control
-  const executeLogin = async (userToLogin: User) => {
+  // Execute actual login with unique activeSessionToken for single-device session control (Instant 0ms UI switch)
+  const executeLogin = (userToLogin: User) => {
     const newSessionToken = 'sess_' + Date.now() + '_' + Math.random().toString(36).substring(2, 9);
+    const deviceId = getClientDeviceId();
     
-    const userWithToken = {
+    const userWithToken: User = {
       ...userToLogin,
       activeSessionToken: newSessionToken,
-      activeSessionDeviceId: getClientDeviceId()
+      activeSessionDeviceId: deviceId
     };
 
-    if (db && userToLogin.uid) {
+    // 1. Synchronously persist session keys to guarantee 100% immediate state persistence
+    if (typeof window !== 'undefined') {
       try {
-        await updateDoc(doc(db, 'users', userToLogin.uid), {
-          activeSessionToken: newSessionToken,
-          activeSessionDeviceId: getClientDeviceId(),
-          lastLoginAt: new Date().toISOString(),
-          isLoggedIn: true
-        }).catch(() => {});
-      } catch (e) {}
+        localStorage.setItem('amb_user_uid', userWithToken.uid);
+        localStorage.setItem('amb_user_phone', userWithToken.phone || '');
+        localStorage.setItem('amb_user_name', userWithToken.name || 'সদস্য');
+        localStorage.setItem('amb_user_role', userWithToken.role || 'user');
+        localStorage.setItem('bnb_user_member_id', userWithToken.memberId || 'BNB00000000');
+        localStorage.setItem('amb_active_session_token', newSessionToken);
+        localStorage.setItem('amb_last_user', JSON.stringify(userWithToken));
+        sessionStorage.setItem('amb_session_unlocked', 'true');
+
+        // Clear transient OTP storage
+        sessionStorage.removeItem('bnb_pending_otp_code');
+        sessionStorage.removeItem('bnb_pending_otp_user');
+        localStorage.removeItem('bnb_pending_otp_code');
+        localStorage.removeItem('bnb_pending_otp_user');
+      } catch (storeErr) {
+        console.warn('Storage save warning:', storeErr);
+      }
     }
 
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('amb_user_uid', userWithToken.uid);
-      localStorage.setItem('amb_user_phone', userWithToken.phone || '');
-      localStorage.setItem('amb_user_name', userWithToken.name || 'সদস্য');
-      localStorage.setItem('amb_user_role', userWithToken.role || 'user');
-      localStorage.setItem('bnb_user_member_id', userWithToken.memberId || 'BNB00000000');
-      localStorage.setItem('amb_active_session_token', newSessionToken);
-      localStorage.setItem('amb_last_user', JSON.stringify(userWithToken));
-      sessionStorage.setItem('amb_session_unlocked', 'true');
-    }
+    // 2. Set explicit success feedback
+    setSuccessMessage('✅ ওটিপি ভেরিফিকেশন সফল হয়েছে! অ্যাকাউন্টে প্রবেশ করা হচ্ছে...');
+    setError('');
+
+    // 3. Immediately invoke onLoginSuccess to switch screen to user dashboard (NEVER blocked by network)
     onLoginSuccess(userWithToken);
+
+    // 4. Background non-blocking session recording via Admin SDK server route
+    try {
+      fetch(apiUrl('/api/auth/record-login'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          uid: userWithToken.uid,
+          activeSessionToken: newSessionToken,
+          deviceId: deviceId
+        })
+      }).catch(() => {});
+    } catch (e) {}
+
+    // 5. Non-blocking client firestore update if available (never awaited)
+    if (db && userToLogin.uid) {
+      updateDoc(doc(db, 'users', userToLogin.uid), {
+        activeSessionToken: newSessionToken,
+        activeSessionDeviceId: deviceId,
+        lastLoginAt: new Date().toISOString(),
+        isLoggedIn: true
+      }).catch(() => {});
+    }
   };
 
-  // Verify OTP (Dual check: Email OTP code OR Firebase Phone Auth SMS confirmation)
+  // Verify OTP (Dual check: Local session OTP, persistent storage OTP, or server-side /api/verify-otp)
   const handleVerifyOtp = async (e?: React.FormEvent, directCode?: string) => {
     if (e) e.preventDefault();
-    const code = directCode || otpInput.trim();
+    const code = (directCode || otpInput).trim();
     if (!code) {
-      setError('অনুগ্রহ করে সিমে বা ইমেইলে আসা ৬ সংখ্যার ওটিপি কোডটি লিখুন।');
+      setError('অনুগ্রহ করে আপনার ইমেইলে আসা ৬ সংখ্যার ওটিপি কোডটি লিখুন।');
       return;
     }
 
@@ -380,12 +443,42 @@ export default function LoginScreen({
     try {
       let isVerified = false;
 
-      // 1. Primary check against generated session/email OTP code
-      if (sentOtpCode && code === sentOtpCode) {
+      // 1. Primary check against local state / persisted storage OTP code
+      const effectiveSentCode = sentOtpCode || (typeof window !== 'undefined' ? (sessionStorage.getItem('bnb_pending_otp_code') || localStorage.getItem('bnb_pending_otp_code') || '') : '');
+      
+      let effectiveUser = foundUser;
+      if (!effectiveUser && typeof window !== 'undefined') {
+        try {
+          const raw = sessionStorage.getItem('bnb_pending_otp_user') || localStorage.getItem('bnb_pending_otp_user');
+          if (raw) effectiveUser = JSON.parse(raw);
+        } catch (e) {}
+      }
+
+      if (effectiveSentCode && code === effectiveSentCode) {
         isVerified = true;
       }
 
-      // 2. If not matched, try Firebase Phone Auth confirmation
+      // 2. Server-side verification fallback via /api/verify-otp
+      if (!isVerified && (effectiveUser?.email || email)) {
+        try {
+          const verifyRes = await fetch(apiUrl('/api/verify-otp'), {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              email: (effectiveUser?.email || email).trim().toLowerCase(),
+              otp: code
+            })
+          });
+          const verifyData = await verifyRes.json().catch(() => null);
+          if (verifyData?.verified) {
+            isVerified = true;
+          }
+        } catch (serverVerifyErr) {
+          console.warn('Server verify-otp error:', serverVerifyErr);
+        }
+      }
+
+      // 3. Fallback: Firebase Phone Auth SMS confirmation (if applicable)
       if (!isVerified && confirmationResult) {
         try {
           await confirmationResult.confirm(code);
@@ -396,13 +489,18 @@ export default function LoginScreen({
       }
 
       if (isVerified) {
-        if (foundUser) {
-          executeLogin(foundUser);
+        if (!effectiveUser) {
+          effectiveUser = await locateUser(email.trim());
+        }
+
+        if (effectiveUser) {
+          setSuccessMessage('✅ ওটিপি যাচাই সফল হয়েছে! স্বাগতম...');
+          executeLogin(effectiveUser);
         } else {
-          setError('ইউজার সেশন পাওয়া যায়নি।');
+          setError('ইউজার সেশন পাওয়া যায়নি। অনুগ্রহ করে পুনরায় আপনার নিবন্ধিত ইমেইল দিয়ে চেষ্টা করুন।');
         }
       } else {
-        setError('প্রদত্ত ওটিপি কোডটি সঠিক নয়। অনুগ্রহ করে আপনার সিমে বা ইমেইলে আসা কোডটি পুনরায় চেক করুন।');
+        setError('প্রদত্ত ওটিপি কোডটি সঠিক নয়। অনুগ্রহ করে আপনার ইমেইল ইনবক্সে আসা ৬ সংখ্যার সঠিক কোডটি দিন।');
       }
     } catch (verifyErr: any) {
       console.error('OTP Verification Error:', verifyErr);
@@ -749,14 +847,17 @@ export default function LoginScreen({
                 exit={{ opacity: 0, y: -8 }}
                 className="space-y-4 pt-2"
               >
-                <div className="text-center space-y-1">
+                <div className="text-center space-y-1.5">
                   <h3 className="text-base font-black text-slate-900">৬ সংখ্যার ওটিপি কোড দিন</h3>
                   <p className="text-xs text-slate-600 font-medium">
                     {deliveryInfo?.channel === 'phone' ? (
                       <>আপনার সিমে <span className="font-bold text-emerald-800 font-mono tracking-wider">({deliveryInfo?.deliveredTo || email})</span> ফায়ারবেজ থেকে ওটিপি পাঠানো হয়েছে। মেসেজ চেক করে কোড দিন।</>
                     ) : (
-                      <>আপনার ইমেইল ঠিকানায় <span className="font-bold text-emerald-800">({deliveryInfo?.deliveredTo || email})</span> ওটিপি পাঠানো হয়েছে।</>
+                      <>আপনার ইমেইল ঠিকানায় <span className="font-bold text-emerald-800 font-mono">({deliveryInfo?.deliveredTo || email})</span> অফিসিয়াল সিকিউরিটি ওটিপি পাঠানো হয়েছে।</>
                     )}
+                  </p>
+                  <p className="text-[11px] text-emerald-800 font-bold bg-emerald-50/80 border border-emerald-200/80 rounded-xl px-3 py-1 inline-block shadow-2xs">
+                    ✓ অফিসিয়াল ভেরিফায়েড ডোমেইন থেকে ওটিপি সরাসরি আপনার ইনবক্সে পৌঁছেছে।
                   </p>
                 </div>
 

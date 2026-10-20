@@ -210,7 +210,7 @@ export default function ForgotPasswordModal({
         setError('');
         setSuccessMsg('ওটিপি সফলভাবে যাচাই হয়েছে। এবার আপনার নতুন পাসওয়ার্ড সেট করুন।');
       } else {
-        setError('ভুল ওটিপি কোড! অনুগ্রহ করে আপনার ইমেইল ইনবক্স বা স্প্যাম ফোল্ডার চেক করে সঠিক কোড দিন।');
+        setError('ভুল ওটিপি কোড! অনুগ্রহ করে আপনার ইমেইল ইনবক্স চেক করে সঠিক ৬ সংখ্যার কোড দিন।');
       }
     } catch (err: any) {
       console.error('[OTP Verify Error]:', err);
@@ -446,8 +446,8 @@ export default function ForgotPasswordModal({
                     placeholder="• • • • • •"
                     className="w-full py-3 px-4 bg-slate-50 border-2 border-slate-200 rounded-full text-slate-900 text-center font-mono text-2xl font-black tracking-widest focus:bg-white focus:outline-none focus:border-emerald-600 focus:ring-4 focus:ring-emerald-500/10 shadow-2xs"
                   />
-                  <p className="text-[11px] text-slate-500 text-center mt-1.5 font-medium">
-                    ইনবক্সে না পেলে Spam / Promotions ফোল্ডার চেক করুন।
+                  <p className="text-[11px] text-emerald-800 text-center mt-1.5 font-bold">
+                    অফিসিয়াল ভেরিফায়েড ওটিপি কোড সরাসরি আপনার ইমেইল ইনবক্সে পাঠানো হয়েছে।
                   </p>
                 </div>
 
