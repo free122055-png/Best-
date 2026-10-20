@@ -380,7 +380,7 @@ export default function LoginScreen({
         localStorage.setItem('bnb_user_member_id', userWithToken.memberId || 'BNB00000000');
         localStorage.setItem('amb_active_session_token', newSessionToken);
         localStorage.setItem('amb_last_user', JSON.stringify(userWithToken));
-        sessionStorage.setItem('amb_session_unlocked', 'true');
+        sessionStorage.removeItem('amb_session_unlocked');
 
         // Clear transient OTP storage
         sessionStorage.removeItem('bnb_pending_otp_code');
@@ -393,7 +393,7 @@ export default function LoginScreen({
     }
 
     // 2. Set explicit success feedback
-    setSuccessMessage('✅ ওটিপি ভেরিফিকেশন সফল হয়েছে! অ্যাকাউন্টে প্রবেশ করা হচ্ছে...');
+    setSuccessMessage('✅ ওটিপি ভেরিফিকেশন সফল হয়েছে! অনুগ্রহ করে আপনার সিকিউরিটি পিন দিন...');
     setError('');
 
     // 3. Immediately invoke onLoginSuccess to switch screen to user dashboard (NEVER blocked by network)
@@ -614,6 +614,23 @@ export default function LoginScreen({
       }
     } catch (e) {}
   };
+
+  // Dedicated Full-Screen Forgot Password Screen (not a popup/modal)
+  if (showForgotPassword) {
+    return (
+      <ForgotPasswordModal
+        isOpen={true}
+        onClose={() => setShowForgotPassword(false)}
+        onLoginSuccess={(loggedInUser) => {
+          executeLogin(loggedInUser);
+        }}
+        locateUser={locateUser}
+        appConfig={appConfig}
+        darkMode={darkMode}
+        appLanguage={appLanguage}
+      />
+    );
+  }
 
   return (
     <div className="min-h-screen w-full bg-white flex flex-col justify-between relative overflow-x-hidden font-sans select-none" id="login-container">
@@ -964,7 +981,7 @@ export default function LoginScreen({
                   </p>
                 </div>
 
-                {/* Forgot Password link */}
+                {/* Forgot PIN link */}
                 <div className="flex justify-end pt-0.5 px-1">
                   <button
                     type="button"
@@ -972,7 +989,7 @@ export default function LoginScreen({
                     className="text-xs font-bold text-emerald-800 hover:text-emerald-950 underline cursor-pointer flex items-center gap-1"
                   >
                     <span>🔑</span>
-                    <span>পাসওয়ার্ড ভুলে গেছেন? রিসেট করুন</span>
+                    <span>Forgot PIN? Reset PIN</span>
                   </button>
                 </div>
 
@@ -1123,16 +1140,6 @@ export default function LoginScreen({
           setError('');
           setShowMigrationModal(false);
         }}
-      />
-
-      {/* Forgot Password Modal (Multi-Channel OTP + Auto Login) */}
-      <ForgotPasswordModal
-        isOpen={showForgotPassword}
-        onClose={() => setShowForgotPassword(false)}
-        onLoginSuccess={(loggedInUser) => {
-          executeLogin(loggedInUser);
-        }}
-        locateUser={locateUser}
       />
     </div>
   );

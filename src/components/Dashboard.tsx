@@ -4744,6 +4744,7 @@ const getTxt = (key: string, fallback: string) => {
             <JenifyPaymentGateway 
               currentUser={liveUser || user}
               onBack={() => {
+                syncLiveProfile();
                 setActiveTab('home');
                 if (setSelectedAction) setSelectedAction(null);
               }}

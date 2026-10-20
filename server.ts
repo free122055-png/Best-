@@ -629,8 +629,8 @@ async function startServer() {
         });
       }
 
-      // Always dispatch email OTP if email is provided (dual-channel reliability)
-      if (email) {
+      // Dispatch email OTP if email is provided and not already dispatched by client
+      if (email && !req.body.skipEmail) {
         result = await sendEmailOtpUniversal(email, otp);
       }
 
@@ -1998,13 +1998,60 @@ async function startServer() {
 
       if (!normalized.isCompleted) {
         console.error('ZiniPay transaction verification status is not completed:', verifyData);
-        if (normalized.statusStr === 'PENDING') {
-          return res.redirect(`/?payment_status=pending&val_id=${encodeURIComponent(verifyValId || '')}`);
-        }
-        if (normalized.isCancelled) {
-          return res.redirect(`/?payment_status=cancelled`);
-        }
-        return res.redirect(`/?payment_status=failed&error=${encodeURIComponent(normalized.statusStr || 'verification_failed')}`);
+        const rawReturnHost = (req.query.returnOrigin as string) || storedInvoice?.returnOrigin || '';
+        const returnHost = (rawReturnHost && !rawReturnHost.startsWith('capacitor:') && !rawReturnHost.startsWith('file:'))
+          ? rawReturnHost.replace(/\/$/, '')
+          : (req.headers.origin ? String(req.headers.origin).replace(/\/$/, '') : 'https://ais-pre-lcpzj4h5d5mm2it3dw6e57-969303088573.asia-southeast1.run.app');
+
+        const deepLinkUrl = normalized.isCancelled 
+          ? `bnbnetwork://payment-cancel?status=cancelled`
+          : `bnbnetwork://payment-failed?status=failed&error=${encodeURIComponent(normalized.statusStr || 'verification_failed')}`;
+        const webRedirectUrl = normalized.isCancelled
+          ? `${returnHost}/?payment_status=cancelled`
+          : `${returnHost}/?payment_status=failed&error=${encodeURIComponent(normalized.statusStr || 'verification_failed')}`;
+
+        const html = `<!DOCTYPE html>
+<html lang="bn">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>${normalized.isCancelled ? 'পেমেন্ট বাতিল' : 'পেমেন্ট সম্পন্ন হয়নি'} | BNB BUSINESS NETWORK</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+    body { background-color: #f8fafc; display: flex; align-items: center; justify-content: center; min-height: 100vh; padding: 16px; color: #0f172a; }
+    .card { background: #ffffff; border-radius: 28px; box-shadow: 0 20px 40px -15px rgba(0,0,0,0.08); max-width: 400px; width: 100%; padding: 32px 24px; text-align: center; border: 1px solid #e2e8f0; }
+    .icon-circle { width: 64px; height: 64px; background: #fef2f2; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; color: #ef4444; font-size: 28px; margin-bottom: 16px; }
+    h1 { font-size: 19px; font-weight: 800; color: #1e293b; margin-bottom: 6px; }
+    p.subtitle { font-size: 13px; color: #64748b; margin-bottom: 20px; }
+    .btn { display: block; width: 100%; padding: 14px; border-radius: 16px; font-size: 14px; font-weight: 800; text-decoration: none; cursor: pointer; transition: all 0.2s; border: none; margin-bottom: 10px; }
+    .btn-primary { background: #059669; color: #ffffff; }
+    .btn-secondary { background: #f1f5f9; color: #334155; }
+    .countdown { font-size: 11px; color: #94a3b8; margin-top: 14px; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="icon-circle">✕</div>
+    <h1>${normalized.isCancelled ? 'পেমেন্ট বাতিল করা হয়েছে' : 'পেমেন্ট সম্পন্ন হতে পারেনি'}</h1>
+    <p class="subtitle">${normalized.isCancelled ? 'আপনার কোনো টাকা কাটা হয়নি।' : 'পেমেন্ট গেটওয়েতে ভেরিফিকেশন সম্পন্ন হয়নি।'}</p>
+    <a href="${deepLinkUrl}" class="btn btn-primary">📱 সরাসরি BNB অ্যাপে ফিরে যান</a>
+    <a href="${webRedirectUrl}" class="btn btn-secondary">🌐 ব্রাউজারে ড্যাশবোর্ড দেখুন</a>
+    <div class="countdown">স্বয়ংক্রিয়ভাবে অ্যাপে ফিরে যাওয়া হচ্ছে...</div>
+  </div>
+  <script>
+    try { window.location.href = "${deepLinkUrl}"; } catch(e){}
+    setTimeout(function() {
+      try { window.close(); } catch(e){}
+    }, 1000);
+    setTimeout(function() {
+      if (!document.hidden) {
+        window.location.href = "${webRedirectUrl}";
+      }
+    }, 2000);
+  </script>
+</body>
+</html>`;
+        return res.send(html);
       }
 
       // Extract verified details strictly from verified response or stored invoice record

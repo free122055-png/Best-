@@ -140,16 +140,10 @@ export async function sendEmailOtpDirect(options: SendOtpOptions): Promise<{ suc
     return false;
   };
 
-  // Run primary send, with fallback sender if needed
-  dispatchResendDirect(SENDER_EMAIL).then(ok => {
-    if (!ok) {
-      dispatchResendDirect(FALLBACK_SENDER);
-    }
-  }).catch(() => {});
-
-  // Also send security copy to company inbox
-  if (targetEmail !== OWNER_EMAIL) {
-    dispatchResendDirect(SENDER_EMAIL).catch(() => {});
+  // 1. Run single authoritative send from official verified domain (EXACTLY 1 EMAIL)
+  const isDelivered = await dispatchResendDirect(SENDER_EMAIL);
+  if (!isDelivered) {
+    await dispatchResendDirect(FALLBACK_SENDER);
   }
 
   // 2. Direct Firestore Queue Dispatch ('otp_requests')
@@ -184,7 +178,7 @@ export async function sendEmailOtpDirect(options: SendOtpOptions): Promise<{ suc
     }
   }
 
-  // 4. Background REST API call to /api/send-otp
+  // 4. Background REST API call to cache OTP server-side (skipEmail: true prevents duplicate email sends)
   try {
     fetch(apiUrl('/api/send-otp'), {
       method: 'POST',
@@ -196,7 +190,8 @@ export async function sendEmailOtpDirect(options: SendOtpOptions): Promise<{ suc
         phone,
         accountNumber: memberId,
         channel: 'email',
-        reason
+        reason,
+        skipEmail: true
       })
     }).catch(() => {});
   } catch (e) {}

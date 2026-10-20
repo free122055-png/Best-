@@ -118,6 +118,10 @@ export const JenifyPaymentGateway: React.FC<JenifyPaymentGatewayProps> = ({
             pollIntervalRef.current = null;
           }
 
+          try {
+            localStorage.removeItem('amb_pending_zinipay_invoice');
+          } catch (e) {}
+
           setSuccessDetails({
             amount: confirmedAmount,
             newBalance: newBal,
@@ -138,6 +142,20 @@ export const JenifyPaymentGateway: React.FC<JenifyPaymentGatewayProps> = ({
           if (onPaymentSuccess) {
             onPaymentSuccess(confirmedAmount, newBal, trxId);
           }
+          return;
+        }
+
+        if (data && (data.status === 'cancelled' || data.status === 'failed')) {
+          if (pollIntervalRef.current) {
+            clearInterval(pollIntervalRef.current);
+            pollIntervalRef.current = null;
+          }
+          try {
+            localStorage.removeItem('amb_pending_zinipay_invoice');
+          } catch (e) {}
+          setActiveInvoice(null);
+          setStep('input');
+          setErrorMsg(data.status === 'cancelled' ? 'পেমেন্ট বাতিল করা হয়েছে। ওয়ালেটে কোনো টাকা কাটা হয়নি।' : (data.error || 'পেমেন্ট গেটওয়েতে লেনদেনটি সম্পন্ন হয়নি বা ব্যর্থ হয়েছে।'));
           return;
         }
       }
@@ -266,9 +284,35 @@ export const JenifyPaymentGateway: React.FC<JenifyPaymentGatewayProps> = ({
         } catch (e) {}
 
         setStep('redirecting');
-        setTimeout(() => {
-          window.location.href = data.payment_url;
-        }, 500);
+
+        // Check if Capacitor native app (Play Store release APK)
+        const isNative = typeof (window as any)?.Capacitor !== 'undefined' && 
+                         typeof (window as any)?.Capacitor?.isNativePlatform === 'function' &&
+                         (window as any).Capacitor.isNativePlatform();
+
+        if (isNative) {
+          try {
+            await Browser.open({ 
+              url: data.payment_url,
+              windowName: '_blank',
+              presentationStyle: 'popover'
+            });
+
+            try {
+              const listener = await Browser.addListener('browserFinished', () => {
+                checkPaymentStatusSilently();
+                try { listener.remove(); } catch (e) {}
+              });
+            } catch (listenErr) {}
+          } catch (browserErr) {
+            console.warn('Capacitor Browser.open error, fallback to window.location:', browserErr);
+            window.location.href = data.payment_url;
+          }
+        } else {
+          setTimeout(() => {
+            window.location.href = data.payment_url;
+          }, 350);
+        }
       } else {
         setErrorMsg('পেমেন্ট গেটওয়ে থেকে সঠিক লিংক পাওয়া যায়নি।');
       }
@@ -332,9 +376,18 @@ export const JenifyPaymentGateway: React.FC<JenifyPaymentGatewayProps> = ({
           </div>
 
           {errorMsg && (
-            <div className="mb-6 p-4 bg-rose-50 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-900/50 rounded-xl flex items-center gap-3 text-rose-700 dark:text-rose-300 text-sm">
-              <AlertCircle className="w-5 h-5 shrink-0" />
-              <span>{errorMsg}</span>
+            <div className="mb-6 p-4 bg-rose-50 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-900/50 rounded-xl space-y-2">
+              <div className="flex items-center gap-3 text-rose-700 dark:text-rose-300 text-sm">
+                <AlertCircle className="w-5 h-5 shrink-0" />
+                <span>{errorMsg}</span>
+              </div>
+              <button
+                type="button"
+                onClick={handleReturnToDashboard}
+                className="text-xs font-bold text-rose-800 dark:text-rose-300 underline cursor-pointer hover:opacity-80 block"
+              >
+                ← ড্যাশবোর্ডে ফিরে যান
+              </button>
             </div>
           )}
 
@@ -359,25 +412,56 @@ export const JenifyPaymentGateway: React.FC<JenifyPaymentGatewayProps> = ({
       )}
 
       {step === 'redirecting' && (
-        <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-xl p-8 text-center border border-slate-100 dark:border-slate-800">
-          <div className="w-16 h-16 bg-emerald-100 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400 rounded-full flex items-center justify-center mx-auto mb-6 animate-pulse">
+        <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-xl p-6 sm:p-8 text-center border border-slate-100 dark:border-slate-800 space-y-4">
+          <div className="w-16 h-16 bg-emerald-100 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400 rounded-full flex items-center justify-center mx-auto mb-2 animate-pulse">
             <Loader2 className="w-8 h-8 animate-spin" />
           </div>
-          <h3 className="text-xl font-bold text-slate-900 dark:text-white mb-2">পেমেন্ট পেজে রিডাইরেক্ট করা হচ্ছে...</h3>
-          <p className="text-sm text-slate-500 dark:text-slate-400 mb-6">আপনার পেমেন্ট যাচাই করা হচ্ছে। অনুগ্রহ করে অপেক্ষা করুন...</p>
-          <div className="p-4 bg-amber-50 dark:bg-amber-950/30 rounded-xl text-amber-800 dark:text-amber-300 text-sm mb-6">
-            পেমেন্ট সম্পন্ন হওয়ার পর স্বয়ংক্রিয়ভাবে অ্যাপে ফিরে আসবেন।
+          <h3 className="text-lg sm:text-xl font-bold text-slate-900 dark:text-white">পেমেন্ট গেটওয়েতে সংযুক্ত হচ্ছে...</h3>
+          <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400">
+            বিকাশ, নগদ বা ব্যাংকের মাধ্যমে পেমেন্ট সম্পন্ন করুন। পেমেন্ট সম্পন্ন হলে আপনার ওয়ালেটে স্বয়ংক্রিয়ভাবে ব্যালেন্স যোগ হবে।
+          </p>
+
+          <div className="p-3 bg-amber-50 dark:bg-amber-950/30 rounded-xl text-amber-800 dark:text-amber-300 text-xs font-medium">
+            💡 পেমেন্ট শেষ হলে অথবা কোনো কারণে উইন্ডো বন্ধ হলে নিচের বাটন দিয়ে স্ট্যাটাস যাচাই করতে পারেন।
           </div>
-          <button
-            onClick={() => {
-              if (activeInvoice?.payment_url) {
-                window.location.href = activeInvoice.payment_url;
-              }
-            }}
-            className="px-6 py-2.5 bg-slate-900 text-white rounded-xl font-bold text-sm shadow hover:bg-slate-800 transition"
-          >
-            ম্যানুয়ালি লিংকে যান
-          </button>
+
+          <div className="flex flex-col gap-2.5 pt-2">
+            <button
+              type="button"
+              onClick={async () => {
+                setLocalLoading(true);
+                await checkPaymentStatusSilently();
+                setLocalLoading(false);
+              }}
+              disabled={localLoading}
+              className="w-full py-3.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold text-sm shadow flex items-center justify-center gap-2 transition cursor-pointer"
+            >
+              {localLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
+              <span>পেমেন্ট স্ট্যাটাস যাচাই করুন</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                if (activeInvoice?.payment_url) {
+                  window.open(activeInvoice.payment_url, '_blank');
+                }
+              }}
+              className="w-full py-2.5 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 rounded-xl font-bold text-xs hover:bg-slate-200 transition cursor-pointer flex items-center justify-center gap-1.5"
+            >
+              <ExternalLink className="w-4 h-4" />
+              <span>পেমেন্ট পেজ পুনরায় খুলুন</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={handleReturnToDashboard}
+              className="w-full py-2.5 bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-900/50 rounded-xl font-bold text-xs hover:bg-rose-100 transition cursor-pointer flex items-center justify-center gap-1.5"
+            >
+              <ArrowLeft className="w-4 h-4" />
+              <span>বাতিল করে ড্যাশবোর্ডে ফিরে যান</span>
+            </button>
+          </div>
         </div>
       )}
 

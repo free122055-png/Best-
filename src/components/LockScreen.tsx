@@ -729,7 +729,7 @@ export default function LockScreen({
               onClick={() => { setShowForgotPinModal(true); setResetError(''); setResetMessage(''); }}
               className="block text-amber-900 hover:text-amber-950 mt-0.5 mb-1 text-[10.5px] font-extrabold tracking-wide cursor-pointer mx-auto bg-amber-50 border border-amber-200/80 py-1.5 px-3.5 rounded-full hover:bg-amber-100 active:scale-95 transition-all shrink-0 text-center shadow-2xs"
             >
-              🔑 পাসওয়ার্ড পরিবর্তন করতে হোয়াটসঅ্যাপে মেসেজ দিন (01865911728)
+              🔑 পিন ভুলে গেছেন? রিসেট রিকোয়েস্ট পাঠান (Forgot PIN)
             </button>
 
             {/* Footer actions */}
@@ -784,7 +784,7 @@ export default function LockScreen({
               <div className="bg-amber-900 text-white p-5 flex justify-between items-center">
                 <div className="flex items-center gap-2">
                   <ShieldAlert className="w-5 h-5 text-amber-300" />
-                  <span className="font-bold text-sm">পাসওয়ার্ড / পিন রিসেট সার্ভিস</span>
+                  <span className="font-bold text-sm">সিকিউরিটি পিন রিসেট সার্ভিস</span>
                 </div>
                 <button 
                   onClick={() => setShowForgotPinModal(false)}
@@ -802,7 +802,7 @@ export default function LockScreen({
                 <div className="space-y-2">
                   <h3 className="text-base font-black text-slate-900">এডমিন আনলক সার্ভিস</h3>
                   <p className="text-xs text-slate-600 leading-relaxed font-medium">
-                    আপনি যদি পাসওয়ার্ড ভুলে গিয়ে থাকেন, তবে নিচে "এডমিনের কাছে আনলক রিকোয়েস্ট পাঠান" বাটনে ক্লিক করুন। এডমিন আপনার তথ্য ভেরিফাই করে এপ্রুভ করলেই অ্যাপস আনলক হয়ে যাবে।
+                    আপনি যদি পিন ভুলে গিয়ে থাকেন, তবে নিচে "এডমিনের কাছে আনলক রিকোয়েস্ট পাঠান" বাটনে ক্লিক করুন। এডমিন আপনার তথ্য ভেরিফাই করে এপ্রুভ করলেই অ্যাপস আনলক হয়ে যাবে।
                   </p>
                 </div>
 

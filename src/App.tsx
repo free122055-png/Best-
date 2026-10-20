@@ -81,8 +81,8 @@ export default function App() {
         }
         const rememberedUid = localStorage.getItem('amb_user_uid');
         const rememberedPhone = localStorage.getItem('amb_user_phone');
-        // Require explicit PIN/password unlock for any remembered user when opening the app
-        if ((rememberedUid || rememberedPhone) && sessionStorage.getItem('amb_session_unlocked') !== 'true') {
+        // Every time user enters/opens the software, if already logged in, ALWAYS ask for PIN
+        if (rememberedUid || rememberedPhone) {
           return true;
         }
       }
@@ -965,7 +965,8 @@ export default function App() {
               localStorage.setItem('amb_user_uid', finalUserData.uid);
               localStorage.setItem('amb_last_user', JSON.stringify(finalUserData));
               setCurrentUser(finalUserData);
-              if (sessionStorage.getItem('amb_session_unlocked') !== 'true') {
+              // Always lock so the user is asked for their PIN every single time they enter the software
+              if (!window.location.search.includes('payment_status=')) {
                 setIsLocked(true);
               }
               if (finalUserData.role === 'admin' || finalUserData.role === 'sub_admin') {
@@ -1247,22 +1248,17 @@ export default function App() {
     const isLockedToOther = false;
 
     if (!isLockedToOther) {
-      if (userData.isAppLocked) {
-        setIsLocked(true);
-      } else {
-        setIsLocked(false);
-      }
-      sessionStorage.setItem('amb_session_unlocked', 'true');
+      // User rule: "একবার লগ আউট করলে তাহলে লগইন চাইবে তারপর পিন চাইবে"
+      // Immediately lock and require PIN after successful login
+      setIsLocked(true);
+      sessionStorage.removeItem('amb_session_unlocked');
       const cleanPhone = userData.phone?.replace(/\D/g, '') || '';
       const isAdminAccount = (userData.role === 'admin' || userData.uid === 'admin_master') && 
                              (cleanPhone.endsWith('00011112222') || cleanPhone.endsWith('11112222') || userData.uid === 'admin_master');
       if (isAdminAccount) {
         localStorage.setItem('amb_admin_mode', 'true');
-        setAdminOpen(true);
       }
-      // Trigger Location Permission Modal on fresh login for authorized device only
-      sessionStorage.setItem('amb_fresh_login_location_needed', 'true');
-      setShowLocationModal(true);
+      setShowLocationModal(false);
     } else {
       setIsLocked(false);
       setShowLocationModal(false);
@@ -1281,13 +1277,7 @@ export default function App() {
 
   const handleLogout = (toRegister = false) => {
     setDrawerOpen(false);
-    if (currentUser && !currentUser.isDemoUser && currentUser.uid !== 'guest_demo') {
-      setLogoutTargetToRegister(toRegister);
-      setIsMandatoryLockOnLogout(true);
-      setShowSetLockModal(true);
-    } else {
-      handleDirectLogout(toRegister);
-    }
+    handleDirectLogout(toRegister);
   };
 
   const handleDirectLogout = (toRegister = false) => {
@@ -1838,10 +1828,11 @@ export default function App() {
                       onClick={() => {
                         setPaymentNotice(null);
                         setActiveTab('home');
+                        setSelectedAction(null);
                       }}
                       className="w-full py-3 bg-gradient-to-r from-emerald-600 to-teal-500 hover:from-emerald-500 hover:to-teal-400 text-white font-black text-xs rounded-xl shadow-lg cursor-pointer transition active:scale-95"
                     >
-                      ঠিক আছে, ওয়ালেট দেখুন ✨
+                      ঠিক আছে, ড্যাশবোর্ডে ফিরে যান ✨
                     </button>
                   </>
                 ) : paymentNotice.status === 'cancelled' ? (
@@ -1859,10 +1850,14 @@ export default function App() {
                     </div>
                     <button
                       type="button"
-                      onClick={() => setPaymentNotice(null)}
-                      className="w-full py-3 bg-slate-800 hover:bg-slate-700 text-white font-black text-xs rounded-xl transition cursor-pointer"
+                      onClick={() => {
+                        setPaymentNotice(null);
+                        setActiveTab('home');
+                        setSelectedAction(null);
+                      }}
+                      className="w-full py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs rounded-xl transition cursor-pointer"
                     >
-                      বন্ধ করুন
+                      ড্যাশবোর্ডে ফিরে যান
                     </button>
                   </>
                 ) : (
@@ -1878,13 +1873,30 @@ export default function App() {
                         {paymentNotice.error || 'পেমেন্ট ভেরিফিকেশন ব্যর্থ হয়েছে। অনুগ্রহ করে আবার চেষ্টা করুন।'}
                       </p>
                     </div>
-                    <button
-                      type="button"
-                      onClick={() => setPaymentNotice(null)}
-                      className="w-full py-3 bg-rose-600 hover:bg-rose-500 text-white font-black text-xs rounded-xl transition cursor-pointer"
-                    >
-                      পুনরায় চেষ্টা করুন
-                    </button>
+                    <div className="space-y-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setPaymentNotice(null);
+                          setActiveTab('home');
+                          setSelectedAction(null);
+                        }}
+                        className="w-full py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs rounded-xl transition cursor-pointer"
+                      >
+                        ড্যাশবোর্ডে ফিরে যান
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setPaymentNotice(null);
+                          setActiveTab('add_money');
+                          setSelectedAction(null);
+                        }}
+                        className="w-full py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-xs rounded-xl transition cursor-pointer"
+                      >
+                        পুনরায় চেষ্টা করুন
+                      </button>
+                    </div>
                   </>
                 )}
               </div>
