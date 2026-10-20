@@ -405,7 +405,8 @@ async function startServer() {
     next();
   });
 
-  // Initialize Firebase Admin for server-side operations with explicit project ID and client fallback
+  // Initialize Firebase Admin & Client Firestore with explicit target database ID
+  const TARGET_DATABASE_ID = 'ai-studio-120ec6e1-2db5-45d2-b1b1-46493400c959';
   let adminDb: any = null;
   const firebaseAdmin = admin as any;
   try {
@@ -413,12 +414,12 @@ async function startServer() {
       try {
         firebaseAdmin.initializeApp({
           credential: firebaseAdmin.credential.applicationDefault(),
-          projectId: 'ai-studio-120ec6e1-2db5-45d2-b1b1-46493400c959'
+          projectId: 'gen-lang-client-0459758196'
         });
       } catch (e1) {
         try {
           firebaseAdmin.initializeApp({
-            projectId: 'ai-studio-120ec6e1-2db5-45d2-b1b1-46493400c959'
+            projectId: 'gen-lang-client-0459758196'
           });
         } catch (e2) {
           firebaseAdmin.initializeApp();
@@ -426,7 +427,11 @@ async function startServer() {
       }
     }
     if (firebaseAdmin && typeof firebaseAdmin.firestore === 'function' && firebaseAdmin.apps && firebaseAdmin.apps.length) {
-      adminDb = firebaseAdmin.firestore();
+      try {
+        adminDb = firebaseAdmin.firestore(TARGET_DATABASE_ID);
+      } catch (e) {
+        adminDb = firebaseAdmin.firestore();
+      }
     }
   } catch (err) {
     console.warn('[Firebase Admin Init Warning]:', err);
@@ -434,8 +439,13 @@ async function startServer() {
 
   if (!adminDb) {
     try {
-      const clientApp = getApps().length ? getApp() : initializeApp({ projectId: 'ai-studio-120ec6e1-2db5-45d2-b1b1-46493400c959' });
-      adminDb = getFirestore(clientApp);
+      const clientApp = getApps().length ? getApp() : initializeApp({
+        projectId: 'gen-lang-client-0459758196',
+        apiKey: 'AIzaSyB21ggSQZmi2cFLHPyMz-Qe9nGhobn2CmY',
+        authDomain: 'gen-lang-client-0459758196.firebaseapp.com',
+        storageBucket: 'gen-lang-client-0459758196.firebasestorage.app'
+      });
+      adminDb = getFirestore(clientApp, TARGET_DATABASE_ID);
     } catch (e) {}
   }
 
@@ -641,24 +651,32 @@ async function startServer() {
         return res.status(500).json({ code: 'admin_db_unavailable', error: 'admin_db_unavailable' });
       }
 
-      // Universal query helper supporting both Admin SDK and Client Modular SDK
+      // Universal query helper supporting both Admin SDK and Client Modular SDK with TARGET_DATABASE_ID
       const queryUsersByField = async (field: string, operator: string, value: any) => {
         try {
           if (adminDb && typeof adminDb.collection === 'function') {
-            const snap = await adminDb.collection('users').where(field, operator, value).limit(1).get();
-            if (!snap.empty) {
+            const snap = await adminDb.collection('users').where(field, operator, value).limit(1).get().catch(() => null);
+            if (snap && !snap.empty) {
               const docSnap = snap.docs[0];
               return { uid: docSnap.id, ...docSnap.data() };
             }
-          } else {
-            const { collection, query, where, limit, getDocs } = await import('firebase/firestore');
-            const targetDb = adminDb;
-            const qRef = query(collection(targetDb, 'users'), where(field, operator, value), limit(1));
-            const snap = await getDocs(qRef);
-            if (!snap.empty) {
-              const docSnap = snap.docs[0];
-              return { uid: docSnap.id, ...docSnap.data() };
-            }
+          }
+        } catch (e) {}
+
+        try {
+          const { collection, query, where, limit, getDocs } = await import('firebase/firestore');
+          const clientApp = getApps().length ? getApp() : initializeApp({
+            projectId: 'gen-lang-client-0459758196',
+            apiKey: 'AIzaSyB21ggSQZmi2cFLHPyMz-Qe9nGhobn2CmY',
+            authDomain: 'gen-lang-client-0459758196.firebaseapp.com',
+            storageBucket: 'gen-lang-client-0459758196.firebasestorage.app'
+          });
+          const targetDb = getFirestore(clientApp, TARGET_DATABASE_ID);
+          const qRef = query(collection(targetDb, 'users'), where(field, operator, value), limit(1));
+          const snap = await getDocs(qRef);
+          if (!snap.empty) {
+            const docSnap = snap.docs[0];
+            return { uid: docSnap.id, ...docSnap.data() };
           }
         } catch (e) {}
         return null;
@@ -667,17 +685,25 @@ async function startServer() {
       const getUserByIdDoc = async (docId: string) => {
         try {
           if (adminDb && typeof adminDb.collection === 'function') {
-            const docSnap = await adminDb.collection('users').doc(docId).get();
-            if (docSnap.exists) {
+            const docSnap = await adminDb.collection('users').doc(docId).get().catch(() => null);
+            if (docSnap && docSnap.exists) {
               return { uid: docSnap.id, ...docSnap.data() };
             }
-          } else {
-            const { doc, getDoc } = await import('firebase/firestore');
-            const targetDb = adminDb;
-            const docSnap = await getDoc(doc(targetDb, 'users', docId));
-            if (docSnap.exists()) {
-              return { uid: docSnap.id, ...docSnap.data() };
-            }
+          }
+        } catch (e) {}
+
+        try {
+          const { doc, getDoc } = await import('firebase/firestore');
+          const clientApp = getApps().length ? getApp() : initializeApp({
+            projectId: 'gen-lang-client-0459758196',
+            apiKey: 'AIzaSyB21ggSQZmi2cFLHPyMz-Qe9nGhobn2CmY',
+            authDomain: 'gen-lang-client-0459758196.firebaseapp.com',
+            storageBucket: 'gen-lang-client-0459758196.firebasestorage.app'
+          });
+          const targetDb = getFirestore(clientApp, TARGET_DATABASE_ID);
+          const docSnap = await getDoc(doc(targetDb, 'users', docId));
+          if (docSnap.exists()) {
+            return { uid: docSnap.id, ...docSnap.data() };
           }
         } catch (e) {}
         return null;
