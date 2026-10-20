@@ -486,7 +486,7 @@ export default function LoginScreen({
       <div id="recaptcha-container" className="hidden" />
 
       {/* 1. TOP HEADER SECTION WITH GREEN GRADIENT & WAVES */}
-      <div className="relative w-full bg-gradient-to-b from-[#094828] via-[#0B5C33] to-[#0D6B3C] text-white pt-4 pb-12 sm:pb-16 px-4 overflow-hidden shadow-lg">
+      <div className="relative w-full bg-gradient-to-b from-[#094828] via-[#0B5C33] to-[#0D6B3C] text-white pt-12 sm:pt-14 pb-12 sm:pb-16 px-4 overflow-hidden shadow-lg" style={{ paddingTop: 'max(2.5rem, env(safe-area-inset-top, 2.5rem))' }}>
         {/* Subtle decorative background silhouettes / landscape */}
         <div className="absolute inset-0 opacity-15 pointer-events-none mix-blend-overlay">
           <svg className="w-full h-full object-cover" viewBox="0 0 800 400" fill="currentColor" preserveAspectRatio="none">
