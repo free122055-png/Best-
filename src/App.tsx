@@ -1301,8 +1301,12 @@ export default function App() {
     localStorage.removeItem('amb_all_users_backup');
     localStorage.removeItem('amb_last_user');
     localStorage.removeItem('amb_admin_mode');
+    localStorage.removeItem('bnb_pending_otp_code');
+    localStorage.removeItem('bnb_pending_otp_user');
     sessionStorage.removeItem('amb_session_unlocked');
     sessionStorage.removeItem('amb_fresh_login_location_needed');
+    sessionStorage.removeItem('bnb_pending_otp_code');
+    sessionStorage.removeItem('bnb_pending_otp_user');
     
     setCurrentUser(null);
     setIsLocked(false);

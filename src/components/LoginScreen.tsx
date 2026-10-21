@@ -36,16 +36,7 @@ export default function LoginScreen({
   onOpenAdminPin
 }: LoginScreenProps) {
   const [isRegistering, setIsRegistering] = useState(initialRegistering);
-  const [step, setStep] = useState<'info' | 'verify-otp' | 'register-details'>(() => {
-    if (typeof window !== 'undefined') {
-      const pendingOtp = sessionStorage.getItem('bnb_pending_otp_code') || localStorage.getItem('bnb_pending_otp_code');
-      const pendingUser = sessionStorage.getItem('bnb_pending_otp_user') || localStorage.getItem('bnb_pending_otp_user');
-      if (pendingOtp && pendingUser) {
-        return 'verify-otp';
-      }
-    }
-    return 'info';
-  });
+  const [step, setStep] = useState<'info' | 'verify-otp' | 'register-details'>('info');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
