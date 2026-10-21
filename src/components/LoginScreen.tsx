@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { db, auth } from '../lib/firebase';
+import { db } from '../lib/firebase';
 import { doc, getDoc, setDoc, updateDoc, getDocs, collection, query, where, addDoc, limit } from 'firebase/firestore';
-import { RecaptchaVerifier, signInWithPhoneNumber, ConfirmationResult } from 'firebase/auth';
 import { Capacitor, CapacitorHttp } from '@capacitor/core';
 import { User, AppConfig } from '../types';
 import { ShieldCheck, UserPlus, LogIn, Mail, KeyRound, Globe, Lock, ArrowRight, AlertTriangle, CheckCircle2, User as UserIcon, Sparkles, Moon, Sun, ArrowLeft, Eye, EyeOff } from 'lucide-react';
@@ -86,7 +85,6 @@ export default function LoginScreen({
     }
     return null;
   });
-  const [confirmationResult, setConfirmationResult] = useState<ConfirmationResult | null>(null);
   const [deliveryInfo, setDeliveryInfo] = useState<{
     deliveredTo?: string;
     isOwnerFallback?: boolean;
@@ -319,25 +317,7 @@ export default function LoginScreen({
         reason: 'login'
       });
 
-      // 4. Background Firebase Phone Auth SIM SMS attempt if phone exists (non-blocking)
-      if (formattedPhone) {
-        if (typeof window !== 'undefined') {
-          try {
-            if (!(window as any).recaptchaVerifier) {
-              (window as any).recaptchaVerifier = new RecaptchaVerifier(auth, 'recaptcha-container', {
-                size: 'invisible',
-                callback: () => {}
-              });
-            }
-            const appVerifier = (window as any).recaptchaVerifier;
-            signInWithPhoneNumber(auth, formattedPhone, appVerifier).then(confirmation => {
-              setConfirmationResult(confirmation);
-            }).catch(() => {});
-          } catch (e) {}
-        }
-      }
-
-      // 5. Update UI state & prompt user instantly (Official Domain - Inbox delivery)
+      // 3. Update UI state & prompt user instantly (Official Domain - Inbox delivery)
       setDeliveryInfo({
         deliveredTo: displayEmail,
         channel: 'email',
@@ -478,16 +458,6 @@ export default function LoginScreen({
         }
       }
 
-      // 3. Fallback: Firebase Phone Auth SMS confirmation (if applicable)
-      if (!isVerified && confirmationResult) {
-        try {
-          await confirmationResult.confirm(code);
-          isVerified = true;
-        } catch (fbConfirmErr) {
-          console.warn('Firebase SMS verification error:', fbConfirmErr);
-        }
-      }
-
       if (isVerified) {
         if (!effectiveUser) {
           effectiveUser = await locateUser(email.trim());
@@ -544,54 +514,31 @@ export default function LoginScreen({
       const standardPhone = cleanPhoneDigits.length === 11 && cleanPhoneDigits.startsWith('0') ? `+88${cleanPhoneDigits}` : cleanPhoneDigits;
       const cleanEmail = email.trim().toLowerCase();
 
-      // Check if phone or email already exists
-      if (db) {
-        const phoneQ = query(collection(db, 'users'), where('phone', '==', standardPhone), limit(1));
-        const phoneSnap = await getDocs(phoneQ);
-        if (!phoneSnap.empty) {
-          setError('এই মোবাইল নম্বর দিয়ে ইতিপূর্বে একটি অ্যাকাউন্ট খোলা হয়েছে। অনুগ্রহ করে লগইন করুন।');
-          setLoading(false);
-          return;
-        }
+      // Fast, authoritative server-side registration via Firebase Admin SDK
+      const res = await fetch(apiUrl('/api/auth/register'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: regName.trim(),
+          email: cleanEmail,
+          phone: standardPhone,
+          password: regPassword.trim(),
+          pin: regPin.trim()
+        })
+      });
 
-        const emailQ = query(collection(db, 'users'), where('email', '==', cleanEmail), limit(1));
-        const emailSnap = await getDocs(emailQ);
-        if (!emailSnap.empty) {
-          setError('এই ইমেইল ঠিকানা দিয়ে ইতিপূর্বে একটি অ্যাকাউন্ট খোলা হয়েছে। অনুগ্রহ করে লগইন করুন।');
-          setLoading(false);
-          return;
-        }
+      const data = await res.json().catch(() => null);
+
+      if (!data || !data.success) {
+        setError(data?.error || 'অ্যাকাউন্ট তৈরিতে সমস্যা হয়েছে। অনুগ্রহ করে পুনরায় চেষ্টা করুন।');
+        setLoading(false);
+        return;
       }
 
-      const newMemberId = await getNextSequentialMemberId();
-      const newUid = `user_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
-
-      const newUser: User = {
-        uid: newUid,
-        name: regName.trim(),
-        email: cleanEmail,
-        phone: standardPhone,
-        memberId: newMemberId,
-        role: 'user',
-        balance: 0,
-        mainBalance: 0,
-        savings: 0,
-        telecomBalance: 0,
-        superShopBalance: 0,
-        dueLoan: 0,
-        password: regPassword.trim(),
-        pin: regPin.trim(),
-        status: 'active',
-        samityStatus: 'none',
-        createdAt: new Date().toISOString()
-      };
-
-      if (db) {
-        await setDoc(doc(db, 'users', newUid), newUser);
-      }
-
-      saveUserToLocalBackup(newUser);
-      executeLogin(newUser);
+      const createdUser: User = data.user;
+      saveUserToLocalBackup(createdUser);
+      setSuccessMessage('✅ আপনার অ্যাকাউন্ট সফলভাবে তৈরি হয়েছে! স্বাগতম...');
+      executeLogin(createdUser);
     } catch (err: any) {
       console.error(err);
       setError(`অ্যাকাউন্ট তৈরিতে সমস্যা হয়েছে: ${err?.message || ''}`);
@@ -634,9 +581,6 @@ export default function LoginScreen({
 
   return (
     <div className="min-h-screen w-full bg-white flex flex-col justify-between relative overflow-x-hidden font-sans select-none" id="login-container">
-      {/* Firebase Phone Auth Invisible Recaptcha Mount Point */}
-      <div id="recaptcha-container" className="hidden" />
-
       {/* 1. TOP HEADER SECTION WITH GREEN GRADIENT & WAVES */}
       <div className="relative w-full bg-gradient-to-b from-[#094828] via-[#0B5C33] to-[#0D6B3C] text-white pt-12 sm:pt-14 pb-12 sm:pb-16 px-4 overflow-hidden shadow-lg" style={{ paddingTop: 'max(2.5rem, env(safe-area-inset-top, 2.5rem))' }}>
         {/* Subtle decorative background silhouettes / landscape */}
@@ -816,13 +760,6 @@ export default function LoginScreen({
                 <AlertTriangle className="w-4 h-4 shrink-0 text-rose-600 mt-0.5" />
                 <span>{error}</span>
               </div>
-              {debugInfo && (
-                <div className="p-2.5 bg-neutral-900 text-amber-400 font-mono text-[10px] rounded-xl overflow-x-auto shadow-inner space-y-1">
-                  <div>Base URL: {apiUrl('')}</div>
-                  <div>Health Build: {healthStatus?.build || 'loading...'} | AdminSDK: {String(healthStatus?.adminSdk ?? 'unknown')}</div>
-                  <div>Req URL: {debugInfo.url} | Status: {debugInfo.status} | Code: {debugInfo.errorCode}</div>
-                </div>
-              )}
             </div>
           )}
 
@@ -1121,9 +1058,6 @@ export default function LoginScreen({
           />
         </svg>
       </div>
-
-      {/* Invisible Recaptcha for Firebase Phone Auth (CRITICAL: Required for Play Store / Native apps to send SMS) */}
-      <div id="recaptcha-container" className="hidden"></div>
 
       {/* Old Account Email Migration Modal */}
       <LegacyEmailMigrationModal

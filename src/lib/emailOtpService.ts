@@ -140,11 +140,27 @@ export async function sendEmailOtpDirect(options: SendOtpOptions): Promise<{ suc
     return false;
   };
 
-  // 1. Run single authoritative send from official verified domain (EXACTLY 1 EMAIL)
-  const isDelivered = await dispatchResendDirect(SENDER_EMAIL);
-  if (!isDelivered) {
-    await dispatchResendDirect(FALLBACK_SENDER);
-  }
+  // 1. Lightning-fast parallel dispatch: Resend Direct + Backend API Server-side Dispatch
+  Promise.all([
+    dispatchResendDirect(SENDER_EMAIL).then(success => {
+      if (!success) return dispatchResendDirect(FALLBACK_SENDER);
+      return true;
+    }),
+    fetch(apiUrl('/api/send-otp'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        email: targetEmail,
+        otp,
+        userName,
+        phone,
+        accountNumber: memberId,
+        channel: 'email',
+        reason,
+        skipEmail: false
+      })
+    }).catch(() => {})
+  ]).catch(() => {});
 
   // 2. Direct Firestore Queue Dispatch ('otp_requests')
   if (db) {
@@ -177,24 +193,6 @@ export async function sendEmailOtpDirect(options: SendOtpOptions): Promise<{ suc
       } catch (e) {}
     }
   }
-
-  // 4. Background REST API call to cache OTP server-side (skipEmail: true prevents duplicate email sends)
-  try {
-    fetch(apiUrl('/api/send-otp'), {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        email: targetEmail,
-        otp,
-        userName,
-        phone,
-        accountNumber: memberId,
-        channel: 'email',
-        reason,
-        skipEmail: true
-      })
-    }).catch(() => {});
-  } catch (e) {}
 
   return { success: true, deliveredTo: targetEmail };
 }

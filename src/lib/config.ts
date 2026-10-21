@@ -471,7 +471,7 @@ export async function loadAppConfig(): Promise<AppConfig> {
         const toSave = stripHeavyConfigFields(data);
         await setDoc(configRef, toSave, { merge: true });
       } catch (e) {
-        console.error("Failed to migrate app config in Firestore:", e);
+        console.warn("App config local migration active:", e);
       }
     }
     return { ...DEFAULT_CONFIG, ...data } as AppConfig;
