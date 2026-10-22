@@ -1411,7 +1411,7 @@ const bankingTypes = ['add_money', 'deposit', 'withdraw', 'bill_pay', 'money_exc
           type: isVirtualSomitiAcc ? 'coop_savings_deposit' : 'transfer',
           typeLabel: isVirtualSomitiAcc ? 'সমিতি ওয়ালেটে অটো ফান্ড জমা' : 'ফান্ড ট্রান্সফার',
           status: 'success',
-          paymentMethod: 'Al Mayadin Wallet',
+          paymentMethod: 'BNB Wallet',
           phone: rData.phone,
           createdAt: new Date().toISOString(),
           description: `মেম্বার ${rData.name || ''} (${rData.memberId || ''}) কে ফান্ড পাঠানো হয়েছে`
@@ -1427,7 +1427,7 @@ const bankingTypes = ['add_money', 'deposit', 'withdraw', 'bill_pay', 'money_exc
           type: isVirtualSomitiAcc ? 'coop_savings_deposit' : 'add_money',
           typeLabel: isVirtualSomitiAcc ? 'সমিতি একাউন্টে সঞ্চয় জমা' : 'ফান্ড গ্রহণ',
           status: 'success',
-          paymentMethod: 'Al Mayadin Wallet',
+          paymentMethod: 'BNB Wallet',
           phone: user.phone,
           createdAt: new Date().toISOString(),
           description: `মেম্বার ${user.name} (${user.memberId}) থেকে ফান্ড গ্রহণ`
@@ -2504,7 +2504,7 @@ const bankingTypes = ['add_money', 'deposit', 'withdraw', 'bill_pay', 'money_exc
         <div className="flex justify-between items-start mb-4">
           <div>
             <p className="text-emerald-400 text-[10px] font-black uppercase tracking-wider">MY BNB লেনদেন ও ফান্ড</p>
-            <h2 className="text-md font-extrabold text-white">Al Mayadin Bazar Portal</h2>
+            <h2 className="text-md font-extrabold text-white">BNB Business Network Portal</h2>
           </div>
           <div className="bg-white/10 border border-white/5 px-2.5 py-1 rounded-full text-[9px] flex items-center gap-1.5 text-slate-100 font-mono font-black">
             <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>

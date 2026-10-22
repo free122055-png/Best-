@@ -155,7 +155,7 @@ export const DEFAULT_CONFIG: AppConfig = {
     about: "BNB লক্ষ্যমাত্রা সেকশন নোটিশ: প্রতিষ্ঠানের কর্পোরেট লক্ষ্য, ভিশন, আগামী দিনের পরিকল্পনা এবং নিয়মনীতি বিস্তারিত পড়ুন।",
     courier: "BNB কুরিয়ার সেকশন নোটিশ: সারাদেশে সুপার ফাস্ট পার্সেল ও লজিস্টিকস ডেলিভারি বুকিং সহজেই গ্রহণ করুন।"
   },
-  appName: "BNB Business Network Bangladesh",
+  appName: "BNB BUSINESS network Bangladesh",
   personalMfsNumber: "01865911728",
   personalBankCard: "4840610010369801",
   supportPhone: "01865911728",

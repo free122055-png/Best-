@@ -494,8 +494,8 @@ export default function LockScreen({
               <BNBLogo className="w-11 h-11 text-emerald-700 filter drop-shadow-xs" />
             )}
           </div>
-          <h1 className="text-base font-black tracking-wider text-emerald-850 uppercase text-center">
-            {appConfig?.appName || 'BNB Business Network Bangladesh'}
+          <h1 className="text-base font-black tracking-wide text-emerald-850 text-center">
+            {appConfig?.appName && !appConfig.appName.toUpperCase().includes('MAYADIN') ? appConfig.appName : 'BNB BUSINESS network Bangladesh'}
           </h1>
           <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">DIGITAL SAMITY SYSTEM</p>
         </div>

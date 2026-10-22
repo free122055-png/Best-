@@ -1,0 +1,39 @@
+{
+  "timestamp": "2026-10-22T11:29:08.643Z",
+  "frontend_payload": {
+    "amount": 50,
+    "userId": "admin_master",
+    "phone": "01800000000"
+  },
+  "user_profile_data": null,
+  "outgoing_zinipay_payload": {
+    "amount": 50,
+    "val_id": "DEP-1792668548694-5274",
+    "redirect_url": "https://businessnetworkbangladesh.com/payment/result?status=success&val_id=DEP-1792668548694-5274&uid=admin_master&token=4fba94e2eb7d9636e288b004d5d950dc&origin=https%3A%2F%2Fbusinessnetworkbangladesh.com",
+    "cancel_url": "https://businessnetworkbangladesh.com/payment/result?status=cancel&val_id=DEP-1792668548694-5274&uid=admin_master&token=4fba94e2eb7d9636e288b004d5d950dc&origin=https%3A%2F%2Fbusinessnetworkbangladesh.com",
+    "webhook_url": "https://businessnetworkbangladesh.com/api/zinipay/webhook",
+    "cus_name": "Bangladesh BNB Administrator",
+    "cus_email": "8800011112222@businessnetworkbangladesh.com",
+    "metadata": {
+      "val_id": "DEP-1792668548694-5274",
+      "order_id": "ORD-DEP-1792668548694-5274",
+      "customer_id": "admin_master",
+      "userId": "admin_master",
+      "phone": "+8800011112222",
+      "memberId": "MAIN_ADMIN",
+      "purpose": "wallet_deposit"
+    }
+  },
+  "outgoing_headers": {
+    "Content-Type": "application/json",
+    "zini-api-key": "95f4bae1906bfd060176e99fa1747c98c8ff6b1b3252d81c"
+  },
+  "zinipay_response_status": 201,
+  "zinipay_response_body": {
+    "status": true,
+    "message": "Invoice created successfully.",
+    "payment_url": "https://secure.zinipay.com/bnb-business-network-bangladesh/payment/9347bbd9-31be-4e47-94c7-c62d74ba0d9e",
+    "val_id": "DEP-1792668548694-5274"
+  },
+  "error": null
+}

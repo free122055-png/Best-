@@ -119,6 +119,10 @@ export const JenifyPaymentGateway: React.FC<JenifyPaymentGatewayProps> = ({
           }
 
           try {
+            await Browser.close();
+          } catch (e) {}
+
+          try {
             localStorage.removeItem('amb_pending_zinipay_invoice');
           } catch (e) {}
 
@@ -151,11 +155,14 @@ export const JenifyPaymentGateway: React.FC<JenifyPaymentGatewayProps> = ({
             pollIntervalRef.current = null;
           }
           try {
+            await Browser.close();
+          } catch (e) {}
+          try {
             localStorage.removeItem('amb_pending_zinipay_invoice');
           } catch (e) {}
           setActiveInvoice(null);
           setStep('input');
-          setErrorMsg(data.status === 'cancelled' ? 'পেমেন্ট বাতিল করা হয়েছে। ওয়ালেটে কোনো টাকা কাটা হয়নি।' : (data.error || 'পেমেন্ট গেটওয়েতে লেনদেনটি সম্পন্ন হয়নি বা ব্যর্থ হয়েছে।'));
+          handleReturnToDashboard();
           return;
         }
       }
@@ -203,12 +210,12 @@ export const JenifyPaymentGateway: React.FC<JenifyPaymentGatewayProps> = ({
     } catch (e) {}
   }, [currentUser?.uid, onPaymentSuccess]);
 
-  // Start silent background verification when redirecting
+  // Start silent background verification when redirecting (800ms sub-second polling for instant close)
   useEffect(() => {
     if (step === 'redirecting' && activeInvoice) {
       pollIntervalRef.current = setInterval(() => {
         checkPaymentStatusSilently();
-      }, 2500);
+      }, 800);
 
       return () => {
         if (pollIntervalRef.current) {
@@ -260,7 +267,8 @@ export const JenifyPaymentGateway: React.FC<JenifyPaymentGatewayProps> = ({
         body: JSON.stringify({
           amount: numAmount,
           userId: targetUserId,
-          phone: targetPhone
+          phone: targetPhone,
+          return_origin: typeof window !== 'undefined' ? window.location.origin : undefined
         })
       });
       clearTimeout(timeoutId);
@@ -283,36 +291,23 @@ export const JenifyPaymentGateway: React.FC<JenifyPaymentGatewayProps> = ({
           localStorage.setItem('amb_pending_zinipay_invoice', JSON.stringify(activeInv));
         } catch (e) {}
 
-        setStep('redirecting');
-
-        // Check if Capacitor native app (Play Store release APK)
-        const isNative = typeof (window as any)?.Capacitor !== 'undefined' && 
-                         typeof (window as any)?.Capacitor?.isNativePlatform === 'function' &&
-                         (window as any).Capacitor.isNativePlatform();
-
-        if (isNative) {
+        // Save current user explicitly to localStorage so session survives redirect
+        if (currentUser) {
           try {
-            await Browser.open({ 
-              url: data.payment_url,
-              windowName: '_blank',
-              presentationStyle: 'popover'
-            });
-
-            try {
-              const listener = await Browser.addListener('browserFinished', () => {
-                checkPaymentStatusSilently();
-                try { listener.remove(); } catch (e) {}
-              });
-            } catch (listenErr) {}
-          } catch (browserErr) {
-            console.warn('Capacitor Browser.open error, fallback to window.location:', browserErr);
-            window.location.href = data.payment_url;
-          }
-        } else {
-          setTimeout(() => {
-            window.location.href = data.payment_url;
-          }, 350);
+            localStorage.setItem('amb_last_user', JSON.stringify(currentUser));
+            if (currentUser.uid) localStorage.setItem('amb_user_uid', currentUser.uid);
+            if (currentUser.phone) localStorage.setItem('amb_user_phone', currentUser.phone);
+            if (currentUser.name) localStorage.setItem('amb_user_name', currentUser.name);
+            if (currentUser.role) localStorage.setItem('amb_user_role', currentUser.role);
+            if (currentUser.memberId) localStorage.setItem('bnb_user_member_id', currentUser.memberId);
+            sessionStorage.setItem('amb_session_unlocked', 'true');
+          } catch (e) {}
         }
+
+        // Open the returned payment_url in the same tab/WebView
+        setTimeout(() => {
+          window.location.href = data.payment_url;
+        }, 150);
       } else {
         setErrorMsg('পেমেন্ট গেটওয়ে থেকে সঠিক লিংক পাওয়া যায়নি।');
       }

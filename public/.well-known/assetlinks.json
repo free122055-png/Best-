@@ -1,0 +1,12 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.bnb.business.network",
+      "sha256_cert_fingerprints": [
+        "D4:12:1B:D5:CA:13:FD:34:B2:AD:41:F2:66:EF:8B:6C:6B:8B:E5:18:46:B3:C4:B9:3E:37:07:07:52:DC:F1:94"
+      ]
+    }
+  }
+]

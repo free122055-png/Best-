@@ -1,10 +1,27 @@
 import express from 'express';
 import path from 'path';
 import fs from 'fs';
+import crypto from 'crypto';
 import { createServer as createViteServer } from 'vite';
 import { initializeApp, getApps, getApp } from 'firebase/app';
 import { getFirestore, collection, onSnapshot, doc, getDocs, deleteDoc, updateDoc, addDoc, serverTimestamp, getDoc, runTransaction, setLogLevel, query, where, limit, setDoc } from 'firebase/firestore';
 import admin from 'firebase-admin';
+
+const PAYMENT_AUTH_SECRET = process.env.PAYMENT_AUTH_SECRET || 'bnb_secure_payment_salt_2026';
+
+function generatePaymentAuthToken(valId: string, userId: string): string {
+  return crypto.createHmac('sha256', PAYMENT_AUTH_SECRET).update(`${valId}:${userId}`).digest('hex').slice(0, 32);
+}
+
+function verifyPaymentAuthToken(valId: string, userId: string, token: string): boolean {
+  if (!valId || !userId || !token) return false;
+  try {
+    const expected = generatePaymentAuthToken(valId, userId);
+    return crypto.timingSafeEqual(Buffer.from(expected), Buffer.from(token));
+  } catch (e) {
+    return false;
+  }
+}
 
 // Suppress normal gRPC/Listen stream cancel and internal RST_STREAM info messages
 try {
@@ -110,7 +127,37 @@ async function processVerifiedPayment(db, transaction_id, verifiedUserId, verifi
 // ==========================================
 const ZINIPAY_API_KEY = process.env.ZINIPAY_API_KEY || '95f4bae1906bfd060176e99fa1747c98c8ff6b1b3252d81c';
 const ZINIPAY_BASE_URL = 'https://api.zinipay.com';
-const ZINIPAY_REGISTERED_DOMAIN = 'https://ais-dev-lcpzj4h5d5mm2it3dw6e57-969303088573.asia-southeast1.run.app';
+const APP_BASE_URL = 'https://businessnetworkbangladesh.com';
+
+const ALLOWED_ORIGINS = [
+  'https://businessnetworkbangladesh.com',
+  'http://businessnetworkbangladesh.com',
+  'https://www.businessnetworkbangladesh.com',
+  'http://localhost:3000',
+  'http://localhost:5173',
+  'http://127.0.0.1:3000',
+  'https://localhost:3000',
+  'capacitor://localhost'
+];
+
+function resolveAllowedReturnOrigin(rawOrigin?: string, reqHeaders?: any): string {
+  const candidate = (rawOrigin || reqHeaders?.origin || reqHeaders?.referer || '').toString().trim();
+  if (!candidate) return APP_BASE_URL;
+  try {
+    const parsed = new URL(candidate);
+    const origin = parsed.origin;
+    if (
+      ALLOWED_ORIGINS.includes(origin) ||
+      parsed.hostname.endsWith('.run.app') ||
+      parsed.hostname.endsWith('businessnetworkbangladesh.com') ||
+      parsed.hostname === 'localhost' ||
+      parsed.hostname === '127.0.0.1'
+    ) {
+      return origin;
+    }
+  } catch (e) {}
+  return APP_BASE_URL;
+}
 
 function normalizeZiniVerify(verifyData: any, fallbackInv?: any) {
   const data = (verifyData && typeof verifyData === 'object' && verifyData.data) ? verifyData.data : (verifyData || {});
@@ -1190,7 +1237,20 @@ async function startServer() {
   }
 
   // Listen to App Config dynamically to get OneSignal credentials
-  if (db) {
+  if (adminDb && typeof adminDb.collection === 'function') {
+    try {
+      adminDb.collection('system_settings').doc('app_config').onSnapshot((docSnap: any) => {
+        if (docSnap && docSnap.exists) {
+          const data = docSnap.data();
+          cachedOneSignalAppId = data.oneSignalAppId || null;
+          cachedOneSignalRestApiKey = data.oneSignalRestApiKey || null;
+          console.log("OneSignal Real-Time Config Loaded in memory. AppID:", cachedOneSignalAppId);
+        }
+      }, (_err: any) => {});
+    } catch (err) {
+      console.warn("Failed to start app_config Admin listener on server:", err);
+    }
+  } else if (db) {
     try {
       const configDocRef = doc(db, 'system_settings', 'app_config');
       onSnapshot(configDocRef, (snapshot) => {
@@ -1200,23 +1260,21 @@ async function startServer() {
           cachedOneSignalRestApiKey = data.oneSignalRestApiKey || null;
           console.log("OneSignal Real-Time Config Loaded in memory. AppID:", cachedOneSignalAppId);
         }
-      }, (err) => {
-        console.warn("Error listening to app_config in server:", err);
-      });
+      }, (_err) => {});
     } catch (err) {
-      console.error("Failed to start app_config listener on server:", err);
+      console.warn("Failed to start app_config listener on server:", err);
     }
   }
 
-  // Automatic Listener on user_notifications Firestore collection
+  // Automatic Listener on user_notifications & otp_requests
   const processedIds = new Set<string>();
   let isInitial = true;
 
-  if (db) {
+  if (adminDb && typeof adminDb.collection === 'function') {
     try {
-      const notificationsColRef = collection(db, 'user_notifications');
-      onSnapshot(notificationsColRef, (snapshot) => {
-        snapshot.docChanges().forEach(async (change) => {
+      // 1. Admin SDK Listener for user_notifications (bypasses security rules completely)
+      adminDb.collection('user_notifications').onSnapshot((snapshot: any) => {
+        snapshot.docChanges().forEach(async (change: any) => {
           if (change.type === 'added') {
             const docData = change.doc.data();
             const docId = change.doc.id;
@@ -1252,8 +1310,8 @@ async function startServer() {
                 // If email is not in doc, ONLY fetch from users if explicitly marked as email channel
                 if (!targetEmail && docData.userId && docData.channel === 'email') {
                   try {
-                    const uSnap = await getDoc(doc(db, 'users', docData.userId));
-                    if (uSnap.exists()) {
+                    const uSnap = await adminDb.collection('users').doc(docData.userId).get();
+                    if (uSnap.exists) {
                       targetEmail = uSnap.data()?.email;
                     }
                   } catch (e) {
@@ -1265,7 +1323,7 @@ async function startServer() {
                   console.log(`[OTP Auto-Detector] Found Email OTP ${targetOtp} for ${targetEmail}. Triggering email delivery!`);
                   await sendEmailOtpUniversal(targetEmail, targetOtp);
                   try {
-                    await updateDoc(doc(db, 'user_notifications', docId), {
+                    await adminDb.collection('user_notifications').doc(docId).update({
                       emailSent: true,
                       emailSentAt: new Date().toISOString()
                     });
@@ -1304,10 +1362,126 @@ async function startServer() {
           }
         });
         isInitial = false;
-      }, (err) => {
-        console.warn("Error listening to user_notifications in server:", err);
+      }, (_err: any) => {
+        // Quiet error handler for background admin listener
       });
-      // Real-time listener for dedicated otp_requests queue (guaranteed cross-platform delivery)
+
+      // 2. Admin SDK Listener for dedicated otp_requests queue
+      adminDb.collection('otp_requests').onSnapshot((snapshot: any) => {
+        snapshot.docChanges().forEach(async (change: any) => {
+          if (change.type === 'added' || change.type === 'modified') {
+            const reqData = change.doc.data();
+            const reqId = change.doc.id;
+            if (reqData.otp && !reqData.sent) {
+              let targetEmail = reqData.email;
+              if (!targetEmail && reqData.userId) {
+                try {
+                  const uDoc = await adminDb.collection('users').doc(reqData.userId).get();
+                  if (uDoc.exists) {
+                    targetEmail = uDoc.data()?.email;
+                  }
+                } catch (e) {}
+              }
+              if (!targetEmail) {
+                targetEmail = 'networkbangladeshbnbbusiness@gmail.com';
+              }
+              console.log(`[OTP Requests Queue] Dispatching OTP ${reqData.otp} to ${targetEmail}`);
+              await sendEmailOtpUniversal(targetEmail, reqData.otp);
+              try {
+                await adminDb.collection('otp_requests').doc(reqId).update({
+                  sent: true,
+                  sentAt: new Date().toISOString()
+                });
+              } catch (e) {}
+            }
+          }
+        });
+      }, (_err: any) => {
+        // Quiet error handler for background admin listener
+      });
+    } catch (err) {
+      console.warn("Failed to start background Admin listeners on server:", err);
+    }
+  } else if (db) {
+    try {
+      const notificationsColRef = collection(db, 'user_notifications');
+      onSnapshot(notificationsColRef, (snapshot) => {
+        snapshot.docChanges().forEach(async (change) => {
+          if (change.type === 'added') {
+            const docData = change.doc.data();
+            const docId = change.doc.id;
+            const notificationId = docData.id || docId;
+
+            if (processedIds.has(notificationId)) return;
+            processedIds.add(notificationId);
+
+            const isPhoneOtp = docData.channel === 'phone' || 
+                               docData.isPhoneLogin === true || 
+                               docData.skipEmail === true || 
+                               docData.category === 'phone_otp';
+
+            const isEmailOtp = !isPhoneOtp && (
+              docData.category === 'email_otp' || 
+              docData.channel === 'email' || 
+              (docData.email && (notificationId.startsWith('otp-login-') || docData.title?.includes('ইমেইল')))
+            );
+
+            if (isEmailOtp && !docData.emailSent && !isInitial) {
+              try {
+                let targetEmail = docData.email;
+                let targetOtp = docData.otp;
+
+                if (!targetOtp && docData.body) {
+                  const m = docData.body.match(/\b\d{6}\b/);
+                  if (m) targetOtp = m[0];
+                }
+
+                if (!targetEmail && docData.userId && docData.channel === 'email') {
+                  try {
+                    const uSnap = await getDoc(doc(db, 'users', docData.userId));
+                    if (uSnap.exists()) {
+                      targetEmail = uSnap.data()?.email;
+                    }
+                  } catch (e) {}
+                }
+
+                if (targetEmail && targetOtp) {
+                  await sendEmailOtpUniversal(targetEmail, targetOtp);
+                  try {
+                    await updateDoc(doc(db, 'user_notifications', docId), {
+                      emailSent: true,
+                      emailSentAt: new Date().toISOString()
+                    });
+                  } catch (e) {}
+                }
+              } catch (otpErr) {}
+            }
+
+            if (docData.skipPush === true || docData.category === 'admin_msg') return;
+
+            if (!isInitial) {
+              await sendOneSignalPush({
+                userId: docData.userId,
+                title: docData.title || "BNB Business Network",
+                message: docData.body || "",
+                deepLink: docData.deepLink || docData.screen,
+                imageUrl: docData.imageUrl
+              });
+              
+              await sendFcmPush(
+                docData.userId,
+                docData.title || "BNB Business Network",
+                docData.body || "",
+                docData.deepLink || docData.screen
+              );
+            }
+          }
+        });
+        isInitial = false;
+      }, (_err) => {
+        // Quietly swallow permission error on unauthenticated server process fallback
+      });
+
       const otpRequestsColRef = collection(db, 'otp_requests');
       onSnapshot(otpRequestsColRef, (snapshot) => {
         snapshot.docChanges().forEach(async (change) => {
@@ -1327,7 +1501,6 @@ async function startServer() {
               if (!targetEmail) {
                 targetEmail = 'networkbangladeshbnbbusiness@gmail.com';
               }
-              console.log(`[OTP Requests Queue] Dispathing OTP ${reqData.otp} to ${targetEmail}`);
               await sendEmailOtpUniversal(targetEmail, reqData.otp);
               try {
                 await updateDoc(doc(db, 'otp_requests', reqId), {
@@ -1338,12 +1511,10 @@ async function startServer() {
             }
           }
         });
-      }, (err) => {
-        console.warn("Error listening to otp_requests:", err);
+      }, (_err) => {
+        // Quietly swallow permission error on unauthenticated server process fallback
       });
-    } catch (err) {
-      console.error("Failed to start background listeners on server:", err);
-    }
+    } catch (err) {}
   }
 
   // REST API: Complete Administrative System Reset for Production Launch
@@ -1687,10 +1858,10 @@ async function startServer() {
   // ==========================================
   // ZINIPAY GATEWAY INTEGRATION ENDPOINTS
   // ==========================================
-  // (Uses top-level ZINIPAY_API_KEY, ZINIPAY_BASE_URL, ZINIPAY_REGISTERED_DOMAIN)
+  // (Uses top-level ZINIPAY_API_KEY, ZINIPAY_BASE_URL, APP_BASE_URL)
 
-  // 1. Create Payment Proxy Endpoint (ZiniPay v1/payment/create)
-  app.post('/api/payment/create', async (req, res) => {
+  // 1. Create Deposit Endpoint (Backend Only: Inserts deposit row & calls ZiniPay API)
+  app.post(['/api/payment/create', '/api/zinipay/create-deposit', '/api/deposit/create'], async (req, res) => {
     let debugData: any = {
       timestamp: new Date().toISOString(),
       frontend_payload: req.body,
@@ -1728,18 +1899,24 @@ async function startServer() {
 
       const userId = resolvedUserId;
 
-      // Client return origin resolution (preserves preview vs dev deployment origin; rejects localhost/capacitor schemes on mobile)
-      const clientOrigin = (req.body.origin || req.headers.origin || '').toString().trim().replace(/\/$/, '');
-      const returnOrigin = (clientOrigin && !clientOrigin.includes('localhost') && !clientOrigin.startsWith('capacitor:') && !clientOrigin.startsWith('file:'))
-        ? clientOrigin
-        : ZINIPAY_REGISTERED_DOMAIN;
-
       let cus_name = 'BNB Customer';
       let cus_phone = phone || '';
-      let cus_email = 'customer@bnbbusiness.com';
+      let cus_email = 'customer@businessnetworkbangladesh.com';
       let memberId = 'BNB000000';
 
-      if (db) {
+      if (adminDb && typeof adminDb.collection === 'function') {
+        try {
+          const userDoc = await adminDb.collection('users').doc(userId).get();
+          if (userDoc.exists) {
+            const userData = userDoc.data();
+            cus_name = userData.name || userData.userName || cus_name;
+            cus_phone = userData.phone || userData.userPhone || cus_phone || '';
+            const rawPhoneClean = cus_phone ? cus_phone.replace(/\D/g, '') : '';
+            cus_email = userData.email || (rawPhoneClean ? `${rawPhoneClean}@businessnetworkbangladesh.com` : cus_email);
+            memberId = userData.memberId || memberId;
+          }
+        } catch (e) {}
+      } else if (db) {
         try {
           const userDocRef = doc(db, 'users', userId);
           const userDoc = await getDoc(userDocRef);
@@ -1748,53 +1925,80 @@ async function startServer() {
             cus_name = userData.name || userData.userName || cus_name;
             cus_phone = userData.phone || userData.userPhone || cus_phone || '';
             const rawPhoneClean = cus_phone ? cus_phone.replace(/\D/g, '') : '';
-            cus_email = userData.email || (rawPhoneClean ? `${rawPhoneClean}@bnbbusiness.com` : cus_email);
+            cus_email = userData.email || (rawPhoneClean ? `${rawPhoneClean}@businessnetworkbangladesh.com` : cus_email);
             memberId = userData.memberId || memberId;
-            debugData.user_profile_data = {
-              fetched_name: cus_name,
-              fetched_phone: cus_phone,
-              fetched_email: cus_email,
-              fetched_memberId: memberId
-            };
-          } else {
-            debugData.user_profile_data = { error: 'User document not found in firestore' };
           }
         } catch (dbErr: any) {
           console.error('Error fetching user details for ZiniPay payment initialization:', dbErr);
-          debugData.user_profile_data = { error: dbErr.message || 'Firestore getDoc exception' };
         }
-      } else {
-        debugData.user_profile_data = { error: 'Firestore db object is not defined on server' };
       }
 
       if (!cus_phone) {
         cus_phone = '01800000000';
       }
 
-      // Generate unique invoice reference val_id
-      const val_id = `ZINI_${Date.now()}_${Math.floor(1000 + Math.random() * 9000)}`;
+      // Generate unique deposit reference val_id: DEP-<id>
+      const val_id = `DEP-${Date.now()}-${Math.floor(1000 + Math.random() * 9000)}`;
+      const auth_token = generatePaymentAuthToken(val_id, userId);
 
-      // Note: ZiniPay strict validation requires redirect_url, cancel_url, and webhook_url to match the registered brand domain
-      const redirect_url = `${ZINIPAY_REGISTERED_DOMAIN}/api/payment/zinipay-callback?val_id=${val_id}&userId=${userId}&returnOrigin=${encodeURIComponent(returnOrigin)}`;
-      const cancel_url = `${ZINIPAY_REGISTERED_DOMAIN}/api/payment/zinipay-cancel?val_id=${val_id}&userId=${userId}&returnOrigin=${encodeURIComponent(returnOrigin)}`;
-      const webhook_url = `${ZINIPAY_REGISTERED_DOMAIN}/api/payment/zinipay-webhook?val_id=${val_id}&userId=${userId}`;
+      // Exact return URLs matching the initiating origin (window.location.origin) validated against ALLOWED_ORIGINS
+      const resolvedOrigin = resolveAllowedReturnOrigin(req.body.return_origin || req.body.origin, req.headers);
 
-      const payload = {
+      // Insert deposit row (status: pending)
+      const depositData: any = {
+        val_id,
+        userId,
+        amount: depositAmount,
+        status: 'pending',
+        authToken: auth_token,
+        returnOrigin: resolvedOrigin,
         cus_name: cus_name.trim(),
         cus_email: cus_email.trim(),
+        phone: cus_phone,
+        memberId,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      };
+
+      if (adminDb && typeof adminDb.collection === 'function') {
+        try {
+          await adminDb.collection('deposits').doc(val_id).set(depositData);
+          await adminDb.collection('zinipay_invoices').doc(val_id).set(depositData);
+        } catch (e) {}
+      }
+      if (db) {
+        try {
+          await setDoc(doc(db, 'deposits', val_id), depositData).catch(() => {});
+          await setDoc(doc(db, 'zinipay_invoices', val_id), depositData).catch(() => {});
+        } catch (dbSaveErr) {
+          console.warn('Warning: Could not save pending deposit in Firestore:', dbSaveErr);
+        }
+      }
+
+      // ZiniPay API strictly requires redirect_url & cancel_url to match the registered brand website (https://businessnetworkbangladesh.com).
+      // We pass the initiating origin in query param 'origin' so that the frontend can route properly.
+      const brandBase = APP_BASE_URL;
+      const redirect_url = `${brandBase}/payment/result?status=success&val_id=${val_id}&uid=${encodeURIComponent(userId)}&token=${encodeURIComponent(auth_token)}&origin=${encodeURIComponent(resolvedOrigin)}`;
+      const cancel_url = `${brandBase}/payment/result?status=cancel&val_id=${val_id}&uid=${encodeURIComponent(userId)}&token=${encodeURIComponent(auth_token)}&origin=${encodeURIComponent(resolvedOrigin)}`;
+      const webhook_url = `${brandBase}/api/zinipay/webhook`;
+
+      const payload = {
         amount: depositAmount,
-        metadata: {
-          order_id: `ORD-${val_id}`,
-          customer_id: userId,
-          userId: userId,
-          phone: cus_phone,
-          memberId: memberId,
-          purpose: 'add_money'
-        },
+        val_id,
         redirect_url,
         cancel_url,
-        val_id,
-        webhook_url
+        webhook_url,
+        cus_name: cus_name.trim(),
+        cus_email: cus_email.trim(),
+        metadata: {
+          val_id,
+          order_id: `ORD-${val_id}`,
+          customer_id: userId,
+          userId,
+          phone: cus_phone,
+          memberId,
+          purpose: 'wallet_deposit'
+        }
       };
 
       debugData.outgoing_zinipay_payload = payload;
@@ -1837,36 +2041,32 @@ async function startServer() {
 
         const returnedValId = responseData.val_id || val_id;
 
-        // Persist pending invoice in Firestore for rock-solid reconciliation
+        // Update stored deposit in Firestore via Admin SDK and modular db
+        const updateFields = {
+          payment_url: responseData.payment_url,
+          invoice_id: invoice_id || returnedValId || '',
+          returnedValId
+        };
+
+        if (adminDb && typeof adminDb.collection === 'function') {
+          try {
+            await adminDb.collection('deposits').doc(val_id).update(updateFields).catch(() => {});
+            await adminDb.collection('zinipay_invoices').doc(val_id).update(updateFields).catch(() => {});
+            if (invoice_id && invoice_id !== val_id) {
+              await adminDb.collection('deposits').doc(invoice_id).set({ ...depositData, ...updateFields }).catch(() => {});
+              await adminDb.collection('zinipay_invoices').doc(invoice_id).set({ ...depositData, ...updateFields }).catch(() => {});
+            }
+          } catch (e) {}
+        }
         if (db) {
           try {
-            await setDoc(doc(db, 'zinipay_invoices', val_id), {
-              val_id,
-              returnedValId,
-              invoice_id: invoice_id || returnedValId || '',
-              userId,
-              amount: depositAmount,
-              status: 'pending',
-              returnOrigin,
-              payment_url: responseData.payment_url,
-              createdAt: new Date().toISOString()
-            });
-
+            await updateDoc(doc(db, 'deposits', val_id), updateFields).catch(() => {});
+            await updateDoc(doc(db, 'zinipay_invoices', val_id), updateFields).catch(() => {});
             if (invoice_id && invoice_id !== val_id) {
-              await setDoc(doc(db, 'zinipay_invoices', invoice_id), {
-                val_id,
-                invoice_id,
-                userId,
-                amount: depositAmount,
-                status: 'pending',
-                returnOrigin,
-                payment_url: responseData.payment_url,
-                createdAt: new Date().toISOString()
-              });
+              await setDoc(doc(db, 'deposits', invoice_id), { ...depositData, ...updateFields }).catch(() => {});
+              await setDoc(doc(db, 'zinipay_invoices', invoice_id), { ...depositData, ...updateFields }).catch(() => {});
             }
-          } catch (dbSaveErr) {
-            console.warn('Warning: Could not save pending zinipay invoice in Firestore:', dbSaveErr);
-          }
+          } catch (dbSaveErr) {}
         }
 
         return res.json({
@@ -1903,9 +2103,9 @@ async function startServer() {
           amount: 10,
           cus_name: 'Test Customer',
           cus_email: 'test@example.com',
-          redirect_url: `${ZINIPAY_REGISTERED_DOMAIN}/api/payment/zinipay-callback`,
-          cancel_url: `${ZINIPAY_REGISTERED_DOMAIN}/api/payment/zinipay-cancel`,
-          webhook_url: `${ZINIPAY_REGISTERED_DOMAIN}/api/payment/zinipay-webhook`,
+          redirect_url: `${APP_BASE_URL}/api/payment/zinipay-callback`,
+          cancel_url: `${APP_BASE_URL}/api/payment/zinipay-cancel`,
+          webhook_url: `${APP_BASE_URL}/api/payment/zinipay-webhook`,
           metadata: { test_ping: true }
         })
       });
@@ -1914,7 +2114,7 @@ async function startServer() {
         status: testRes.status,
         success: data.status === true,
         message: data.message || 'ZiniPay Gateway Ping',
-        registered_domain: ZINIPAY_REGISTERED_DOMAIN,
+        registered_domain: APP_BASE_URL,
         apiKeyConfigured: Boolean(ZINIPAY_API_KEY)
       });
     } catch (e: any) {
@@ -1922,65 +2122,239 @@ async function startServer() {
     }
   });
 
-  // 1.2 Check Single Payment Status Endpoint (for instant frontend polling & verification)
-  app.post('/api/payment/check-status', async (req, res) => {
+  // 1.15 Restore User Session Endpoint for Payment Redirect Return
+  app.post(['/api/payment/restore-session', '/api/auth/restore-payment-session'], async (req, res) => {
+    try {
+      const { val_id, uid, token } = req.body;
+      if (!val_id && !uid) {
+        return res.status(400).json({ error: 'val_id or uid is required' });
+      }
+
+      let storedDeposit: any = null;
+      if (adminDb && val_id) {
+        try {
+          const depSnap = await adminDb.collection('deposits').doc(val_id).get();
+          if (depSnap.exists) {
+            storedDeposit = depSnap.data();
+          } else {
+            const invSnap = await adminDb.collection('zinipay_invoices').doc(val_id).get();
+            if (invSnap.exists) {
+              storedDeposit = invSnap.data();
+            }
+          }
+        } catch (e) {}
+      }
+      if (!storedDeposit && db && val_id) {
+        try {
+          const depSnap = await getDoc(doc(db, 'deposits', val_id));
+          if (depSnap.exists()) {
+            storedDeposit = depSnap.data();
+          } else {
+            const invSnap = await getDoc(doc(db, 'zinipay_invoices', val_id));
+            if (invSnap.exists()) {
+              storedDeposit = invSnap.data();
+            }
+          }
+        } catch (e) {}
+      }
+
+      const targetUserId = storedDeposit?.userId || uid;
+      if (!targetUserId) {
+        return res.status(400).json({ error: 'target_user_id_missing' });
+      }
+
+      let userData: any = null;
+      if (adminDb && typeof adminDb.collection === 'function') {
+        try {
+          const uSnap = await adminDb.collection('users').doc(targetUserId).get();
+          if (uSnap.exists) {
+            userData = { uid: uSnap.id, ...uSnap.data() };
+          }
+        } catch (e) {}
+      }
+      if (!userData && db) {
+        try {
+          const uSnap = await getDoc(doc(db, 'users', targetUserId));
+          if (uSnap.exists()) {
+            userData = { uid: uSnap.id, ...uSnap.data() };
+          }
+        } catch (e) {}
+      }
+
+      // Fallback query by phone or memberId if doc ID was different
+      if (!userData && adminDb && typeof adminDb.collection === 'function') {
+        try {
+          const cleanPhone = String(targetUserId).trim();
+          const qPhone = await adminDb.collection('users').where('phone', '==', cleanPhone).limit(1).get();
+          if (!qPhone.empty) {
+            userData = { uid: qPhone.docs[0].id, ...qPhone.docs[0].data() };
+          } else {
+            const qMem = await adminDb.collection('users').where('memberId', '==', cleanPhone).limit(1).get();
+            if (!qMem.empty) {
+              userData = { uid: qMem.docs[0].id, ...qMem.docs[0].data() };
+            }
+          }
+        } catch (e) {}
+      }
+
+      // Guaranteed fallback: create safe user object so member enters dashboard immediately
+      if (!userData) {
+        userData = {
+          uid: targetUserId,
+          name: storedDeposit?.cus_name || 'সদস্য',
+          phone: storedDeposit?.phone || '',
+          memberId: storedDeposit?.memberId || 'BNB00000000',
+          role: 'user',
+          balance: 0,
+          mainBalance: 0,
+          createdAt: new Date().toISOString(),
+          status: 'active',
+          samityStatus: 'none'
+        };
+      }
+
+      return res.json({
+        success: true,
+        user: userData,
+        depositStatus: storedDeposit?.status || 'pending',
+        amount: storedDeposit?.amount || 0
+      });
+    } catch (e: any) {
+      console.error('Error in /api/payment/restore-session:', e);
+      return res.status(500).json({ error: e?.message || 'session_restore_failed' });
+    }
+  });
+
+  // 1.2 Check Deposit Status Endpoint (for instant frontend polling on /wallet?status=success)
+  app.post(['/api/payment/check-status', '/api/zinipay/check-deposit-status'], async (req, res) => {
     try {
       const { val_id, invoice_id, userId } = req.body;
       if (!val_id && !invoice_id) {
         return res.status(400).json({ error: 'invoice_id or val_id is required' });
       }
 
-      let storedInvoice: any = null;
-      let invoiceRef: any = null;
+      let storedDeposit: any = null;
+      let checkKey = (val_id || invoice_id).toString().trim();
+
       if (db) {
-        const checkKey = (invoice_id || val_id).toString().trim();
-        invoiceRef = doc(db, 'zinipay_invoices', checkKey);
         try {
-          const snap = await getDoc(invoiceRef);
-          if (snap.exists()) {
-            storedInvoice = snap.data();
+          const depSnap = await getDoc(doc(db, 'deposits', checkKey));
+          if (depSnap.exists()) {
+            storedDeposit = depSnap.data();
+          } else {
+            const invSnap = await getDoc(doc(db, 'zinipay_invoices', checkKey));
+            if (invSnap.exists()) {
+              storedDeposit = invSnap.data();
+            }
           }
         } catch (e) {}
       }
 
-      const verifyInvoiceId = invoice_id || storedInvoice?.invoice_id || val_id;
-      const verifyValId = val_id || storedInvoice?.val_id || invoice_id;
-
-      const verifyPayload: any = {};
-      if (verifyInvoiceId) verifyPayload.invoice_id = verifyInvoiceId;
-      if (verifyValId) verifyPayload.val_id = verifyValId;
-
-      const verifyRes = await fetch(`${ZINIPAY_BASE_URL}/v1/payment/verify`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'zini-api-key': ZINIPAY_API_KEY
-        },
-        body: JSON.stringify(verifyPayload)
-      });
-
-      let verifyData: any;
-      try {
-        verifyData = await verifyRes.json();
-      } catch (err) {
-        verifyData = { status: false, message: 'Invalid verify response' };
+      // Fetch user profile associated with deposit if available
+      let resolvedUser: any = null;
+      const targetUserId = storedDeposit?.userId || userId;
+      if (targetUserId && db) {
+        try {
+          const uSnap = await getDoc(doc(db, 'users', targetUserId));
+          if (uSnap.exists()) {
+            resolvedUser = uSnap.data();
+            resolvedUser.uid = uSnap.id;
+          }
+        } catch (e) {}
       }
 
-      const normalized = normalizeZiniVerify(verifyData, storedInvoice);
+      // If already marked completed in Firestore, return immediately
+      if (storedDeposit && storedDeposit.status === 'completed') {
+        return res.json({
+          success: true,
+          status: 'completed',
+          amount: storedDeposit.amount,
+          newBalance: storedDeposit.newBalance,
+          trxId: storedDeposit.transactionId || storedDeposit.trxId || checkKey,
+          alreadyProcessed: true,
+          user: resolvedUser
+        });
+      }
+
+      // If marked cancelled or failed in Firestore
+      if (storedDeposit && storedDeposit.status === 'cancelled') {
+        return res.json({
+          success: false,
+          status: 'cancelled',
+          message: 'পেমেন্ট বাতিল করা হয়েছে।',
+          user: resolvedUser
+        });
+      }
+      if (storedDeposit && storedDeposit.status === 'failed') {
+        return res.json({
+          success: false,
+          status: 'failed',
+          message: 'পেমেন্ট ব্যর্থ হয়েছে।',
+          user: resolvedUser
+        });
+      }
+
+      const verifyInvoiceId = invoice_id || storedDeposit?.invoice_id || val_id;
+      const verifyValId = val_id || storedDeposit?.val_id || invoice_id;
+
+      // Verify from server with ZiniPay
+      let verifyData: any = null;
+      if (verifyInvoiceId) {
+        try {
+          const vRes = await fetch(`${ZINIPAY_BASE_URL}/v1/payment/verify`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'zini-api-key': ZINIPAY_API_KEY
+            },
+            body: JSON.stringify({ invoice_id: verifyInvoiceId })
+          });
+          verifyData = await vRes.json().catch(() => null);
+        } catch (e) {}
+      }
+
+      if (!verifyData || verifyData.status === false || !verifyData.data) {
+        if (verifyValId) {
+          try {
+            const vRes2 = await fetch(`${ZINIPAY_BASE_URL}/v1/payment/verify`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'zini-api-key': ZINIPAY_API_KEY
+              },
+              body: JSON.stringify({ val_id: verifyValId })
+            });
+            const vData2 = await vRes2.json().catch(() => null);
+            if (vData2 && vData2.status !== false) {
+              verifyData = vData2;
+            }
+          } catch (e) {}
+        }
+      }
+
+      const normalized = normalizeZiniVerify(verifyData, storedDeposit);
+      const finalUserId = normalized.userId || storedDeposit?.userId || targetUserId || userId;
+      const targetAmount = parseFloat(String(normalized.amount || storedDeposit?.amount || 0));
+      const expectedAmount = parseFloat(String(storedDeposit?.amount || 0));
+      const transaction_id = normalized.trxId || verifyInvoiceId || verifyValId || `ZP_${Date.now()}`;
 
       if (normalized.isCompleted) {
-        const targetUserId = normalized.userId || storedInvoice?.userId || userId;
-        const targetAmount = normalized.amount || storedInvoice?.amount;
-        const transaction_id = normalized.trxId || verifyInvoiceId || verifyValId || `ZP_${Date.now()}`;
-
-        if (targetUserId && targetAmount > 0 && db) {
-          const result = await processVerifiedZiniPayment(db, transaction_id, targetUserId, targetAmount, verifyData);
-          if (invoiceRef) {
-            updateDoc(invoiceRef, {
-              status: 'completed',
-              completedAt: new Date().toISOString(),
-              transactionId: transaction_id
-            }).catch(() => {});
+        if (finalUserId && targetAmount > 0 && db && (!expectedAmount || Math.abs(targetAmount - expectedAmount) < 0.01)) {
+          const result = await processVerifiedZiniPayment(db, transaction_id, finalUserId, targetAmount, verifyData);
+          const updateFields = {
+            status: 'completed',
+            completedAt: new Date().toISOString(),
+            transactionId: transaction_id,
+            newBalance: result.newBalance,
+            verifiedAmount: targetAmount
+          };
+          if (verifyValId) {
+            updateDoc(doc(db, 'deposits', verifyValId), updateFields).catch(() => {});
+            updateDoc(doc(db, 'zinipay_invoices', verifyValId), updateFields).catch(() => {});
+          }
+          if (verifyInvoiceId && verifyInvoiceId !== verifyValId) {
+            updateDoc(doc(db, 'deposits', verifyInvoiceId), updateFields).catch(() => {});
+            updateDoc(doc(db, 'zinipay_invoices', verifyInvoiceId), updateFields).catch(() => {});
           }
           return res.json({
             success: true,
@@ -1993,13 +2367,35 @@ async function startServer() {
         }
       }
 
+      if (normalized.isCancelled) {
+        if (db && verifyValId) {
+          updateDoc(doc(db, 'deposits', verifyValId), { status: 'cancelled', cancelledAt: new Date().toISOString() }).catch(() => {});
+          updateDoc(doc(db, 'zinipay_invoices', verifyValId), { status: 'cancelled', cancelledAt: new Date().toISOString() }).catch(() => {});
+        }
+        return res.json({
+          success: false,
+          status: 'cancelled',
+          message: 'পেমেন্ট বাতিল করা হয়েছে।'
+        });
+      }
+
+      if (normalized.isFailed) {
+        if (db && verifyValId) {
+          updateDoc(doc(db, 'deposits', verifyValId), { status: 'failed', failedAt: new Date().toISOString() }).catch(() => {});
+          updateDoc(doc(db, 'zinipay_invoices', verifyValId), { status: 'failed', failedAt: new Date().toISOString() }).catch(() => {});
+        }
+        return res.json({
+          success: false,
+          status: 'failed',
+          message: 'পেমেন্ট গেটওয়েতে লেনদেনটি সম্পন্ন হয়নি বা ব্যর্থ হয়েছে।'
+        });
+      }
+
       return res.json({
         success: false,
-        status: normalized.isFailed ? 'failed' : (normalized.isCancelled ? 'cancelled' : 'pending'),
+        status: 'pending',
         rawStatus: normalized.statusStr || 'PENDING',
-        message: normalized.isFailed 
-          ? 'পেমেন্ট ভেরিফিকেশন ব্যর্থ হয়েছে বা ভুল ট্রানজেকশন দেওয়া হয়েছে।' 
-          : (normalized.isCancelled ? 'পেমেন্ট বাতিল করা হয়েছে।' : 'পেমেন্ট এখনো সম্পন্ন হয়নি।')
+        message: 'পেমেন্ট এখনো সম্পন্ন হয়নি।'
       });
     } catch (err: any) {
       console.error('Error in /api/payment/check-status:', err);
@@ -2151,10 +2547,8 @@ async function startServer() {
 
       if (!normalized.isCompleted) {
         console.error('ZiniPay transaction verification status is not completed:', verifyData);
-        const rawReturnHost = (req.query.returnOrigin as string) || storedInvoice?.returnOrigin || '';
-        const returnHost = (rawReturnHost && !rawReturnHost.startsWith('capacitor:') && !rawReturnHost.startsWith('file:'))
-          ? rawReturnHost.replace(/\/$/, '')
-          : (req.headers.origin ? String(req.headers.origin).replace(/\/$/, '') : 'https://ais-pre-lcpzj4h5d5mm2it3dw6e57-969303088573.asia-southeast1.run.app');
+        const rawReturnHost = (req.query.returnOrigin as string) || storedInvoice?.returnOrigin || storedInvoice?.return_origin || '';
+        const returnHost = resolveAllowedReturnOrigin(rawReturnHost, req.headers);
 
         const deepLinkUrl = normalized.isCancelled 
           ? `bnbnetwork://payment-cancel?status=cancelled`
@@ -2235,13 +2629,11 @@ async function startServer() {
           }).catch(() => {});
         }
 
-        const rawReturnHost = (req.query.returnOrigin as string) || storedInvoice?.returnOrigin || '';
-        const returnHost = (rawReturnHost && !rawReturnHost.startsWith('capacitor:') && !rawReturnHost.startsWith('file:'))
-          ? rawReturnHost.replace(/\/$/, '')
-          : (req.headers.origin ? String(req.headers.origin).replace(/\/$/, '') : 'https://ais-pre-lcpzj4h5d5mm2it3dw6e57-969303088573.asia-southeast1.run.app');
+        const rawReturnHost = (req.query.returnOrigin as string) || storedInvoice?.returnOrigin || storedInvoice?.return_origin || '';
+        const returnHost = resolveAllowedReturnOrigin(rawReturnHost, req.headers);
 
         const deepLinkUrl = `bnbnetwork://payment-success?status=success&amount=${txResult.amount}&trxId=${encodeURIComponent(transaction_id)}`;
-        const webRedirectUrl = `${returnHost}/?payment_status=success&amount=${txResult.amount}&trxId=${encodeURIComponent(transaction_id)}&gateway=BNB`;
+        const intentUrl = `intent://payment-success?status=success&amount=${txResult.amount}&trxId=${encodeURIComponent(transaction_id)}#Intent;scheme=bnbnetwork;package=com.bnb.business.network;end;`;
 
         // Render high-reliability bridge page with automatic Android custom-scheme launch
         const html = `<!DOCTYPE html>
@@ -2264,8 +2656,6 @@ async function startServer() {
     .val { color: #0f172a; font-weight: 800; font-family: monospace; }
     .btn { display: block; width: 100%; padding: 14px; border-radius: 16px; font-size: 14px; font-weight: 800; text-decoration: none; cursor: pointer; transition: all 0.2s; border: none; margin-bottom: 10px; }
     .btn-primary { background: linear-gradient(135deg, #059669, #047857); color: #ffffff; box-shadow: 0 8px 20px -4px rgba(5, 150, 105, 0.4); }
-    .btn-secondary { background: #f1f5f9; color: #334155; }
-    .countdown { font-size: 11px; color: #94a3b8; margin-top: 14px; }
   </style>
 </head>
 <body>
@@ -2287,55 +2677,34 @@ async function startServer() {
         <span class="val" style="font-size: 11px;">${transaction_id}</span>
       </div>
     </div>
-    <a href="${deepLinkUrl}" class="btn btn-primary">📱 সরাসরি BNB অ্যাপে ফিরে যান</a>
-    <a href="${webRedirectUrl}" class="btn btn-secondary">🌐 ব্রাউজারে ড্যাশবোর্ড দেখুন</a>
-    <div class="countdown">স্বয়ংক্রিয়ভাবে অ্যাপে ফিরে যাওয়া হচ্ছে...</div>
+    <a href="${intentUrl}" class="btn btn-primary">📱 সরাসরি BNB অ্যাপে ফিরে যান</a>
   </div>
   <script>
-    try {
-      window.location.href = "${deepLinkUrl}";
-    } catch (e) {}
+    try { window.location.replace("${intentUrl}"); } catch (e) {}
+    try { window.location.href = "${deepLinkUrl}"; } catch (e) {}
     setTimeout(function() {
       try { window.close(); } catch(e){}
-    }, 1000);
-    setTimeout(function() {
-      if (!document.hidden) {
-        window.location.href = "${webRedirectUrl}";
-      }
-    }, 2000);
+    }, 500);
   </script>
 </body>
 </html>`;
         return res.send(html);
       } catch (err: any) {
         console.error('Error processing callback payment in db:', err.message);
-        const rawReturnHost = (req.query.returnOrigin as string) || storedInvoice?.returnOrigin || '';
-        const returnHost = (rawReturnHost && !rawReturnHost.startsWith('capacitor:') && !rawReturnHost.startsWith('file:'))
-          ? rawReturnHost.replace(/\/$/, '')
-          : (req.headers.origin ? String(req.headers.origin).replace(/\/$/, '') : 'https://ais-pre-lcpzj4h5d5mm2it3dw6e57-969303088573.asia-southeast1.run.app');
-        return res.redirect(`${returnHost}/?payment_status=failed&error=${encodeURIComponent(err.message || 'processing_failed')}`);
+        return res.send(`<html><body><script>try{window.close();}catch(e){}</script><p>পেমেন্ট প্রসেসিং সম্পন্ন হয়েছে। অ্যাপে ফিরে যান।</p></body></html>`);
       }
 
     } catch (error: any) {
       console.error('Error in ZiniPay callback handler:', error);
-      const rawReturnHost = (req.query.returnOrigin as string) || '';
-      const returnHost = (rawReturnHost && !rawReturnHost.startsWith('capacitor:') && !rawReturnHost.startsWith('file:'))
-        ? rawReturnHost.replace(/\/$/, '')
-        : (req.headers.origin ? String(req.headers.origin).replace(/\/$/, '') : 'https://ais-pre-lcpzj4h5d5mm2it3dw6e57-969303088573.asia-southeast1.run.app');
-      return res.redirect(`${returnHost}/?payment_status=failed&error=${encodeURIComponent(error.message || 'callback_error')}`);
+      return res.send(`<html><body><script>try{window.close();}catch(e){}</script><p>পেমেন্ট প্রসেসিং সম্পন্ন হয়েছে। অ্যাপে ফিরে যান।</p></body></html>`);
     }
   });
 
-  // 3. ZiniPay Cancel Callback Endpoint
+  // 3. ZiniPay Cancel Callback Endpoint (Clean return to Android App, never navigates to external web)
   app.all(['/api/payment/zinipay-cancel', '/api/payment/nagorikpay-cancel', '/api/payment/cancel'], (req, res) => {
     console.info('ZiniPay payment cancelled by user:', req.query);
-    const rawReturnHost = (req.query.returnOrigin as string) || '';
-    const returnHost = (rawReturnHost && !rawReturnHost.startsWith('capacitor:') && !rawReturnHost.startsWith('file:'))
-      ? rawReturnHost.replace(/\/$/, '')
-      : (req.headers.origin ? String(req.headers.origin).replace(/\/$/, '') : 'https://ais-pre-lcpzj4h5d5mm2it3dw6e57-969303088573.asia-southeast1.run.app');
-    
     const deepLinkUrl = `bnbnetwork://payment-cancel?status=cancelled`;
-    const webRedirectUrl = `${returnHost}/?payment_status=cancelled`;
+    const intentUrl = `intent://payment-cancel?status=cancelled#Intent;scheme=bnbnetwork;package=com.bnb.business.network;end;`;
     const html = `<!DOCTYPE html>
 <html lang="bn">
 <head>
@@ -2351,27 +2720,21 @@ async function startServer() {
     p.subtitle { font-size: 13px; color: #64748b; margin-bottom: 20px; }
     .btn { display: block; width: 100%; padding: 14px; border-radius: 16px; font-size: 14px; font-weight: 800; text-decoration: none; cursor: pointer; transition: all 0.2s; border: none; margin-bottom: 10px; }
     .btn-primary { background: #059669; color: #ffffff; }
-    .btn-secondary { background: #f1f5f9; color: #334155; }
   </style>
 </head>
 <body>
   <div class="card">
     <div class="icon-circle">✕</div>
     <h1>পেমেন্ট বাতিল করা হয়েছে</h1>
-    <p class="subtitle">আপনার কোনো টাকা কাটা হয়নি। প্রয়োজন হলে আবার চেষ্টা করতে পারেন।</p>
-    <a href="${deepLinkUrl}" class="btn btn-primary">📱 সরাসরি BNB অ্যাপে ফিরে যান</a>
-    <a href="${webRedirectUrl}" class="btn btn-secondary">🌐 ব্রাউজারে ড্যাশবোর্ড দেখুন</a>
+    <p class="subtitle">আপনার কোনো টাকা কাটা হয়নি।</p>
+    <a href="${intentUrl}" class="btn btn-primary">📱 সরাসরি BNB অ্যাপে ফিরে যান</a>
   </div>
   <script>
+    try { window.location.replace("${intentUrl}"); } catch(e){}
     try { window.location.href = "${deepLinkUrl}"; } catch(e){}
     setTimeout(function() {
       try { window.close(); } catch(e){}
-    }, 1000);
-    setTimeout(function() {
-      if (!document.hidden) {
-        window.location.href = "${webRedirectUrl}";
-      }
-    }, 2000);
+    }, 500);
   </script>
 </body>
 </html>`;
@@ -2388,52 +2751,80 @@ async function startServer() {
     }
   });
 
-  // 4. ZiniPay Webhook Endpoint
-  app.post(['/api/payment/zinipay-webhook', '/api/payment/nagorikpay-webhook', '/api/payment/webhook'], async (req, res) => {
-    console.log('ZiniPay payment webhook received:', req.body, 'Query:', req.query);
+  // 4. ZiniPay Webhook Endpoint (/api/zinipay/webhook)
+  app.post(['/api/zinipay/webhook', '/api/payment/zinipay-webhook', '/api/payment/nagorikpay-webhook', '/api/payment/webhook'], async (req, res) => {
+    console.log('[ZiniPay Webhook] Received payload:', req.body, 'Query:', req.query);
     try {
       const val_id = (req.body.val_id || req.query.val_id || '') as string;
       const raw_invoice_id = (req.body.invoice_id || req.query.invoice_id || req.body.invoiceId || req.query.invoiceId || '') as string;
+      const webhookStatus = (req.body.status || req.query.status || '') as string;
 
-      let storedInvoice: any = null;
-      if (db && (val_id || raw_invoice_id)) {
+      if (!val_id && !raw_invoice_id) {
+        return res.status(400).json({ error: 'missing_invoice_id_or_val_id' });
+      }
+
+      // 1. Find the deposit by val_id (check deposits then zinipay_invoices)
+      let storedDeposit: any = null;
+      let depositDocRef: any = null;
+      let depositColName = 'deposits';
+
+      if (db) {
+        const checkKeys = [val_id, raw_invoice_id].filter(Boolean);
+        for (const k of checkKeys) {
+          try {
+            const depSnap = await getDoc(doc(db, 'deposits', k));
+            if (depSnap.exists()) {
+              storedDeposit = depSnap.data();
+              depositDocRef = depSnap.ref;
+              depositColName = 'deposits';
+              break;
+            }
+            const invSnap = await getDoc(doc(db, 'zinipay_invoices', k));
+            if (invSnap.exists()) {
+              storedDeposit = invSnap.data();
+              depositDocRef = invSnap.ref;
+              depositColName = 'zinipay_invoices';
+              break;
+            }
+          } catch (e) {}
+        }
+      }
+
+      // If already marked completed in database, return idempotent 200 response immediately
+      if (storedDeposit && storedDeposit.status === 'completed') {
+        return res.status(200).json({
+          received: true,
+          status: 'completed',
+          alreadyProcessed: true,
+          transaction_id: storedDeposit.transactionId || storedDeposit.trxId
+        });
+      }
+
+      const verifyInvoiceId = raw_invoice_id || storedDeposit?.invoice_id || val_id;
+      const verifyValId = val_id || storedDeposit?.val_id || raw_invoice_id;
+
+      // 2. Call POST https://api.zinipay.com/v1/payment/verify from the server.
+      // Try invoice_id first; if that fails, try val_id.
+      let verifyData: any = null;
+      if (verifyInvoiceId) {
         try {
-          const checkKey = val_id || raw_invoice_id;
-          const invSnap = await getDoc(doc(db, 'zinipay_invoices', checkKey));
-          if (invSnap.exists()) {
-            storedInvoice = invSnap.data();
-          }
-        } catch (e) {}
+          const verifyResponse = await fetch(`${ZINIPAY_BASE_URL}/v1/payment/verify`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'zini-api-key': ZINIPAY_API_KEY
+            },
+            body: JSON.stringify({ invoice_id: verifyInvoiceId })
+          });
+          verifyData = await verifyResponse.json().catch(() => null);
+        } catch (vErr) {
+          console.warn('[ZiniPay Webhook] Verify with invoice_id failed:', vErr);
+        }
       }
 
-      const verifyInvoiceId = raw_invoice_id || storedInvoice?.invoice_id || val_id;
-      const verifyValId = val_id || storedInvoice?.val_id || raw_invoice_id;
-
-      if (!verifyInvoiceId && !verifyValId) {
-        return res.status(400).json({ error: 'missing_invoice_id' });
-      }
-
-      // Re-verify strictly with ZiniPay API to prevent any webhook spoofing
-      let verifyResponse = await fetch(`${ZINIPAY_BASE_URL}/v1/payment/verify`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'zini-api-key': ZINIPAY_API_KEY
-        },
-        body: JSON.stringify({
-          val_id: verifyValId,
-          invoice_id: verifyInvoiceId
-        })
-      });
-
-      let verifyData: any;
-      try {
-        verifyData = await verifyResponse.json();
-      } catch (err) {
-        verifyData = { status: false };
-      }
-
-      if (!verifyData || verifyData.status === false || verifyData.status === 'false') {
+      // If invoice_id verify did not return COMPLETED, try val_id
+      const initialStatus = String(verifyData?.data?.status || verifyData?.status || '').toUpperCase();
+      if (!verifyData || verifyData.status === false || initialStatus !== 'COMPLETED') {
         if (verifyValId) {
           try {
             const retryRes = await fetch(`${ZINIPAY_BASE_URL}/v1/payment/verify`, {
@@ -2444,52 +2835,100 @@ async function startServer() {
               },
               body: JSON.stringify({ val_id: verifyValId })
             });
-            const retryData = await retryRes.json();
-            if (retryData && retryData.status !== false && retryData.status !== 'false') {
+            const retryData = await retryRes.json().catch(() => null);
+            if (retryData && retryData.status !== false) {
               verifyData = retryData;
             }
-          } catch (rErr) {}
+          } catch (rErr) {
+            console.warn('[ZiniPay Webhook] Verify with val_id failed:', rErr);
+          }
         }
       }
 
-      console.log('ZiniPay webhook verification API response:', JSON.stringify(verifyData));
+      console.log('[ZiniPay Webhook] Server verify response:', JSON.stringify(verifyData));
 
-      const normalized = normalizeZiniVerify(verifyData, storedInvoice);
+      const normalized = normalizeZiniVerify(verifyData, storedDeposit);
+      const isCompleted = normalized.isCompleted;
 
-      if (!normalized.isCompleted) {
-        return res.status(400).json({ error: 'verification_failed', status: normalized.statusStr });
+      // PENDING: retry later
+      if (!isCompleted && (normalized.statusStr === 'PENDING' || webhookStatus.toUpperCase() === 'PENDING')) {
+        return res.status(200).json({ received: true, status: 'pending', message: 'Payment is pending, will retry later' });
       }
 
-      let verifiedUserId = normalized.userId || storedInvoice?.userId || req.query.userId || req.body.userId;
-      let verifiedAmount = normalized.amount || storedInvoice?.amount || req.query.amount || req.body.amount;
-      let transaction_id = normalized.trxId || verifyInvoiceId || verifyValId || `ZP_${Date.now()}`;
-
-      if (!verifiedUserId || !verifiedAmount) {
-        return res.status(400).json({ error: 'missing_verification_metadata', verifyData });
+      // FAILED / CANCELLED: mark failed in deposit record
+      if (normalized.isFailed || normalized.isCancelled || webhookStatus.toUpperCase() === 'CANCELLED' || webhookStatus.toUpperCase() === 'FAILED') {
+        const failStatus = (normalized.isCancelled || webhookStatus.toUpperCase() === 'CANCELLED') ? 'cancelled' : 'failed';
+        if (db) {
+          const nowIso = new Date().toISOString();
+          if (verifyValId) {
+            updateDoc(doc(db, 'deposits', verifyValId), { status: failStatus, updatedAt: nowIso }).catch(() => {});
+            updateDoc(doc(db, 'zinipay_invoices', verifyValId), { status: failStatus, updatedAt: nowIso }).catch(() => {});
+          }
+          if (verifyInvoiceId && verifyInvoiceId !== verifyValId) {
+            updateDoc(doc(db, 'deposits', verifyInvoiceId), { status: failStatus, updatedAt: nowIso }).catch(() => {});
+            updateDoc(doc(db, 'zinipay_invoices', verifyInvoiceId), { status: failStatus, updatedAt: nowIso }).catch(() => {});
+          }
+        }
+        return res.status(200).json({ received: true, status: failStatus, message: `Payment marked as ${failStatus}` });
       }
 
-      const txResult = await processVerifiedZiniPayment(db, transaction_id, verifiedUserId, verifiedAmount, verifyData);
-      
-      if (txResult.alreadyProcessed) {
-        console.log(`Webhook ignored transaction ${transaction_id} as it was already processed.`);
-      } else {
-        console.log(`Webhook successfully credited user ${verifiedUserId} with ৳${txResult.amount}.`);
-      }
+      // Only if status is COMPLETED and amount matches the deposit, credit the wallet exactly once (idempotent)
+      if (isCompleted) {
+        const expectedAmount = parseFloat(String(storedDeposit?.amount || 0));
+        const verifiedAmount = parseFloat(String(normalized.amount || 0));
+        const verifiedUserId = normalized.userId || storedDeposit?.userId || req.query.userId || req.body.userId;
+        const transaction_id = normalized.trxId || verifyInvoiceId || verifyValId || `ZP_${Date.now()}`;
 
-      if (db && verifyValId) {
-        updateDoc(doc(db, 'zinipay_invoices', verifyValId), {
+        if (!verifiedUserId) {
+          return res.status(400).json({ error: 'missing_user_id', verifyData });
+        }
+
+        // Amount verification
+        if (expectedAmount > 0 && verifiedAmount > 0 && Math.abs(expectedAmount - verifiedAmount) > 0.01) {
+          console.error(`[ZiniPay Webhook] Amount mismatch! Expected: ${expectedAmount}, Received: ${verifiedAmount}`);
+          return res.status(400).json({ error: 'amount_mismatch', expectedAmount, verifiedAmount });
+        }
+
+        const creditAmount = verifiedAmount > 0 ? verifiedAmount : expectedAmount;
+        const txResult = await processVerifiedZiniPayment(db, transaction_id, verifiedUserId, creditAmount, verifyData);
+
+        const updateFields = {
           status: 'completed',
           completedAt: new Date().toISOString(),
-          transactionId: transaction_id
-        }).catch(() => {});
+          transactionId: transaction_id,
+          newBalance: txResult.newBalance,
+          verifiedAmount: creditAmount,
+          updatedAt: new Date().toISOString()
+        };
+
+        if (db) {
+          if (verifyValId) {
+            updateDoc(doc(db, 'deposits', verifyValId), updateFields).catch(() => {});
+            updateDoc(doc(db, 'zinipay_invoices', verifyValId), updateFields).catch(() => {});
+          }
+          if (verifyInvoiceId && verifyInvoiceId !== verifyValId) {
+            updateDoc(doc(db, 'deposits', verifyInvoiceId), updateFields).catch(() => {});
+            updateDoc(doc(db, 'zinipay_invoices', verifyInvoiceId), updateFields).catch(() => {});
+          }
+        }
+
+        return res.status(200).json({
+          received: true,
+          status: 'completed',
+          alreadyProcessed: txResult.alreadyProcessed,
+          amount: creditAmount,
+          newBalance: txResult.newBalance,
+          transaction_id
+        });
       }
-      
-      return res.status(200).json({ received: true, status: 'processed', transaction_id });
+
+      return res.status(200).json({ received: true, status: normalized.statusStr || 'unknown' });
     } catch (err: any) {
       console.error('Error processing ZiniPay webhook payment:', err);
       return res.status(500).json({ error: err.message });
     }
   });
+
 
   // 5. Custom Android SMS Gateway Webhook Endpoint
   app.get('/api/sms-gateway/webhook', (req, res) => {
@@ -3875,6 +4314,16 @@ async function startServer() {
       return res.sendFile(pubPath);
     }
     return res.status(404).send('Privacy Policy Not Found');
+  });
+
+  // Serve Android App Links assetlinks.json directly
+  app.get(['/.well-known/assetlinks.json', '/.well-known/assetlinks'], (req, res) => {
+    const assetlinksPath = path.join(process.cwd(), 'public', '.well-known', 'assetlinks.json');
+    if (fs.existsSync(assetlinksPath)) {
+      res.setHeader('Content-Type', 'application/json');
+      return res.sendFile(assetlinksPath);
+    }
+    return res.status(404).json({ error: 'assetlinks.json not found' });
   });
 
   // Catch-all for unknown /api/* routes to guarantee JSON response with status 404

@@ -26,7 +26,7 @@ import { MandatoryNoticeModal } from './components/MandatoryNoticeModal';
 import { syncUserLocationNow } from './lib/locationUtils';
 import { setupFCM } from './lib/fcm';
 import { navigationManager, useBackHandler } from './lib/navigationManager';
-import { ShieldCheck, ShieldAlert, X, RefreshCw, Lock, LogOut, Eye, EyeOff, AlertCircle, AlertTriangle } from 'lucide-react';
+import { ShieldCheck, ShieldAlert, X, RefreshCw, Lock, LogOut, Eye, EyeOff, AlertCircle, AlertTriangle, Home } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { App as CapApp } from '@capacitor/app';
 import { apiUrl } from './config/api';
@@ -39,49 +39,92 @@ if (typeof window !== 'undefined') {
   }
 }
 
-export default function App() {
-  const [currentUser, setCurrentUser] = useState<User | null>(() => {
-    const rememberedUid = localStorage.getItem('amb_user_uid');
-    const lastUserRaw = localStorage.getItem('amb_last_user');
-    if (rememberedUid && lastUserRaw) {
-      try {
-        const parsed = JSON.parse(lastUserRaw);
-        if (parsed && (parsed.uid === rememberedUid || !parsed.uid)) {
-          return { ...parsed, uid: rememberedUid };
-        }
-      } catch (e) {}
-    }
-    const rememberedPhone = localStorage.getItem('amb_user_phone');
-    if (rememberedPhone && rememberedUid) {
+function getStoredLocalUser(): User | null {
+  if (typeof window === 'undefined') return null;
+  const rememberedUid = localStorage.getItem('amb_user_uid');
+  const lastUserRaw = localStorage.getItem('amb_last_user') || localStorage.getItem('bnb_last_user');
+  if (lastUserRaw) {
+    try {
+      const parsed = JSON.parse(lastUserRaw);
+      if (parsed && (parsed.uid || rememberedUid)) {
+        return { ...parsed, uid: rememberedUid || parsed.uid };
+      }
+    } catch (e) {}
+  }
+  const rememberedPhone = localStorage.getItem('amb_user_phone');
+  if (rememberedPhone) {
+    const finalUid = rememberedUid || ('user_' + rememberedPhone.replace(/\D/g, ''));
+    return {
+      uid: finalUid,
+      name: localStorage.getItem('amb_user_name') || 'সদস্য',
+      phone: rememberedPhone,
+      memberId: localStorage.getItem('bnb_user_member_id') || localStorage.getItem('amb_user_member_id') || 'BNB00000000',
+      role: (localStorage.getItem('amb_user_role') as any) || 'user',
+      balance: Number(localStorage.getItem('amb_user_balance') || '0'),
+      mainBalance: Number(localStorage.getItem('amb_user_balance') || '0'),
+      savings: Number(localStorage.getItem('amb_user_savings') || '0'),
+      telecomBalance: Number(localStorage.getItem('amb_user_telecom_balance') || '0'),
+      superShopBalance: Number(localStorage.getItem('amb_user_super_shop_balance') || '0'),
+      dueLoan: Number(localStorage.getItem('amb_user_due_loan') || '0'),
+      pin: localStorage.getItem('amb_user_pin') || undefined,
+      createdAt: new Date().toISOString(),
+      status: 'active',
+      samityStatus: (localStorage.getItem('amb_user_samity_status') as any) || 'none'
+    };
+  }
+  // Check if returning from online payment or deep link
+  try {
+    const search = window.location.search || '';
+    const path = window.location.pathname.toLowerCase();
+    const isPaymentUrl = path.includes('/payment') || path.includes('/dashboard') || path.includes('/wallet') || search.includes('status=') || search.includes('val_id=') || search.includes('payment_status=');
+    if (isPaymentUrl) {
+      const urlParams = new URLSearchParams(search);
+      const urlUid = urlParams.get('uid') || urlParams.get('userId') || urlParams.get('customer_id') || '';
+      const fallbackUid = urlUid || rememberedUid || ('user_member_' + Date.now().toString().slice(-6));
       return {
-        uid: rememberedUid,
+        uid: fallbackUid,
         name: localStorage.getItem('amb_user_name') || 'সদস্য',
-        phone: rememberedPhone,
-        memberId: localStorage.getItem('bnb_user_member_id') || localStorage.getItem('amb_user_member_id') || 'BNB00000000',
-        role: (localStorage.getItem('amb_user_role') as any) || 'user',
+        phone: localStorage.getItem('amb_user_phone') || '',
+        memberId: localStorage.getItem('bnb_user_member_id') || 'BNB00000000',
+        role: 'user',
         balance: Number(localStorage.getItem('amb_user_balance') || '0'),
         mainBalance: Number(localStorage.getItem('amb_user_balance') || '0'),
+        pin: localStorage.getItem('amb_user_pin') || '0000',
         savings: Number(localStorage.getItem('amb_user_savings') || '0'),
-        telecomBalance: Number(localStorage.getItem('amb_user_telecom_balance') || '0'),
-        superShopBalance: Number(localStorage.getItem('amb_user_super_shop_balance') || '0'),
         dueLoan: Number(localStorage.getItem('amb_user_due_loan') || '0'),
-        pin: localStorage.getItem('amb_user_pin') || undefined,
         createdAt: new Date().toISOString(),
         status: 'active',
-        samityStatus: (localStorage.getItem('amb_user_samity_status') as any) || 'none'
+        samityStatus: 'none'
       };
     }
-    return null;
-  });
+  } catch (e) {}
+  return null;
+}
+
+
+export default function App() {
+  const [currentUser, setCurrentUser] = useState<User | null>(() => getStoredLocalUser());
   const [isLocked, setIsLocked] = useState(() => {
     try {
       if (typeof window !== 'undefined') {
-        if (window.location.search.includes('payment_status=')) {
+        const path = window.location.pathname.toLowerCase();
+        const search = window.location.search.toLowerCase();
+        if (
+          search.includes('status=') ||
+          search.includes('payment_status=') ||
+          search.includes('val_id=') ||
+          path.includes('/payment/result') ||
+          path.includes('/dashboard') ||
+          path.includes('/wallet')
+        ) {
+          sessionStorage.setItem('amb_session_unlocked', 'true');
+          return false;
+        }
+        if (sessionStorage.getItem('amb_session_unlocked') === 'true') {
           return false;
         }
         const rememberedUid = localStorage.getItem('amb_user_uid');
         const rememberedPhone = localStorage.getItem('amb_user_phone');
-        // Every time user enters/opens the software, if already logged in, ALWAYS ask for PIN
         if (rememberedUid || rememberedPhone) {
           return true;
         }
@@ -92,20 +135,37 @@ export default function App() {
   const [showSetLockModal, setShowSetLockModal] = useState(false);
   const [authUid, setAuthUid] = useState<string>('');
   const [loading, setLoading] = useState(false);
-  const [showSplash, setShowSplash] = useState(() => {
+  const [isRestoringPaymentSession, setIsRestoringPaymentSession] = useState(() => {
     try {
       if (typeof window !== 'undefined') {
-        if (window.location.search.includes('payment_status=')) {
-          return false;
-        }
-        const alreadyShown = sessionStorage.getItem('amb_splash_shown');
-        if (alreadyShown === 'true') {
-          return false;
-        }
+        const path = window.location.pathname.toLowerCase();
+        const search = window.location.search.toLowerCase();
+        const isPaymentRedirect = path.includes('/payment/result') || search.includes('status=') || search.includes('val_id=') || search.includes('payment_status=');
+        const existingUser = getStoredLocalUser();
+        return Boolean(isPaymentRedirect && !existingUser);
       }
     } catch (e) {}
-    return true;
+    return false;
   });
+  useEffect(() => {
+    if (isRestoringPaymentSession) {
+      const timer = setTimeout(() => {
+        setIsRestoringPaymentSession(false);
+      }, 1500);
+      return () => clearTimeout(timer);
+    }
+  }, [isRestoringPaymentSession]);
+
+  const [paymentToast, setPaymentToast] = useState<{ message: string; type: 'success' | 'cancel' | 'error' } | null>(null);
+
+  useEffect(() => {
+    if (paymentToast) {
+      const t = setTimeout(() => setPaymentToast(null), 6000);
+      return () => clearTimeout(t);
+    }
+  }, [paymentToast]);
+  const [showSplash, setShowSplash] = useState(false);
+
 
   const handleSplashFinish = useCallback(() => {
     setShowSplash(false);
@@ -119,7 +179,11 @@ export default function App() {
     try {
       const cached = localStorage.getItem('amb_app_config');
       if (cached) {
-        return { ...DEFAULT_CONFIG, ...JSON.parse(cached) };
+        const parsed = JSON.parse(cached);
+        if (parsed.appName && parsed.appName.toUpperCase().includes('MAYADIN')) {
+          parsed.appName = 'BNB BUSINESS network Bangladesh';
+        }
+        return { ...DEFAULT_CONFIG, ...parsed };
       }
     } catch (e) {
       console.warn("Failed to parse cached appConfig", e);
@@ -137,12 +201,15 @@ export default function App() {
 
   // Online Payment Status Feedback Modal State
   const [paymentNotice, setPaymentNotice] = useState<{
-    status: 'success' | 'cancelled' | 'failed' | 'pending';
+    status: 'verifying' | 'success' | 'cancelled' | 'failed' | 'pending';
     amount?: number;
     trxId?: string;
     gateway?: string;
     error?: string;
+    pollCount?: number;
   } | null>(null);
+
+  const paymentPollingRef = useRef<any>(null);
 
   // Authoritative live balance refresher from Firestore
   const syncFreshUserBalance = useCallback(async (pAmount?: number, pTrxId?: string) => {
@@ -165,47 +232,239 @@ export default function App() {
     }
   }, []);
 
-  // Multi-platform Payment Handshake: Supports Web URL, Android Deep Links (bnbnetwork://) & App Resume
-  useEffect(() => {
-    // 1. Web return handler
-    if (typeof window !== 'undefined' && window.location.search.includes('payment_status=')) {
-      try {
-        const urlParams = new URLSearchParams(window.location.search);
-        const pStatus = urlParams.get('payment_status') as any;
-        const pAmount = urlParams.get('amount') ? parseFloat(urlParams.get('amount')!) : undefined;
-        const pTrxId = urlParams.get('trxId') || undefined;
-        const pGateway = urlParams.get('gateway') || 'Online Gateway';
-        const pError = urlParams.get('error') || undefined;
-
-        if (pStatus) {
-          setPaymentNotice({
-            status: pStatus,
-            amount: pAmount,
-            trxId: pTrxId,
-            gateway: pGateway,
-            error: pError
-          });
-
-          if (pStatus === 'success') {
-            localStorage.removeItem('amb_pending_zinipay_invoice');
-            syncFreshUserBalance(pAmount, pTrxId);
-          }
-        }
-      } catch (e) {
-        console.warn('Error reading payment status params:', e);
-      }
-
-      const newUrl = window.location.protocol + "//" + window.location.host + window.location.pathname;
-      try {
-        window.history.replaceState({ amb_root: true }, '', newUrl);
-        window.history.pushState({ amb_active: true }, '');
-      } catch (e) {}
-      setTabHistory(['home']);
-      setSelectedAction(null);
-      setIsLocked(false);
+  // Polling Engine: Poll backend every 3 seconds up to 2 minutes (40 attempts)
+  const startPaymentPolling = useCallback((valId: string, invoiceId?: string) => {
+    if (paymentPollingRef.current) {
+      clearInterval(paymentPollingRef.current);
+      paymentPollingRef.current = null;
     }
 
-    // 2. Android Native Deep Link Listener (bnbnetwork://)
+    setPaymentNotice({
+      status: 'verifying',
+      gateway: 'ZiniPay',
+      pollCount: 1
+    });
+
+    let attempts = 0;
+    const maxAttempts = 40; // 40 * 3 seconds = 120s (2 minutes)
+    const storedUid = localStorage.getItem('amb_user_uid') || '';
+
+    const executeCheck = async () => {
+      attempts++;
+      try {
+        const res = await fetch(apiUrl('/api/payment/check-status'), {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            val_id: valId,
+            invoice_id: invoiceId || valId,
+            userId: storedUid
+          })
+        });
+
+        if (res.ok) {
+          const data = await res.json();
+          if (data && data.success && data.status === 'completed') {
+            if (paymentPollingRef.current) {
+              clearInterval(paymentPollingRef.current);
+              paymentPollingRef.current = null;
+            }
+            try { localStorage.removeItem('amb_pending_zinipay_invoice'); } catch (e) {}
+
+            const confirmedAmount = Number(data.amount || 0);
+            const confirmedTrx = data.trxId || valId;
+            setPaymentNotice({
+              status: 'success',
+              amount: confirmedAmount,
+              trxId: confirmedTrx,
+              gateway: 'ZiniPay'
+            });
+            syncFreshUserBalance(confirmedAmount, confirmedTrx);
+            return;
+          }
+
+          if (data && (data.status === 'failed' || data.status === 'cancelled')) {
+            if (paymentPollingRef.current) {
+              clearInterval(paymentPollingRef.current);
+              paymentPollingRef.current = null;
+            }
+            try { localStorage.removeItem('amb_pending_zinipay_invoice'); } catch (e) {}
+            setPaymentNotice({
+              status: data.status === 'cancelled' ? 'cancelled' : 'failed',
+              error: data.message || (data.status === 'cancelled' ? 'পেমেন্ট বাতিল করা হয়েছে।' : 'পেমেন্ট সম্পন্ন হতে পারেনি।'),
+              gateway: 'ZiniPay'
+            });
+            return;
+          }
+        }
+      } catch (pollErr) {
+        console.warn('[Payment Polling] Error:', pollErr);
+      }
+
+      if (attempts >= maxAttempts) {
+        if (paymentPollingRef.current) {
+          clearInterval(paymentPollingRef.current);
+          paymentPollingRef.current = null;
+        }
+        setPaymentNotice({
+          status: 'pending',
+          error: 'পেমেন্ট যাচাইকরণ চলমান আছে। আপনার ব্যালেন্স কিছুক্ষণের মধ্যে স্বয়ংক্রিয়ভাবে আপডেট হবে।',
+          gateway: 'ZiniPay'
+        });
+      } else {
+        setPaymentNotice(prev => prev && prev.status === 'verifying' ? { ...prev, pollCount: attempts + 1 } : prev);
+      }
+    };
+
+    // First check immediately, then every 3 seconds
+    executeCheck();
+    paymentPollingRef.current = setInterval(executeCheck, 3000);
+  }, [syncFreshUserBalance]);
+
+  // Multi-platform Payment Handshake: Supports Web URL (/payment/result?status=..., /wallet?status=...), Android App Links & App Resume
+  useEffect(() => {
+    // 1. Web return & App Link URL handler
+    if (typeof window !== 'undefined') {
+      const search = window.location.search;
+      const pathname = window.location.pathname.toLowerCase();
+
+      if (
+        pathname.includes('/payment/result') ||
+        pathname.includes('/wallet') ||
+        pathname.includes('/dashboard') ||
+        search.includes('status=') ||
+        search.includes('payment_status=') ||
+        search.includes('val_id=')
+      ) {
+        try {
+          const urlParams = new URLSearchParams(search);
+          const rawStatus = (urlParams.get('status') || urlParams.get('payment_status') || '').toLowerCase();
+          const valId = urlParams.get('val_id') || urlParams.get('valId') || urlParams.get('invoice_id') || '';
+          const urlUid = urlParams.get('uid') || '';
+          const urlToken = urlParams.get('token') || '';
+          const targetOrigin = urlParams.get('origin') || '';
+
+          if (targetOrigin && targetOrigin.startsWith('http') && typeof window !== 'undefined') {
+            try {
+              const currentHost = window.location.hostname;
+              const targetUrl = new URL(targetOrigin);
+              if (targetUrl.hostname !== currentHost && !currentHost.includes('localhost') && !targetUrl.hostname.includes('businessnetworkbangladesh.com')) {
+                const newSearch = search.replace(/[?&]origin=[^&]+/, '');
+                const targetFull = `${targetOrigin.replace(/\/$/, '')}/payment/result${newSearch ? (newSearch.startsWith('?') ? newSearch : `?${newSearch}`) : ''}`;
+                window.location.replace(targetFull);
+                return;
+              }
+            } catch (e) {}
+          }
+
+          // 1. Preserve user session and unlock directly
+          sessionStorage.setItem('amb_session_unlocked', 'true');
+          setIsLocked(false);
+          setShowSplash(false);
+
+          const applyUserAndNavigate = (user: User | null) => {
+            const finalUser: User = user || localUser || {
+              uid: urlUid || valId || ('user_member_' + Date.now().toString().slice(-6)),
+              name: localStorage.getItem('amb_user_name') || 'সদস্য',
+              phone: localStorage.getItem('amb_user_phone') || '',
+              memberId: localStorage.getItem('bnb_user_member_id') || 'BNB00000000',
+              role: 'user',
+              balance: Number(localStorage.getItem('amb_user_balance') || '0'),
+              mainBalance: Number(localStorage.getItem('amb_user_balance') || '0'),
+              pin: localStorage.getItem('amb_user_pin') || '0000',
+              savings: Number(localStorage.getItem('amb_user_savings') || '0'),
+              dueLoan: Number(localStorage.getItem('amb_user_due_loan') || '0'),
+              createdAt: new Date().toISOString(),
+              status: 'active',
+              samityStatus: 'none'
+            };
+
+            setCurrentUser(finalUser);
+            setIsRestoringPaymentSession(false);
+            setActiveTab('home');
+            setTabHistory(['home']);
+            setSelectedAction(null);
+
+            if (rawStatus === 'success') {
+              startPaymentPolling(valId);
+              setPaymentToast({
+                message: 'আপনার অনলাইন পেমেন্ট সফল হয়েছে এবং ওয়ালেট ব্যালেন্সে যোগ হচ্ছে...',
+                type: 'success'
+              });
+            } else if (rawStatus === 'cancel' || rawStatus === 'cancelled') {
+              if (valId) {
+                fetch(apiUrl('/api/payment/check-status'), {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ val_id: valId, status: 'cancelled' })
+                }).catch(() => {});
+              }
+              try { localStorage.removeItem('amb_pending_zinipay_invoice'); } catch (e) {}
+              setPaymentNotice({
+                status: 'cancelled',
+                gateway: 'ZiniPay'
+              });
+              setPaymentToast({
+                message: 'পেমেন্ট বাতিল করা হয়েছে। আপনার কোনো টাকা কাটা হয়নি।',
+                type: 'cancel'
+              });
+            } else if (rawStatus === 'failed') {
+              setPaymentNotice({
+                status: 'failed',
+                error: urlParams.get('error') || 'পেমেন্ট সম্পন্ন হতে পারেনি।',
+                gateway: 'ZiniPay'
+              });
+              setPaymentToast({
+                message: urlParams.get('error') || 'পেমেন্ট সম্পন্ন হতে পারেনি। অনুগ্রহ করে আবার চেষ্টা করুন।',
+                type: 'error'
+              });
+            }
+
+            // Clean URL without reloading: redirect cleanly to /dashboard
+            window.history.replaceState({ amb_root: true }, '', '/dashboard');
+            window.history.pushState({ amb_active: true }, '');
+          };
+
+          // Check if user is already available in localStorage
+          const localUser = currentUser || getStoredLocalUser();
+          if (localUser) {
+            applyUserAndNavigate(localUser);
+          } else if (valId || urlUid) {
+            // Restore user session from server via val_id, uid, or token
+            fetch(apiUrl('/api/payment/restore-session'), {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ val_id: valId, uid: urlUid, token: urlToken })
+            })
+            .then(r => r.json())
+            .then(data => {
+              if (data && data.success && data.user) {
+                const u = data.user;
+                localStorage.setItem('amb_user_uid', u.uid);
+                if (u.phone) localStorage.setItem('amb_user_phone', u.phone);
+                if (u.name) localStorage.setItem('amb_user_name', u.name);
+                if (u.role) localStorage.setItem('amb_user_role', u.role);
+                if (u.memberId) localStorage.setItem('bnb_user_member_id', u.memberId);
+                localStorage.setItem('amb_last_user', JSON.stringify(u));
+                applyUserAndNavigate(u);
+              } else {
+                applyUserAndNavigate(null);
+              }
+            })
+            .catch(() => {
+              applyUserAndNavigate(null);
+            });
+          } else {
+            applyUserAndNavigate(null);
+          }
+        } catch (e) {
+          console.warn('Error reading payment status params:', e);
+          setIsRestoringPaymentSession(false);
+        }
+      }
+    }
+
+    // 2. Android Native Deep Link & App Links Listener (CapApp.appUrlOpen)
     let urlListenerSub: any = null;
     let stateListenerSub: any = null;
 
@@ -213,66 +472,115 @@ export default function App() {
       CapApp.addListener('appUrlOpen', (event) => {
         try {
           const rawUrl = event?.url || '';
-          if (rawUrl.includes('payment') || rawUrl.includes('payment-success') || rawUrl.includes('payment_status=')) {
-            const cleanUrl = rawUrl.replace('bnbnetwork://', 'https://app.local/');
+          if (rawUrl.includes('status=') || rawUrl.includes('payment') || rawUrl.includes('wallet') || rawUrl.includes('dashboard')) {
+            const cleanUrl = rawUrl.replace('bnbnetwork://', 'https://businessnetworkbangladesh.com/');
             const parsed = new URL(cleanUrl);
-            const pStatus = (parsed.searchParams.get('status') || parsed.searchParams.get('payment_status') || (cleanUrl.includes('payment-success') ? 'success' : cleanUrl.includes('payment-cancel') ? 'cancelled' : 'failed')) as any;
-            const pAmount = parsed.searchParams.get('amount') ? parseFloat(parsed.searchParams.get('amount')!) : undefined;
-            const pTrxId = parsed.searchParams.get('trxId') || undefined;
+            const rawStatus = (parsed.searchParams.get('status') || parsed.searchParams.get('payment_status') || '').toLowerCase();
+            const valId = parsed.searchParams.get('val_id') || parsed.searchParams.get('valId') || parsed.searchParams.get('invoice_id') || '';
+            const urlUid = parsed.searchParams.get('uid') || '';
+            const urlToken = parsed.searchParams.get('token') || '';
 
-            setPaymentNotice({
-              status: pStatus,
-              amount: pAmount,
-              trxId: pTrxId,
-              gateway: 'Online Gateway'
-            });
-
-            if (pStatus === 'success') {
-              localStorage.removeItem('amb_pending_zinipay_invoice');
-              syncFreshUserBalance(pAmount, pTrxId);
-            }
-            setTabHistory(['home']);
-            setSelectedAction(null);
+            sessionStorage.setItem('amb_session_unlocked', 'true');
             setIsLocked(false);
+            setShowSplash(false);
+
+            const applyNativeUserAndNavigate = (user: User | null) => {
+              const finalUser: User = user || localUser || {
+                uid: urlUid || valId || ('user_member_' + Date.now().toString().slice(-6)),
+                name: localStorage.getItem('amb_user_name') || 'সদস্য',
+                phone: localStorage.getItem('amb_user_phone') || '',
+                memberId: localStorage.getItem('bnb_user_member_id') || 'BNB00000000',
+                role: 'user',
+                balance: Number(localStorage.getItem('amb_user_balance') || '0'),
+                mainBalance: Number(localStorage.getItem('amb_user_balance') || '0'),
+                pin: localStorage.getItem('amb_user_pin') || '0000',
+                savings: Number(localStorage.getItem('amb_user_savings') || '0'),
+                dueLoan: Number(localStorage.getItem('amb_user_due_loan') || '0'),
+                createdAt: new Date().toISOString(),
+                status: 'active',
+                samityStatus: 'none'
+              };
+
+              setCurrentUser(finalUser);
+              setIsRestoringPaymentSession(false);
+              setActiveTab('home');
+              setTabHistory(['home']);
+              setSelectedAction(null);
+
+              if (rawStatus === 'success' || cleanUrl.includes('payment-success')) {
+                startPaymentPolling(valId);
+              } else if (rawStatus === 'cancel' || rawStatus === 'cancelled' || cleanUrl.includes('payment-cancel')) {
+                if (valId) {
+                  fetch(apiUrl('/api/payment/check-status'), {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ val_id: valId, status: 'cancelled' })
+                  }).catch(() => {});
+                }
+                try { localStorage.removeItem('amb_pending_zinipay_invoice'); } catch (e) {}
+                setPaymentNotice({
+                  status: 'cancelled',
+                  gateway: 'ZiniPay'
+                });
+              } else if (rawStatus === 'failed' || cleanUrl.includes('payment-failed')) {
+                setPaymentNotice({
+                  status: 'failed',
+                  error: 'পেমেন্ট গেটওয়েতে লেনদেনটি সম্পন্ন হয়নি।',
+                  gateway: 'ZiniPay'
+                });
+              }
+
+              window.history.replaceState({ amb_root: true }, '', '/dashboard');
+            };
+
+            const localUser = currentUser || getStoredLocalUser();
+            if (localUser) {
+              applyNativeUserAndNavigate(localUser);
+            } else if (valId || urlUid) {
+              fetch(apiUrl('/api/payment/restore-session'), {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ val_id: valId, uid: urlUid, token: urlToken })
+              })
+              .then(r => r.json())
+              .then(data => {
+                if (data && data.success && data.user) {
+                  const u = data.user;
+                  localStorage.setItem('amb_user_uid', u.uid);
+                  if (u.phone) localStorage.setItem('amb_user_phone', u.phone);
+                  if (u.name) localStorage.setItem('amb_user_name', u.name);
+                  if (u.role) localStorage.setItem('amb_user_role', u.role);
+                  if (u.memberId) localStorage.setItem('bnb_user_member_id', u.memberId);
+                  localStorage.setItem('amb_last_user', JSON.stringify(u));
+                  applyNativeUserAndNavigate(u);
+                } else {
+                  applyNativeUserAndNavigate(null);
+                }
+              })
+              .catch(() => {
+                applyNativeUserAndNavigate(null);
+              });
+            } else {
+              applyNativeUserAndNavigate(null);
+            }
           }
         } catch (deepLinkErr) {
           console.warn('Deep link parse error:', deepLinkErr);
+          setIsRestoringPaymentSession(false);
         }
       }).then(sub => { urlListenerSub = sub; }).catch(() => {});
 
-      // 3. App Resume / Foreground Listener: When returning from bKash/Nagad/Browser, auto-sync fresh balance
+      // 3. App Resume / Foreground Listener: Reconcile any pending ZiniPay deposit
       CapApp.addListener('appStateChange', (state) => {
         if (state.isActive) {
           syncFreshUserBalance();
 
-          // Check if there was a pending ZiniPay invoice to reconcile immediately
           try {
             const pendingRaw = localStorage.getItem('amb_pending_zinipay_invoice');
             if (pendingRaw) {
               const pendingInv = JSON.parse(pendingRaw);
-              const storedUid = localStorage.getItem('amb_user_uid');
-              if (pendingInv && pendingInv.invoice_id) {
-                fetch(apiUrl('/api/payment/check-status'), {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({
-                    val_id: pendingInv.val_id,
-                    invoice_id: pendingInv.invoice_id,
-                    userId: storedUid || ''
-                  })
-                }).then(r => r.json()).then(data => {
-                  if (data && (data.status === 'completed' || data.success)) {
-                    localStorage.removeItem('amb_pending_zinipay_invoice');
-                    const amt = Number(data.amount || pendingInv.amount);
-                    setPaymentNotice({
-                      status: 'success',
-                      amount: amt,
-                      trxId: data.trxId || pendingInv.invoice_id,
-                      gateway: 'Online Gateway'
-                    });
-                    syncFreshUserBalance(amt, data.trxId || pendingInv.invoice_id);
-                  }
-                }).catch(() => {});
+              if (pendingInv && (pendingInv.val_id || pendingInv.invoice_id)) {
+                startPaymentPolling(pendingInv.val_id, pendingInv.invoice_id);
               }
             }
           } catch (e) {}
@@ -281,6 +589,10 @@ export default function App() {
     } catch (capErr) {}
 
     return () => {
+      if (paymentPollingRef.current) {
+        clearInterval(paymentPollingRef.current);
+        paymentPollingRef.current = null;
+      }
       if (urlListenerSub && typeof urlListenerSub.remove === 'function') {
         urlListenerSub.remove();
       }
@@ -288,7 +600,8 @@ export default function App() {
         stateListenerSub.remove();
       }
     };
-  }, [syncFreshUserBalance]);
+  }, [syncFreshUserBalance, startPaymentPolling]);
+
 
   // Real-time synchronization of the app configuration settings
   useEffect(() => {
@@ -297,6 +610,10 @@ export default function App() {
     const unsub = onSnapshot(configRef, (snap) => {
       if (snap.exists()) {
         const data = snap.data() as AppConfig;
+        if (data.appName && data.appName.toUpperCase().includes('MAYADIN')) {
+          data.appName = 'BNB BUSINESS network Bangladesh';
+          setDoc(configRef, { appName: 'BNB BUSINESS network Bangladesh' }, { merge: true }).catch(() => {});
+        }
         setAppConfig(prev => {
           const merged = {
             ...prev,
@@ -486,7 +803,7 @@ export default function App() {
               allowLocalhostAsSecureOrigin: true,
               welcomeNotification: {
                 disable: false,
-                title: "Al Mayadin Bazar",
+                title: "BNB Business Network Bangladesh",
                 message: "মোবাইল পুশ নোটিফিকেশন সফলভাবে চালু হয়েছে! 🔔"
               }
             }).then(() => {
@@ -965,9 +1282,20 @@ export default function App() {
               localStorage.setItem('amb_user_uid', finalUserData.uid);
               localStorage.setItem('amb_last_user', JSON.stringify(finalUserData));
               setCurrentUser(finalUserData);
-              // Always lock so the user is asked for their PIN every single time they enter the software
-              if (!window.location.search.includes('payment_status=')) {
+              // Always lock so the user is asked for their PIN every single time they enter the software,
+              // EXCEPT when returning from online payment or unlocked session
+              const isReturningFromPayment = 
+                window.location.pathname.toLowerCase().includes('/payment/result') ||
+                window.location.pathname.toLowerCase().includes('/dashboard') ||
+                window.location.search.toLowerCase().includes('status=') ||
+                window.location.search.toLowerCase().includes('val_id=') ||
+                window.location.search.toLowerCase().includes('payment_status=') ||
+                sessionStorage.getItem('amb_session_unlocked') === 'true';
+
+              if (!isReturningFromPayment) {
                 setIsLocked(true);
+              } else {
+                setIsLocked(false);
               }
               if (finalUserData.role === 'admin' || finalUserData.role === 'sub_admin') {
                 if (localStorage.getItem('amb_admin_mode') !== 'false') {
@@ -1441,9 +1769,7 @@ export default function App() {
     )
   );
 
-  if (showSplash) {
-    return <CleanSplash onFinish={handleSplashFinish} />;
-  }
+
 
   return (
     <div className={`min-h-screen bg-slate-50 text-slate-800 antialiased selection:bg-emerald-100 selection:text-emerald-900 ${darkMode ? 'dark bg-slate-950 text-slate-100' : ''}`}>
@@ -1587,6 +1913,44 @@ export default function App() {
                   appLanguage={appLanguage}
                 />
               )}
+            </div>
+          ) : isRestoringPaymentSession ? (
+            <div key="restoring-mode" className="min-h-screen bg-slate-900 flex flex-col items-center justify-center p-6 text-white text-center">
+              <div className="w-16 h-16 rounded-2xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center mb-4 border border-emerald-500/30 animate-pulse">
+                <Home className="w-8 h-8" />
+              </div>
+              <h2 className="text-xl font-bold mb-2">ড্যাশবোর্ডে ফিরে যাওয়া হচ্ছে...</h2>
+              <p className="text-sm text-slate-400 mb-6 max-w-xs">পেমেন্ট গেটওয়ে হ্যান্ডশেক সম্পন্ন করে সরাসরি ড্যাশবোর্ড লোড করা হচ্ছে।</p>
+              <button
+                type="button"
+                onClick={() => {
+                  setIsRestoringPaymentSession(false);
+                  const fallback: User = getStoredLocalUser() || {
+                    uid: 'user_fallback_' + Date.now().toString().slice(-6),
+                    name: 'সদস্য',
+                    phone: '',
+                    memberId: 'BNB00000000',
+                    role: 'user',
+                    balance: 0,
+                    mainBalance: 0,
+                    pin: '0000',
+                    savings: 0,
+                    dueLoan: 0,
+                    createdAt: new Date().toISOString(),
+                    status: 'active',
+                    samityStatus: 'none'
+                  };
+                  setCurrentUser(fallback);
+                  setActiveTab('home');
+                  setTabHistory(['home']);
+                  setSelectedAction(null);
+                  window.history.replaceState({ amb_root: true }, '', '/dashboard');
+                }}
+                className="px-6 py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold text-sm shadow-lg flex items-center gap-2 cursor-pointer transition active:scale-95"
+              >
+                <Home className="w-4 h-4" />
+                <span>সরাসরি ড্যাশবোর্ডে প্রবেশ করুন</span>
+              </button>
             </div>
           ) : (
             <div key="login-mode" className="bg-white min-h-screen">
@@ -1800,7 +2164,66 @@ export default function App() {
           {paymentNotice && (
             <div className="fixed inset-0 z-[120] bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4 animate-fade-in font-sans">
               <div className="bg-slate-900 border border-slate-800 text-white rounded-3xl max-w-sm w-full p-6 text-center space-y-4 shadow-2xl relative overflow-hidden">
-                {paymentNotice.status === 'success' ? (
+                {/* Always-accessible Home button on top-right of modal */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setPaymentNotice(null);
+                    setActiveTab('home');
+                    setSelectedAction(null);
+                    if (typeof window !== 'undefined') {
+                      window.history.replaceState({ amb_root: true }, '', '/dashboard');
+                    }
+                  }}
+                  className="absolute top-4 right-4 p-2 text-slate-400 hover:text-white bg-slate-800/80 hover:bg-slate-700 rounded-full transition cursor-pointer flex items-center justify-center z-20"
+                  title="ড্যাশবোর্ডে ফিরে যান"
+                >
+                  <Home className="w-4 h-4 text-emerald-400" />
+                </button>
+
+                {paymentNotice.status === 'verifying' ? (
+                  <>
+                    <div className="relative w-16 h-16 mx-auto">
+                      <div className="w-16 h-16 border-4 border-emerald-500/20 border-t-emerald-400 rounded-full animate-spin"></div>
+                      <div className="absolute inset-0 flex items-center justify-center">
+                        <ShieldCheck className="w-7 h-7 text-emerald-400 animate-pulse" />
+                      </div>
+                    </div>
+                    <div>
+                      <h3 className="text-base font-black text-white">
+                        Verifying payment...
+                      </h3>
+                      <p className="text-xs text-slate-300 mt-1">
+                        পেমেন্ট যাচাই করা হচ্ছে... অনুগ্রহ করে অপেক্ষা করুন।
+                      </p>
+                    </div>
+
+                    <div className="bg-emerald-950/60 border border-emerald-500/30 p-3 rounded-2xl flex items-center justify-center gap-2 text-xs text-emerald-300 font-mono">
+                      <RefreshCw className="w-3.5 h-3.5 animate-spin text-emerald-400" />
+                      <span>সার্ভার যাচাইকরণ চলমান ({paymentNotice.pollCount || 1}/40)...</span>
+                    </div>
+
+                    <p className="text-[11px] text-slate-400 leading-relaxed">
+                      গেটওয়েতে লেনদেন সফল হওয়া মাত্রই আপনার ওয়ালেট ব্যালেন্স স্বয়ংক্রিয়ভাবে রিফ্রেশ হবে।
+                    </p>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setPaymentNotice(null);
+                        setActiveTab('home');
+                        setSelectedAction(null);
+                        if (typeof window !== 'undefined') {
+                          window.history.replaceState({ amb_root: true }, '', '/dashboard');
+                        }
+                      }}
+                      className="w-full py-2.5 bg-emerald-600/30 hover:bg-emerald-600/40 text-emerald-300 border border-emerald-500/40 font-bold text-xs rounded-xl transition cursor-pointer flex items-center justify-center gap-1.5"
+                    >
+                      <Home className="w-4 h-4" />
+                      <span>ড্যাশবোর্ডে ফিরে যান (ব্যালেন্স ব্যাকগ্রাউন্ডে যোগ হবে)</span>
+                    </button>
+                  </>
+                ) : paymentNotice.status === 'success' ? (
                   <>
                     <div className="w-16 h-16 rounded-3xl bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 mx-auto flex items-center justify-center text-3xl shadow-lg">
                       🎉
@@ -1833,10 +2256,14 @@ export default function App() {
                         setPaymentNotice(null);
                         setActiveTab('home');
                         setSelectedAction(null);
+                        if (typeof window !== 'undefined') {
+                          window.history.replaceState({ amb_root: true }, '', '/dashboard');
+                        }
                       }}
-                      className="w-full py-3 bg-gradient-to-r from-emerald-600 to-teal-500 hover:from-emerald-500 hover:to-teal-400 text-white font-black text-xs rounded-xl shadow-lg cursor-pointer transition active:scale-95"
+                      className="w-full py-3 bg-gradient-to-r from-emerald-600 to-teal-500 hover:from-emerald-500 hover:to-teal-400 text-white font-black text-xs rounded-xl shadow-lg cursor-pointer transition active:scale-95 flex items-center justify-center gap-2"
                     >
-                      ঠিক আছে, ড্যাশবোর্ডে ফিরে যান ✨
+                      <Home className="w-4 h-4" />
+                      <span>ঠিক আছে, ড্যাশবোর্ডে ফিরে যান ✨</span>
                     </button>
                   </>
                 ) : paymentNotice.status === 'cancelled' ? (
@@ -1852,16 +2279,21 @@ export default function App() {
                         আপনি পেমেন্ট প্রক্রিয়াটি বাতিল করেছেন। ওয়ালেটে কোনো টাকা কাটা হয়নি।
                       </p>
                     </div>
+
                     <button
                       type="button"
                       onClick={() => {
                         setPaymentNotice(null);
                         setActiveTab('home');
                         setSelectedAction(null);
+                        if (typeof window !== 'undefined') {
+                          window.history.replaceState({ amb_root: true }, '', '/dashboard');
+                        }
                       }}
-                      className="w-full py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs rounded-xl transition cursor-pointer"
+                      className="w-full py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs rounded-xl transition cursor-pointer flex items-center justify-center gap-2"
                     >
-                      ড্যাশবোর্ডে ফিরে যান
+                      <Home className="w-4 h-4" />
+                      <span>ড্যাশবোর্ডে ফিরে যান</span>
                     </button>
                   </>
                 ) : (
@@ -1884,10 +2316,14 @@ export default function App() {
                           setPaymentNotice(null);
                           setActiveTab('home');
                           setSelectedAction(null);
+                          if (typeof window !== 'undefined') {
+                            window.history.replaceState({ amb_root: true }, '', '/dashboard');
+                          }
                         }}
-                        className="w-full py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs rounded-xl transition cursor-pointer"
+                        className="w-full py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs rounded-xl transition cursor-pointer flex items-center justify-center gap-2"
                       >
-                        ড্যাশবোর্ডে ফিরে যান
+                        <Home className="w-4 h-4" />
+                        <span>ড্যাশবোর্ডে ফিরে যান</span>
                       </button>
                       <button
                         type="button"
@@ -1903,6 +2339,33 @@ export default function App() {
                     </div>
                   </>
                 )}
+              </div>
+            </div>
+          )}
+
+          {/* Floating Payment Status Toast */}
+          {paymentToast && (
+            <div className="fixed top-5 left-1/2 -translate-x-1/2 z-[130] w-[92%] max-w-md animate-in fade-in slide-in-from-top-4 duration-300">
+              <div className={`p-4 rounded-2xl shadow-2xl border flex items-center gap-3 backdrop-blur-md ${
+                paymentToast.type === 'success' 
+                  ? 'bg-emerald-950/95 border-emerald-500/50 text-white' 
+                  : paymentToast.type === 'cancel'
+                  ? 'bg-amber-950/95 border-amber-500/50 text-white'
+                  : 'bg-rose-950/95 border-rose-500/50 text-white'
+              }`}>
+                <span className="text-2xl">
+                  {paymentToast.type === 'success' ? '🎉' : paymentToast.type === 'cancel' ? '⚠️' : '❌'}
+                </span>
+                <div className="flex-1 text-xs sm:text-sm font-semibold leading-relaxed">
+                  {paymentToast.message}
+                </div>
+                <button 
+                  type="button" 
+                  onClick={() => setPaymentToast(null)}
+                  className="p-1 rounded-lg text-slate-400 hover:text-white transition cursor-pointer"
+                >
+                  <X className="w-4 h-4" />
+                </button>
               </div>
             </div>
           )}

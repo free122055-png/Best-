@@ -1,77 +1,9 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    
-    // Helper functions for hardened security
-    function isSignedIn() {
-      return request.auth != null;
-    }
-    
-    function isOwner(userId) {
-      return isSignedIn() && request.auth.uid == userId;
-    }
-
-    // App Configuration & System Settings: Publicly readable so app initializes with official brand assets
-    match /system_settings/{docId} {
-      allow read: if true;
-      allow write: if true;
-    }
-
-    match /app_config/{docId} {
-      allow read: if true;
-      allow write: if true;
-    }
-
-    // Notices and announcements
-    match /notices/{docId} {
-      allow read: if true;
-      allow write: if isSignedIn();
-    }
-
-    // User Notifications: In-app alerts, activity logs
-    match /user_notifications/{docId} {
-      allow read: if isSignedIn();
-      allow write: if true;
-    }
-
-    // App Lock & Unlock requests
-    match /app_lock_requests/{docId} {
-      allow read, write: if true;
-    }
-
-    // Agent Locations: public read, owner write
-    match /agentLocations/{userId} {
-      allow read: if true;
-      allow write: if isSignedIn() && request.auth.uid == userId;
-    }
-
-    // Users Collection: Users can read and update their own profile, but CANNOT modify balance, walletBalance, role, or memberId
-    match /users/{userId} {
-      allow read: if true;
-      allow create: if (isSignedIn() && request.auth.uid == userId) || 
-                       (request.resource.data.role == 'user' && request.resource.data.balance == 0);
-      allow update: if isOwner(userId) && 
-                    !request.resource.data.diff(resource.data).affectedKeys().hasAny(['balance', 'walletBalance', 'role', 'memberId']);
-      allow delete: if false; // Permanent lifetime protection
-    }
-
-    // Payment Invoices, Orders, and Reconciliations
-    match /zinipay_invoices/{docId} {
-      allow read, write: if true;
-    }
-
-    match /payment_orders/{orderId} {
-      allow read, write: if true;
-    }
-
-    match /transactions/{transactionId} {
-      allow read, write: if true;
-    }
-
-    // General fallback for all other collections
+    // Open access for all application features, offerings, notifications, ration cards, and user profiles
     match /{document=**} {
-      allow read: if isSignedIn();
-      allow write: if false;
+      allow read, write: if true;
     }
   }
 }

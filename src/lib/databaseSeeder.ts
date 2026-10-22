@@ -119,19 +119,24 @@ export async function restoreAndSeedDatabase() {
     const configSnap = await getDoc(configRef);
     if (!configSnap.exists()) {
       await setDoc(configRef, {
-        appName: 'Business Network Bangladesh (BNB)',
+        appName: 'BNB BUSINESS network Bangladesh',
         appSubtitle: 'ন্যাশনাল কোঅপারেটিভ ও বিজনেস পোর্টাল',
         noticeText: 'BNB ম্যানেজমেন্ট কোম্পানি ইনভেস্টর সাধারণ ফান্ডে স্বাগতম! আপনার অ্যাকাউন্ট এবং ব্যালেন্স সম্পূর্ণ সুরক্ষিত রয়েছে।',
-        helpline: '01618599077',
-        bKashMerchant: '01618599077',
-        nagadMerchant: '01618599077',
-        rocketMerchant: '01618599077',
+        helpline: '01865911728',
+        bKashMerchant: '01865911728',
+        nagadMerchant: '01865911728',
+        rocketMerchant: '01865911728',
         bankAccountInfo: 'BNB Business Cooperative Ltd, A/C: 1150-201-998877, Islami Bank Bangladesh PLC',
         maintenanceMode: false,
         minDeposit: 100,
         minWithdraw: 500,
         profitRateYearly: 18.5
       });
+    } else {
+      const existingConfig = configSnap.data();
+      if (existingConfig?.appName && (existingConfig.appName.toUpperCase().includes('MAYADIN') || existingConfig.appName.toUpperCase().includes('AL MAYADIN'))) {
+        await setDoc(configRef, { appName: 'BNB BUSINESS network Bangladesh' }, { merge: true });
+      }
     }
 
     // 4. Cache in localStorage for instant offline fallback

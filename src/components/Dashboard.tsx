@@ -636,7 +636,7 @@ export const Dashboard = React.memo(function Dashboard({
         'লোন সুবিধা': 'Loan Panel',
         'সমিতি ফান্ড': 'Samity Fund',
         'সদস্য সঞ্চয়': 'Samity General',
-        'আল মায়াদিন পে': 'Al Mayadin Pay',
+        'বিএনবি পে': 'BNB Pay',
         'পেমেন্ট করুন': 'Scan & Pay',
         'টেলিকম রিচার্জ': 'Mobile Recharge',
         'রিচার্জ প্যানেল': 'Telecom Panel',
@@ -746,7 +746,7 @@ const getTxt = (key: string, fallback: string) => {
     {
       id: 1,
       tag: "সঞ্চয় ও বিনিয়োগ",
-      title: "Al Mayadin Bazar",
+      title: "BNB Business Network Bangladesh",
       description: "নিরাপদে আপনার আমানত সঞ্চয় করুন ও সহজ ঋণের সুবিধা গ্রহণ করুন।",
       bgGradient: "from-emerald-950 via-emerald-900 to-teal-950",
       image: "https://images.unsplash.com/photo-1579621970563-ebec7560ff3e?auto=format&fit=crop&q=80&w=650"
@@ -1167,7 +1167,7 @@ const getTxt = (key: string, fallback: string) => {
   const [hasSubmittedAgent, setHasSubmittedAgent] = useState(false);
 
   const [chatMessages, setChatMessages] = useState<any[]>([
-    { id: '1', sender: 'support', text: 'আসসালামু আলাইকুম! Al Mayadin Bazar (BNB) সাপোর্ট সেন্টারে আপনাকে স্বাগতম। আমি আপনার ডিজিটাল সহকারী। আমাদের সমিতি, ঋণ, টেলিকম বা সুপার শপ সম্পর্কে যেকোনো প্রশ্ন করতে পারেন।', timestamp: '10:30 AM' }
+    { id: '1', sender: 'support', text: 'আসসালামু আলাইকুম! BNB Business Network Bangladesh সাপোর্ট সেন্টারে আপনাকে স্বাগতম। আমি আপনার ডিজিটাল সহকারী। আমাদের সমিতি, ঋণ, টেলিকম বা সুপার শপ সম্পর্কে যেকোনো প্রশ্ন করতে পারেন।', timestamp: '10:30 AM' }
   ]);
   const [chatInputText, setChatInputText] = useState('');
   const [noticeSearchQuery, setNoticeSearchQuery] = useState('');
@@ -2415,7 +2415,7 @@ const getTxt = (key: string, fallback: string) => {
         status: 'success',
         description: `ওয়ালেট ব্যালেন্স হতে সুদমুক্ত করযে হাসানা ঋণ পরিশোধ সফল সম্পন্ন (1 মাসের কুলডাউন কাউন্ট শুরু)।`,
         createdAt: nowIso,
-        paymentMethod: 'Al Mayadin Wallet',
+        paymentMethod: 'BNB Wallet',
         receiptNo: `REC-${Math.floor(100000 + Math.random() * 900000)}`
       };
 
@@ -2558,7 +2558,7 @@ const getTxt = (key: string, fallback: string) => {
                 status: 'success',
                 description: `নিজের মেইন ব্যালেন্স হতে মেম্বার টেলিকম ওয়ালেটে স্থানান্তর সফল।`,
                 createdAt: new Date().toISOString(),
-                paymentMethod: 'Al Mayadin Wallet',
+                paymentMethod: 'BNB Wallet',
                 receiptNo: `REC-${Math.floor(10000 + Math.random() * 90000)}`,
                 transferSector: 'telecom'
               };
@@ -2585,7 +2585,7 @@ const getTxt = (key: string, fallback: string) => {
                 status: 'success',
                 description: `নিজের মেইন ব্যালেন্স হতে মেম্বার সুপার শপ ওয়ালেটে স্থানান্তর সফল।`,
                 createdAt: new Date().toISOString(),
-                paymentMethod: 'Al Mayadin Wallet',
+                paymentMethod: 'BNB Wallet',
                 receiptNo: `REC-${Math.floor(100000 + Math.random() * 900000)}`,
                 transferSector: 'shop'
               };
@@ -2612,7 +2612,7 @@ const getTxt = (key: string, fallback: string) => {
                 status: 'success',
                 description: `নিজের মেইন ব্যালেন্স হতে কো-অপারেтивной সঞ্চয় তহবিলে জমার আবেদন সফল।`,
                 createdAt: new Date().toISOString(),
-                paymentMethod: 'Al Mayadin Wallet',
+                paymentMethod: 'BNB Wallet',
                 receiptNo: `REC-${Math.floor(100000 + Math.random() * 900000)}`,
                 transferSector: 'samity'
               };
@@ -2991,7 +2991,7 @@ const getTxt = (key: string, fallback: string) => {
                   ? `সদস্য ${searchedMember.name} (আইডি: ${searchedMember.memberId}) এর সমিতি সঞ্চয় একাউন্টে ৳${amt}${descSuffix} পাঠানো সফল। TrxID: ${cleanTrxId}`
                   : `সদস্য ${searchedMember.name} (আইডি: ${searchedMember.memberId}) কে মেইন ব্যালেন্সে ৳${amt} পাঠানো সফল। TrxID: ${cleanTrxId}`,
                 createdAt: now.toISOString(),
-                paymentMethod: 'Al Mayadin Wallet',
+                paymentMethod: 'BNB Wallet',
                 receiptNo: cleanTrxId,
                 transactionId: cleanTrxId,
                 receiverUid: searchedMember.uid,
@@ -3015,7 +3015,7 @@ const getTxt = (key: string, fallback: string) => {
                   ? `সদস্য ${liveUser.name} (আইডি: ${liveUser.memberId}) হতে সমিতি সঞ্চয় একাউন্টে ৳${amt}${descSuffix} জমা প্রাপ্তি। TrxID: ${cleanTrxId}`
                   : `সদস্য ${liveUser.name} (আইডি: ${liveUser.memberId}) হতে মেইন ব্যালেন্সে জমা প্রাপ্তি। TrxID: ${cleanTrxId}`,
                 createdAt: now.toISOString(),
-                paymentMethod: 'Al Mayadin Wallet',
+                paymentMethod: 'BNB Wallet',
                 receiptNo: cleanTrxId,
                 transactionId: cleanTrxId,
                 transferSector: isSamityVirtualTarget ? 'samity' : 'main'

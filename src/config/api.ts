@@ -3,7 +3,8 @@
  * Ensures seamless operation across Web and Android Capacitor (Play Store app).
  */
 
-export const DEFAULT_PRODUCTION_SERVER_URL = 'https://ais-pre-lcpzj4h5d5mm2it3dw6e57-969303088573.asia-southeast1.run.app';
+export const APP_BASE_URL = 'https://businessnetworkbangladesh.com';
+export const DEFAULT_PRODUCTION_SERVER_URL = APP_BASE_URL;
 
 export function isNativeOrLocalhost(): boolean {
   if (typeof window === 'undefined') return false;
@@ -22,12 +23,16 @@ export function getApiBaseUrl(): string {
     return String((window as any).BNB_API_BASE_URL).replace(/\/$/, '');
   }
   if (isNativeOrLocalhost()) {
-    return DEFAULT_PRODUCTION_SERVER_URL;
+    // In native app or local dev, use window.location.origin if available or APP_BASE_URL
+    if (typeof window !== 'undefined' && window.location.origin && window.location.origin.startsWith('http')) {
+      return window.location.origin.replace(/\/$/, '');
+    }
+    return APP_BASE_URL;
   }
-  if (typeof window !== 'undefined' && window.location.origin && !window.location.origin.includes('localhost')) {
+  if (typeof window !== 'undefined' && window.location.origin) {
     return window.location.origin.replace(/\/$/, '');
   }
-  return DEFAULT_PRODUCTION_SERVER_URL;
+  return APP_BASE_URL;
 }
 
 export function apiUrl(endpoint: string): string {
@@ -37,5 +42,9 @@ export function apiUrl(endpoint: string): string {
 }
 
 export function getReturnOrigin(): string {
-  return DEFAULT_PRODUCTION_SERVER_URL;
+  if (typeof window !== 'undefined' && window.location.origin && window.location.origin.startsWith('http')) {
+    return window.location.origin.replace(/\/$/, '');
+  }
+  return APP_BASE_URL;
 }
+

@@ -33,6 +33,21 @@
                 <data android:scheme="bnbnetwork" />
             </intent-filter>
 
+            <!-- Android App Links for production domain and wallet redirects -->
+            <intent-filter android:autoVerify="true">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="https" android:host="businessnetworkbangladesh.com" android:pathPrefix="/payment/result" />
+                <data android:scheme="https" android:host="www.businessnetworkbangladesh.com" android:pathPrefix="/payment/result" />
+                <data android:scheme="https" android:host="businessnetworkbangladesh.com" android:pathPrefix="/dashboard" />
+                <data android:scheme="https" android:host="www.businessnetworkbangladesh.com" android:pathPrefix="/dashboard" />
+                <data android:scheme="https" android:host="businessnetworkbangladesh.com" android:pathPrefix="/wallet" />
+                <data android:scheme="https" android:host="www.businessnetworkbangladesh.com" android:pathPrefix="/wallet" />
+                <data android:scheme="https" android:host="businessnetworkbangladesh.com" />
+                <data android:scheme="https" android:host="www.businessnetworkbangladesh.com" />
+            </intent-filter>
+
         </activity>
 
         <provider
